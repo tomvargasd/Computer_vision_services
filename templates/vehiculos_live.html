@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ source.name }} · CVVision Live — Vehículos</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #F4F5F7;
+      color: #182A55;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      height: 100dvh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .lv-topbar {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 0 20px;
+      height: 52px;
+      background: #FFFFFF;
+      border-bottom: 1px solid #D8DCE3;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+    .lv-back {
+      display: inline-flex; align-items: center; gap: 7px;
+      color: #9D9FA2; text-decoration: none;
+      font-size: 0.8rem; font-weight: 500; transition: color .18s;
+    }
+    .lv-back:hover { color: #182A55; }
+    .lv-back svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    .lv-sep { width: 1px; height: 22px; background: #D8DCE3; }
+    .lv-source-name { font-size: 0.9rem; font-weight: 600; }
+    .lv-badge { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: 3px 9px; border-radius: 20px; }
+    .lv-badge.stream { background: rgba(255,222,0,0.15); color: #182A55; }
+    .lv-badge.video  { background: rgba(24,42,85,0.08); color: #182A55; }
+    .lv-status { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: #9D9FA2; margin-left: auto; }
+    .lv-dot { width: 7px; height: 7px; border-radius: 50%; background: #9D9FA2; }
+    .lv-dot.on { background: #22C55E; box-shadow: 0 0 6px rgba(34,197,94,0.5); animation: pulse-dot 2s infinite; }
+    @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.5} }
+    .lv-btn-stop {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(239,68,68,0.10); border: 1px solid #D8DCE3;
+      color: #EF4444; font-size: 0.75rem; font-weight: 600; font-family: inherit;
+      padding: 6px 14px; border-radius: 7px; cursor: pointer; transition: background .18s;
+    }
+    .lv-btn-stop:hover { background: rgba(239,68,68,0.18); }
+    .lv-btn-stop svg { width: 12px; height: 12px; stroke: currentColor; fill: currentColor; stroke-width: 0; }
+    .lv-btn-reset {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: rgba(24,42,85,0.06); border: 1px solid #D8DCE3; color: #9D9FA2;
+      font-size: 0.75rem; font-family: inherit; padding: 6px 12px; border-radius: 7px; cursor: pointer; transition: color .18s;
+    }
+    .lv-btn-reset:hover { color: #182A55; }
+    .lv-btn-reset svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; }
+
+    .lv-body { display: flex; flex: 1; min-height: 0; }
+
+    .lv-feed {
+      flex: 1; min-width: 0; background: #000;
+      display: flex; align-items: center; justify-content: center;
+      position: relative; border-right: 1px solid #D8DCE3;
+    }
+    .lv-feed-img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+    .lv-feed-placeholder {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 12px; color: #9D9FA2; text-align: center; padding: 32px;
+    }
+    .lv-feed-placeholder svg { width: 64px; height: 64px; stroke: #D8DCE3; fill: none; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; }
+    .lv-feed-placeholder p    { font-size: 0.88rem; color: #9D9FA2; }
+    .lv-feed-placeholder span { font-size: 0.72rem; color: #9D9FA2; word-break: break-all; }
+    .lv-feed-ts { position: absolute; bottom: 10px; right: 14px; font-size: 0.68rem; font-family: "SF Mono","Fira Code",monospace; color: rgba(255,255,255,0.4); pointer-events: none; }
+
+    .lv-panel {
+      width: 340px; flex-shrink: 0;
+      display: flex; flex-direction: column; gap: 0;
+      overflow-y: auto; background: #FFFFFF;
+    }
+    .lv-section { border-bottom: 1px solid #D8DCE3; padding: 16px; }
+    .lv-section-title {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .08em; color: #9D9FA2; margin-bottom: 14px;
+    }
+    .lv-section-title svg { width: 13px; height: 13px; stroke: #182A55; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+    .lv-count-big { text-align: center; padding: 8px 0 12px; }
+    .lv-count-num { font-size: 3rem; font-weight: 800; line-height: 1; color: #182A55; font-variant-numeric: tabular-nums; }
+    .lv-count-lbl { font-size: 0.68rem; color: #9D9FA2; text-transform: uppercase; letter-spacing: .06em; margin-top: 4px; }
+
+    .lv-row-group { display: flex; gap: 10px; margin-top: 8px; }
+    .lv-stat-card {
+      flex: 1; background: #F0F1F3; border: 1px solid #D8DCE3;
+      border-radius: 10px; padding: 12px 10px; text-align: center;
+    }
+    .lv-stat-val { font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .lv-stat-val.in   { color: #22C55E; }
+    .lv-stat-val.out  { color: #EF4444; }
+    .lv-stat-val.plate { color: #F59E0B; }
+    .lv-stat-lbl { font-size: 0.6rem; text-transform: uppercase; letter-spacing: .07em; color: #9D9FA2; margin-top: 3px; }
+
+    .lv-func-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 8px 0;
+    }
+    .lv-func-row + .lv-func-row { border-top: 1px solid #E5E7EB; }
+    .lv-func-info { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+    .lv-func-lbl  { font-size: 0.82rem; font-weight: 500; }
+    .lv-func-sub  { font-size: 0.68rem; color: #9D9FA2; }
+
+    .lv-settings-row {
+      display: flex; align-items: center; gap: 10px; padding: 10px 0;
+    }
+    .lv-settings-row + .lv-settings-row { border-top: 1px solid #E5E7EB; }
+    .lv-settings-row label { font-size: 0.78rem; font-weight: 500; flex: 1; }
+    .lv-settings-row select, .lv-settings-row input[type="range"] { flex: 1; }
+    .lv-settings-row select {
+      padding: 4px 8px; border: 1px solid #D8DCE3; border-radius: 6px;
+      font-size: 0.75rem; background: #fff; font-family: inherit;
+    }
+    .lv-settings-row input[type="range"] { height: 4px; accent-color: #182A55; }
+    .line-pos-value { font-size: 0.72rem; color: #9D9FA2; min-width: 28px; text-align: right; }
+
+    /* registros */
+    .reg-list { display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; }
+    .reg-item {
+      display: flex; gap: 10px; align-items: center;
+      background: #F9FAFB; border: 1px solid #E5E7EB;
+      border-radius: 8px; padding: 8px; cursor: pointer;
+      transition: border-color .15s;
+    }
+    .reg-item:hover { border-color: #182A55; }
+    .reg-thumb {
+      width: 64px; height: 48px; object-fit: cover; border-radius: 4px;
+      background: #E5E7EB; flex-shrink: 0;
+    }
+    .reg-info { flex: 1; min-width: 0; }
+    .reg-info .reg-id { font-size: 0.72rem; font-weight: 600; }
+    .reg-info .reg-time { font-size: 0.62rem; color: #9D9FA2; }
+    .reg-info .reg-dir {
+      display: inline-block; font-size: 0.6rem; font-weight: 700;
+      padding: 1px 6px; border-radius: 10px; text-transform: uppercase;
+    }
+    .reg-dir.in { background: rgba(34,197,94,0.12); color: #16A34A; }
+    .reg-dir.out { background: rgba(239,68,68,0.12); color: #DC2626; }
+    .reg-plate {
+      font-size: 0.7rem; font-weight: 700; font-family: "SF Mono","Fira Code",monospace;
+      color: #F59E0B; letter-spacing: .04em;
+    }
+
+    /* Placas tab */
+    .plate-list { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; }
+    .plate-item {
+      display: flex; gap: 8px; align-items: center;
+      background: #F9FAFB; border: 1px solid #E5E7EB;
+      border-radius: 6px; padding: 6px 8px; cursor: pointer;
+    }
+    .plate-item:hover { border-color: #182A55; }
+    .plate-thumb { width: 48px; height: 24px; object-fit: cover; border-radius: 3px; background: #E5E7EB; }
+    .plate-text { font-size: 0.72rem; font-weight: 700; font-family: "SF Mono","Fira Code",monospace; color: #182A55; letter-spacing: .03em; }
+    .plate-time { font-size: 0.6rem; color: #9D9FA2; margin-left: auto; }
+
+    /* subtabs within panel */
+    .lv-subtabs {
+      display: flex; border-bottom: 1px solid #D8DCE3;
+    }
+    .lv-subtab {
+      flex: 1; padding: 10px; text-align: center;
+      font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .06em; color: #9D9FA2; cursor: pointer;
+      border-bottom: 2px solid transparent; transition: color .18s, border-color .18s;
+      background: none; font-family: inherit;
+    }
+    .lv-subtab.active { color: #182A55; border-bottom-color: #182A55; }
+    .lv-subtab-panel { display: none; }
+    .lv-subtab-panel.active { display: block; }
+
+    /* Lightbox */
+    .lb-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.85); z-index: 1000;
+      align-items: center; justify-content: center;
+    }
+    .lb-overlay.open { display: flex; }
+    .lb-overlay img { max-width: 90vw; max-height: 90vh; border-radius: 8px; border: 1px solid #D8DCE3; }
+    .lb-close { position: absolute; top: 20px; right: 24px; font-size: 2rem; color: #fff; cursor: pointer; line-height: 1; }
+
+    .lv-info-row {
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 0.72rem; color: #9D9FA2; padding: 10px 16px;
+      border-top: 1px solid #D8DCE3;
+    }
+    .lv-info-id { color: #182A55; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<header class="lv-topbar">
+  <a class="lv-back" href="/module/vehiculos">
+    <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    Volver
+  </a>
+  <div class="lv-sep"></div>
+  <span class="lv-source-name">{{ source.name }}</span>
+  <span class="lv-badge {{ source.type }}">{{ source.type }}</span>
+  <div class="lv-status">
+    <span class="lv-dot on" id="lv-dot"></span>
+    <span id="lv-status-txt">Iniciando…</span>
+  </div>
+  <button class="lv-btn-reset" id="btn-reset">
+    <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+    Reiniciar
+  </button>
+  <button class="lv-btn-stop" id="btn-stop">
+    <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/></svg>
+    Detener
+  </button>
+</header>
+
+<div class="lv-body">
+
+  <div class="lv-feed">
+    <div class="lv-feed-placeholder" id="feed-placeholder">
+      <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <p id="feed-placeholder-msg">Conectando con la fuente…</p>
+      <span>{{ source.path }}</span>
+    </div>
+    <img class="lv-feed-img" id="lv-feed-img" src="" alt="Live feed" style="display:none">
+    <span class="lv-feed-ts" id="lv-ts"></span>
+  </div>
+
+  <div class="lv-panel">
+
+    <!-- subtabs: Conteo / Placas -->
+    <div class="lv-subtabs">
+      <button class="lv-subtab active" data-panel="conteo">Conteo</button>
+      <button class="lv-subtab" data-panel="placas">Placas detectadas</button>
+    </div>
+
+    <!-- ══ TAB: Conteo ═══════════════════════════════════════ -->
+    <div class="lv-subtab-panel active" id="panel-conteo">
+
+      <div class="lv-section">
+        <div class="lv-section-title">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 12h18M12 3v18"/></svg>
+          Conteo de Vehículos
+        </div>
+
+        <div class="lv-count-big">
+          <div class="lv-count-num" id="cnt-vehiculos">0</div>
+          <div class="lv-count-lbl">vehículos totales</div>
+        </div>
+
+        <div class="lv-row-group">
+          <div class="lv-stat-card">
+            <div class="lv-stat-val in" id="cnt-in">0</div>
+            <div class="lv-stat-lbl">Entradas</div>
+          </div>
+          <div class="lv-stat-card">
+            <div class="lv-stat-val out" id="cnt-out">0</div>
+            <div class="lv-stat-lbl">Salidas</div>
+          </div>
+          <div class="lv-stat-card">
+            <div class="lv-stat-val plate" id="cnt-plates">0</div>
+            <div class="lv-stat-lbl">Placas</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Línea de conteo -->
+      <div class="lv-section">
+        <div class="lv-section-title">
+          <svg viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+          Línea de conteo
+        </div>
+
+        <div class="lv-settings-row">
+          <label>Orientación</label>
+          <select id="line-mode">
+            <option value="horizontal" {% if settings.get('vehiculos_line_mode', 'horizontal') == 'horizontal' %}selected{% endif %}>Horizontal</option>
+            <option value="vertical" {% if settings.get('vehiculos_line_mode', 'horizontal') == 'vertical' %}selected{% endif %}>Vertical</option>
+          </select>
+        </div>
+        <div class="lv-settings-row">
+          <label>Posición</label>
+          <input type="range" id="line-pos" min="1" max="99" value="{{ settings.get('vehiculos_line_pos', '50') }}">
+          <span class="line-pos-value" id="line-pos-val">{{ settings.get('vehiculos_line_pos', '50') }}%</span>
+        </div>
+      </div>
+
+      <!-- Detección de Placas -->
+      <div class="lv-section">
+        <div class="lv-section-title">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="14" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Detección de Placas
+        </div>
+        <div class="lv-func-row">
+          <div class="lv-func-info">
+            <span class="lv-func-lbl">Detectar placas</span>
+            <span class="lv-func-sub">Reconoce placas en vehículos detectados</span>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-placas"
+                   {% if func_state.get('deteccion_placas') %}checked{% endif %}>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Últimas detecciones -->
+      <div class="lv-section">
+        <div class="lv-section-title">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Últimos vehículos
+        </div>
+        <div class="reg-list" id="reg-list">
+          <p style="font-size:0.75rem;color:#9D9FA2;font-style:italic">Esperando detecciones…</p>
+        </div>
+      </div>
+
+    </div><!-- /panel-conteo -->
+
+    <!-- ══ TAB: Placas detectadas ══════════════════════════════ -->
+    <div class="lv-subtab-panel" id="panel-placas">
+
+      <div class="lv-section">
+        <div class="lv-section-title">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="14" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Placas detectadas
+        </div>
+
+        <div class="lv-count-big">
+          <div class="lv-count-num" id="cnt-plates-tab">0</div>
+          <div class="lv-count-lbl">placas reconocidas</div>
+        </div>
+
+        <div class="plate-list" id="plate-list">
+          <p style="font-size:0.75rem;color:#9D9FA2;font-style:italic">No se han detectado placas aún.</p>
+        </div>
+      </div>
+
+    </div><!-- /panel-placas -->
+
+    <!-- Info -->
+    <div class="lv-info-row">
+      <span>Fuente #<span class="lv-info-id">{{ source.id }}</span></span>
+      <span id="lv-fps">— fps</span>
+    </div>
+
+  </div><!-- /lv-panel -->
+</div><!-- /lv-body -->
+
+<!-- Lightbox -->
+<div class="lb-overlay" id="lb-overlay">
+  <span class="lb-close" id="lb-close">×</span>
+  <img id="lb-img" src="" alt="Captura">
+</div>
+
+<script>
+const SOURCE_ID = {{ source.id }};
+let poll = null;
+let frameCount = 0;
+let fpsTimer   = null;
+
+let lastRegsJson = "";
+let lastPlacasJson = "";
+
+(async () => {
+  document.getElementById("feed-placeholder-msg").textContent = "Iniciando pipeline…";
+  const r = await fetch(`/api/vehiculos/sources/${SOURCE_ID}/start`, { method: "POST" });
+  if (r.ok) {
+    document.getElementById("feed-placeholder-msg").textContent = "Cargando modelo de IA…";
+    startStream();
+    poll = setInterval(fetchStats, 2000);
+    startFpsMeter();
+  } else {
+    document.getElementById("feed-placeholder-msg").textContent = "Error al iniciar el pipeline";
+    document.getElementById("lv-dot").classList.remove("on");
+    document.getElementById("lv-status-txt").textContent = "Error";
+  }
+})();
+
+function startStream() {
+  const img = document.getElementById("lv-feed-img");
+  img.onload = () => {
+    document.getElementById("feed-placeholder").style.display = "none";
+    img.style.display = "block";
+    document.getElementById("lv-status-txt").textContent = "En línea";
+    frameCount++;
+  };
+  img.onerror = () => {
+    document.getElementById("feed-placeholder").style.display = "flex";
+    document.getElementById("feed-placeholder-msg").textContent = "Error de conexión con la fuente";
+    img.style.display = "none";
+    document.getElementById("lv-dot").classList.remove("on");
+    document.getElementById("lv-status-txt").textContent = "Sin señal";
+  };
+  img.src = `/api/vehiculos/stream/${SOURCE_ID}`;
+}
+
+function startFpsMeter() {
+  frameCount = 0;
+  fpsTimer = setInterval(() => {
+    document.getElementById("lv-fps").textContent = `${frameCount} fps`;
+    frameCount = 0;
+  }, 1000);
+}
+
+async function fetchStats() {
+  try {
+    const r = await fetch(`/api/vehiculos/sources/${SOURCE_ID}/stats`);
+    if (!r.ok) return;
+    const d = await r.json();
+    updateStats(d);
+  } catch (_) {}
+}
+
+function updateStats(d) {
+  document.getElementById("cnt-vehiculos").textContent = d.total_vehicles ?? 0;
+  document.getElementById("cnt-in").textContent = d.total_in ?? 0;
+  document.getElementById("cnt-out").textContent = d.total_out ?? 0;
+  document.getElementById("cnt-plates").textContent = d.plates_count ?? 0;
+  document.getElementById("cnt-plates-tab").textContent = d.plates_count ?? 0;
+
+  const regsJson = JSON.stringify(d.registros || []);
+  if (regsJson !== lastRegsJson) {
+    lastRegsJson = regsJson;
+    renderRegistros(d.registros || []);
+  }
+
+  const placasJson = JSON.stringify(d.placas || []);
+  if (placasJson !== lastPlacasJson) {
+    lastPlacasJson = placasJson;
+    renderPlacas(d.placas || []);
+  }
+
+  const now = new Date();
+  document.getElementById("lv-ts").textContent =
+    now.toLocaleTimeString("es-MX", {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+}
+
+function renderRegistros(regs) {
+  const container = document.getElementById("reg-list");
+  if (regs.length === 0) {
+    container.innerHTML = '<p style="font-size:0.75rem;color:#9D9FA2;font-style:italic">Esperando detecciones…</p>';
+    return;
+  }
+  container.innerHTML = regs.slice().reverse().map(r => {
+    const src = `/static/uploads/captures/vehiculos/${r.image}`;
+    const dirClass = r.direction === "in" ? "in" : "out";
+    const dirLabel = r.direction === "in" ? "Entrada" : "Salida";
+    const plateHtml = r.plate_text
+      ? `<div class="reg-plate">${r.plate_text}</div>`
+      : "";
+    return `<div class="reg-item" onclick="openLightbox('${src}')">
+      <img class="reg-thumb" src="${src}" alt="Vehículo ${r.track_id}" loading="lazy">
+      <div class="reg-info">
+        <div class="reg-id">Vehículo #${r.track_id}</div>
+        <div class="reg-time">${r.timestamp}</div>
+        <span class="reg-dir ${dirClass}">${dirLabel}</span>
+        ${plateHtml}
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function renderPlacas(placas) {
+  const container = document.getElementById("plate-list");
+  if (placas.length === 0) {
+    container.innerHTML = '<p style="font-size:0.75rem;color:#9D9FA2;font-style:italic">No se han detectado placas aún.</p>';
+    return;
+  }
+  container.innerHTML = placas.slice().reverse().map(p => {
+    const src = `/static/uploads/captures/vehiculos/${p.image}`;
+    return `<div class="plate-item" onclick="openLightbox('${src}')">
+      <img class="plate-thumb" src="${src}" alt="Placa" loading="lazy">
+      <span class="plate-text">${p.plate}</span>
+      <span class="plate-time">${p.timestamp}</span>
+    </div>`;
+  }).join("");
+}
+
+// ── Lightbox ──────────────────────────────────────────────────────────────
+const lbOverlay = document.getElementById("lb-overlay");
+const lbImg     = document.getElementById("lb-img");
+
+function openLightbox(url) {
+  lbImg.src = url;
+  lbOverlay.classList.add("open");
+}
+document.getElementById("lb-close").addEventListener("click", () => lbOverlay.classList.remove("open"));
+lbOverlay.addEventListener("click", e => { if (e.target === lbOverlay) lbOverlay.classList.remove("open"); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") lbOverlay.classList.remove("open"); });
+
+// ── Subtabs panel ─────────────────────────────────────────────────────────
+document.querySelectorAll(".lv-subtab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".lv-subtab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".lv-subtab-panel").forEach(p => p.classList.remove("active"));
+    tab.classList.add("active");
+    document.getElementById("panel-" + tab.dataset.panel).classList.add("active");
+  });
+});
+
+// ── Línea de conteo ───────────────────────────────────────────────────────
+document.getElementById("line-mode").addEventListener("change", async () => {
+  const mode = document.getElementById("line-mode").value;
+  await fetch(`/api/vehiculos/sources/${SOURCE_ID}/line-mode`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode }),
+  });
+});
+
+const linePos = document.getElementById("line-pos");
+const linePosVal = document.getElementById("line-pos-val");
+linePos.addEventListener("input", () => {
+  linePosVal.textContent = linePos.value + "%";
+});
+let linePosTimer;
+linePos.addEventListener("change", async () => {
+  clearTimeout(linePosTimer);
+  linePosTimer = setTimeout(async () => {
+    await fetch(`/api/vehiculos/sources/${SOURCE_ID}/line-pos`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pos: parseInt(linePos.value) }),
+    });
+  }, 300);
+});
+
+// ── Toggle placas ─────────────────────────────────────────────────────────
+document.getElementById("toggle-placas").addEventListener("change", async () => {
+  const enabled = document.getElementById("toggle-placas").checked;
+  await fetch(`/api/vehiculos/sources/${SOURCE_ID}/plate-detection`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
+});
+
+// ── Reiniciar ─────────────────────────────────────────────────────────────
+document.getElementById("btn-reset").addEventListener("click", async () => {
+  await fetch(`/api/vehiculos/sources/${SOURCE_ID}/reset`, { method: "POST" });
+  lastRegsJson = "";
+  lastPlacasJson = "";
+  document.getElementById("reg-list").innerHTML = '<p style="font-size:0.75rem;color:#9D9FA2;font-style:italic">Esperando detecciones…</p>';
+  document.getElementById("plate-list").innerHTML = '<p style="font-size:0.75rem;color:#9D9FA2;font-style:italic">No se han detectado placas aún.</p>';
+  document.getElementById("cnt-vehiculos").textContent = "0";
+  document.getElementById("cnt-in").textContent = "0";
+  document.getElementById("cnt-out").textContent = "0";
+  document.getElementById("cnt-plates").textContent = "0";
+  document.getElementById("cnt-plates-tab").textContent = "0";
+});
+
+// ── Detener ───────────────────────────────────────────────────────────────
+document.getElementById("btn-stop").addEventListener("click", async () => {
+  clearInterval(poll);
+  clearInterval(fpsTimer);
+  await fetch(`/api/vehiculos/sources/${SOURCE_ID}/stop`, { method: "POST" });
+  document.getElementById("lv-feed-img").src = "";
+  document.getElementById("lv-feed-img").style.display = "none";
+  document.getElementById("feed-placeholder").style.display = "flex";
+  document.getElementById("feed-placeholder-msg").textContent = "Análisis detenido";
+  document.getElementById("lv-dot").classList.remove("on");
+  document.getElementById("lv-status-txt").textContent = "Detenido";
+  document.getElementById("lv-fps").textContent = "— fps";
+});
+
+window.addEventListener("pagehide", () => {
+  navigator.sendBeacon(`/api/vehiculos/sources/${SOURCE_ID}/stop`);
+});
+</script>
+</body>
+</html>

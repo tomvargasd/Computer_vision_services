@@ -1,0 +1,393 @@
+{% extends "base.html" %}
+{% block title %}{{ module.label }} · CVVision{% endblock %}
+{% block page_title %}{{ module.label }}{% endblock %}
+
+{% block content %}
+<div class="module-page">
+
+  <!-- Estado del módulo -->
+  <div class="module-status-bar {% if module.enabled %}status-on{% endif %}" id="status-bar">
+    <div class="status-left">
+      <span class="status-circle {% if module.enabled %}on{% endif %}" id="status-circle"></span>
+      <span id="status-text">{{ 'Módulo activo' if module.enabled else 'Módulo inactivo' }}</span>
+    </div>
+    <label class="toggle">
+      <input type="checkbox" class="toggle-module" data-module="{{ module_id }}"
+             {% if module.enabled %}checked{% endif %}>
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <!-- Funciones del módulo -->
+  <div class="functions-grid">
+    {% for func_id, func in module.functions.items() %}
+    <div class="func-card {% if func.enabled %}active{% endif %}" id="fcard-{{ module_id }}-{{ func_id }}">
+      <div class="func-card-header">
+        <div>
+          <h4 class="func-card-title">{{ func.label }}</h4>
+          <p class="func-card-desc">{{ func.description }}</p>
+        </div>
+        {% if func.locked %}
+        <span class="func-locked-badge">
+          <svg viewBox="0 0 24 24" style="width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Activo
+        </span>
+        {% else %}
+        <label class="toggle">
+          <input type="checkbox" class="toggle-func"
+                 data-module="{{ module_id }}" data-func="{{ func_id }}"
+                 {% if func.enabled %}checked{% endif %}
+                 {% if not module.enabled %}disabled{% endif %}>
+          <span class="slider"></span>
+        </label>
+        {% endif %}
+      </div>
+
+      <div class="func-badge-row">
+        <span class="badge badge-status {% if func.enabled %}badge-on{% endif %}" id="badge-{{ module_id }}-{{ func_id }}">
+          {{ 'Activa' if func.enabled else 'Inactiva' }}
+        </span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Fuentes asignadas al módulo -->
+  <div class="sources-section">
+    <div class="sources-header">
+      <h3 class="sources-title">
+        <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        Fuentes de video
+      </h3>
+      <button class="btn-add-source" data-module="{{ module_id }}" id="btn-add-source-module">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Añadir fuente
+      </button>
+    </div>
+
+    {% if sources %}
+    <ul class="sources-list" id="sources-list">
+      {% for src in sources %}
+      <li class="source-item source-item-clickable"
+          id="source-{{ src.id }}"
+          onclick="window.location.href='/module/{{ module_id }}/live/{{ src.id }}'">
+        <div class="source-icon">
+          {% if src.type == 'stream' %}
+          <svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>
+          {% else %}
+          <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          {% endif %}
+        </div>
+        <div class="source-info">
+          <span class="source-name">{{ src.name }}</span>
+          <span class="source-path">{{ src.path.split('/')[-1] }}</span>
+        </div>
+        <span class="source-type-badge {{ src.type }}">{{ src.type }}</span>
+        <a class="btn-launch" href="/module/{{ module_id }}/live/{{ src.id }}" onclick="event.stopPropagation()">
+          <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Iniciar
+        </a>
+        <button class="source-delete" data-id="{{ src.id }}" title="Eliminar" onclick="event.stopPropagation(); deleteSource({{ src.id }})">
+          <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+        </button>
+        <button class="source-edit" data-id="{{ src.id }}" data-name="{{ src.name }}" title="Editar nombre" onclick="event.stopPropagation(); openEditModal('{{ src.id }}', '{{ src.name | replace("'", "\\'") }}')">
+          <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="sources-empty" id="sources-empty">
+      <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      <p>No hay fuentes registradas para este módulo</p>
+      <span>Usa "Añadir fuente" para registrar un video o stream</span>
+    </div>
+    <ul class="sources-list" id="sources-list" style="display:none"></ul>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- ══ MODAL: Añadir fuente ══════════════════════ -->
+<div class="modal-backdrop" id="modal-source" hidden>
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Añadir fuente de video</h3>
+      <button class="modal-close" id="modal-close">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-field">
+        <label class="modal-label">Tipo de recurso</label>
+        <div class="type-toggle">
+          <button class="type-btn active" data-type="video">
+            <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+            Video
+          </button>
+          <button class="type-btn" data-type="stream">
+            <svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>
+            Stream / RTSP
+          </button>
+        </div>
+      </div>
+      <div class="modal-field">
+        <label class="modal-label">Nombre</label>
+        <input class="modal-input" id="src-name" type="text" placeholder="Ej: Cámara entrada 1"/>
+      </div>
+      <!-- Video: file picker -->
+      <div class="modal-field" id="field-file">
+        <label class="modal-label">Archivo de video</label>
+        <label class="upload-area" id="upload-area">
+          <input type="file" id="src-file" accept=".mp4,.avi,.mov,.mkv,.webm,.m4v,.ts,.flv" style="display:none"/>
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span id="upload-label">Haz clic o arrastra un video aquí</span>
+        </label>
+        <div class="upload-progress" id="upload-progress" hidden>
+          <div class="upload-progress-bar" id="upload-progress-bar"></div>
+        </div>
+      </div>
+      <!-- Stream: URL -->
+      <div class="modal-field" id="field-url" hidden>
+        <label class="modal-label">URL / RTSP</label>
+        <input class="modal-input" id="src-url" type="text" placeholder="rtsp://192.168.1.1/stream"/>
+      </div>
+      <div class="modal-error" id="modal-error" hidden></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" id="btn-cancel">Cancelar</button>
+      <button class="btn-confirm" id="btn-confirm">Registrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: Editar fuente ══════════════════════ -->
+<div class="modal-backdrop" id="modal-edit" hidden>
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Editar fuente</h3>
+      <button class="modal-close" id="edit-modal-close">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-field">
+        <label class="modal-label">Nombre</label>
+        <input class="modal-input" id="edit-name" type="text"/>
+      </div>
+      <div class="modal-error" id="edit-error" hidden></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" id="edit-cancel">Cancelar</button>
+      <button class="btn-confirm" id="edit-confirm">Guardar</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+window.CURRENT_MODULE = "{{ module_id }}";
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+const streamIcon = `<svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>`;
+const videoIcon  = `<svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>`;
+
+function launchBtn(id) {
+  return `<a class="btn-launch" href="/module/${window.CURRENT_MODULE}/live/${id}" onclick="event.stopPropagation()">
+    <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>Iniciar</a>`;
+}
+
+function deleteBtnHtml(id, name) {
+  const safeName = name.replace(/'/g, "\\'");
+  return `<button class="source-delete" data-id="${id}" title="Eliminar" onclick="event.stopPropagation(); deleteSource(${id})">
+    <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+  </button>
+  <button class="source-edit" data-id="${id}" data-name="${name}" title="Editar nombre" onclick="event.stopPropagation(); openEditModal('${id}', '${safeName}')">
+    <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+  </button>`;
+}
+
+// ── Modal Añadir ──────────────────────────────────────────────────────────
+const modal         = document.getElementById("modal-source");
+const errorBox      = document.getElementById("modal-error");
+const fieldFile     = document.getElementById("field-file");
+const fieldUrl      = document.getElementById("field-url");
+const uploadArea    = document.getElementById("upload-area");
+const fileInput     = document.getElementById("src-file");
+const uploadLabel   = document.getElementById("upload-label");
+const progressWrap  = document.getElementById("upload-progress");
+const progressBar   = document.getElementById("upload-progress-bar");
+let selectedType = "video";
+let uploadedPath = "";
+
+document.getElementById("btn-add-source-module").addEventListener("click", () => {
+  errorBox.hidden = true;
+  uploadedPath = "";
+  uploadLabel.textContent = "Haz clic o arrastra un video aquí";
+  progressWrap.hidden = true;
+  progressBar.style.width = "0%";
+  document.getElementById("src-name").value = "";
+  document.getElementById("src-url").value = "";
+  modal.hidden = false;
+});
+document.getElementById("modal-close").addEventListener("click",  () => modal.hidden = true);
+document.getElementById("btn-cancel").addEventListener("click",   () => modal.hidden = true);
+modal.addEventListener("click", e => { if (e.target === modal) modal.hidden = true; });
+
+// Tipo toggle
+document.querySelectorAll(".type-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".type-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    selectedType = btn.dataset.type;
+    fieldFile.hidden  = selectedType !== "video";
+    fieldUrl.hidden   = selectedType !== "stream";
+  });
+});
+
+// File picker
+uploadArea.addEventListener("click", () => fileInput.click());
+uploadArea.addEventListener("dragover", e => { e.preventDefault(); uploadArea.classList.add("drag-over"); });
+uploadArea.addEventListener("dragleave", () => uploadArea.classList.remove("drag-over"));
+uploadArea.addEventListener("drop", e => {
+  e.preventDefault();
+  uploadArea.classList.remove("drag-over");
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener("change", () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+
+function handleFile(file) {
+  uploadLabel.textContent = `Subiendo: ${file.name}…`;
+  progressWrap.hidden = false;
+  progressBar.style.width = "0%";
+  uploadedPath = "";
+
+  const fd = new FormData();
+  fd.append("video", file);
+
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", "/api/sources/upload-video");
+  xhr.upload.onprogress = e => {
+    if (e.lengthComputable) progressBar.style.width = Math.round(e.loaded / e.total * 100) + "%";
+  };
+  xhr.onload = () => {
+    if (xhr.status === 200) {
+      const data = JSON.parse(xhr.responseText);
+      uploadedPath = data.path;
+      progressBar.style.width = "100%";
+      uploadLabel.textContent = `✓ ${file.name}`;
+    } else {
+      uploadLabel.textContent = "Error al subir el archivo";
+      progressWrap.hidden = true;
+      showError("No se pudo subir el archivo. Intenta de nuevo.");
+    }
+  };
+  xhr.onerror = () => { uploadLabel.textContent = "Error de red"; showError("Error de red."); };
+  xhr.send(fd);
+}
+
+document.getElementById("btn-confirm").addEventListener("click", async () => {
+  const name = document.getElementById("src-name").value.trim();
+  if (!name) { showError("Escribe un nombre para la fuente."); return; }
+
+  let path = "";
+  if (selectedType === "video") {
+    if (!uploadedPath) { showError("Sube un archivo de video primero."); return; }
+    path = uploadedPath;
+  } else {
+    path = document.getElementById("src-url").value.trim();
+    if (!path) { showError("Introduce la URL o ruta RTSP."); return; }
+  }
+
+  const res  = await fetch("/api/sources", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ module_id: window.CURRENT_MODULE, name, type: selectedType, path }),
+  });
+  const data = await res.json();
+  if (!res.ok) { showError(data.error || "Error"); return; }
+
+  modal.hidden = true;
+  addSourceToList(data);
+  document.getElementById("sources-empty")?.style?.setProperty("display", "none");
+  document.getElementById("sources-list").style.display = "";
+});
+
+function showError(msg) {
+  errorBox.textContent = msg;
+  errorBox.hidden = false;
+}
+
+function addSourceToList(src) {
+  const list = document.getElementById("sources-list");
+  const li   = document.createElement("li");
+  li.className = "source-item source-item-clickable";
+  li.id = `source-${src.id}`;
+  li.addEventListener("click", () => window.location.href = `/module/${window.CURRENT_MODULE}/live/${src.id}`);
+  const displayPath = src.path.includes("/static/uploads/videos/")
+    ? "📁 " + src.path.split("/").pop()
+    : src.path;
+  li.innerHTML = `
+    <div class="source-icon">${src.type === "stream" ? streamIcon : videoIcon}</div>
+    <div class="source-info">
+      <span class="source-name">${src.name}</span>
+      <span class="source-path">${displayPath}</span>
+    </div>
+    <span class="source-type-badge ${src.type}">${src.type}</span>
+    ${launchBtn(src.id)}
+    ${deleteBtnHtml(src.id, src.name)}`;
+  list.prepend(li);
+}
+
+async function deleteSource(id) {
+  if (!confirm("¿Eliminar esta fuente?")) return;
+  const res = await fetch(`/api/sources/${id}`, { method: "DELETE" });
+  if (res.ok) {
+    document.getElementById(`source-${id}`)?.remove();
+    if (!document.querySelector(".source-item")) {
+      document.getElementById("sources-empty")?.style?.setProperty("display", "");
+      document.getElementById("sources-list").style.display = "none";
+    }
+  }
+}
+
+// ── Modal Editar ──────────────────────────────────────────────────────────
+const editModal   = document.getElementById("modal-edit");
+const editError   = document.getElementById("edit-error");
+let editingId     = null;
+
+function openEditModal(id, name) {
+  editingId = id;
+  document.getElementById("edit-name").value = name;
+  editError.hidden = true;
+  editModal.hidden = false;
+}
+
+document.getElementById("edit-modal-close").addEventListener("click", () => editModal.hidden = true);
+document.getElementById("edit-cancel").addEventListener("click",      () => editModal.hidden = true);
+editModal.addEventListener("click", e => { if (e.target === editModal) editModal.hidden = true; });
+
+document.getElementById("edit-confirm").addEventListener("click", async () => {
+  const name = document.getElementById("edit-name").value.trim();
+  if (!name) { editError.textContent = "El nombre no puede estar vacío."; editError.hidden = false; return; }
+
+  const res  = await fetch(`/api/sources/${editingId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  const data = await res.json();
+  if (!res.ok) { editError.textContent = data.error || "Error"; editError.hidden = false; return; }
+
+  const li = document.getElementById(`source-${editingId}`);
+  if (li) {
+    li.querySelector(".source-name").textContent = data.name;
+    const editBtn = li.querySelector(".source-edit");
+    if (editBtn) editBtn.dataset.name = data.name;
+  }
+  editModal.hidden = true;
+});
+</script>
+{% endblock %}

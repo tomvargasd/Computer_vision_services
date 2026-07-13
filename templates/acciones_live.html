@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ source.name }} · CVVision Live — Acciones</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #F4F5F7;
+      color: #182A55;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      height: 100dvh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Topbar ────────────────────────────────────────────── */
+    .lv-topbar {
+      display: flex; align-items: center; gap: 14px;
+      padding: 0 20px; height: 52px;
+      background: #FFFFFF; border-bottom: 1px solid #D8DCE3;
+      flex-shrink: 0; z-index: 10;
+    }
+    .lv-back {
+      display: inline-flex; align-items: center; gap: 7px;
+      color: #9D9FA2; text-decoration: none;
+      font-size: 0.8rem; font-weight: 500; transition: color .18s;
+    }
+    .lv-back:hover { color: #182A55; }
+    .lv-back svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    .lv-sep { width: 1px; height: 22px; background: #D8DCE3; }
+    .lv-source-name { font-size: 0.9rem; font-weight: 600; }
+    .lv-badge { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: 3px 9px; border-radius: 20px; }
+    .lv-badge.stream { background: rgba(255,222,0,0.15); color: #182A55; }
+    .lv-badge.video  { background: rgba(24,42,85,0.08); color: #182A55; }
+    .lv-status { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: #9D9FA2; margin-left: auto; }
+    .lv-dot { width: 7px; height: 7px; border-radius: 50%; background: #9D9FA2; }
+    .lv-dot.on { background: #22C55E; box-shadow: 0 0 6px rgba(34,197,94,0.5); animation: pulse-dot 2s infinite; }
+    @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+    .lv-btn-stop {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(239,68,68,0.10); border: 1px solid #D8DCE3;
+      color: #EF4444; font-size: 0.75rem; font-weight: 600; font-family: inherit;
+      padding: 6px 14px; border-radius: 7px; cursor: pointer; transition: background .18s;
+    }
+    .lv-btn-stop:hover { background: rgba(239,68,68,0.18); }
+    .lv-btn-stop svg { width: 12px; height: 12px; stroke: currentColor; fill: currentColor; stroke-width: 0; }
+
+    /* ── Layout ────────────────────────────────────────────── */
+    .lv-body { display: flex; flex: 1; min-height: 0; }
+
+    .lv-feed {
+      flex: 1; min-width: 0; background: #000;
+      display: flex; align-items: center; justify-content: center;
+      position: relative; border-right: 1px solid #D8DCE3;
+    }
+    .lv-feed-img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+    .lv-feed-placeholder {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 12px; color: #9D9FA2; text-align: center; padding: 32px;
+    }
+    .lv-feed-placeholder svg { width: 64px; height: 64px; stroke: #D8DCE3; fill: none; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; }
+    .lv-feed-placeholder p { font-size: 0.88rem; color: #9D9FA2; }
+    .lv-feed-placeholder span { font-size: 0.72rem; color: #9D9FA2; word-break: break-all; }
+    .lv-feed-ts { position: absolute; bottom: 10px; right: 14px; font-size: 0.68rem; font-family: "SF Mono","Fira Code",monospace; color: rgba(255,255,255,0.4); pointer-events: none; }
+
+    /* ── Panel lateral ─────────────────────────────────────── */
+    .lv-panel {
+      width: 280px; flex-shrink: 0;
+      display: flex; flex-direction: column;
+      overflow-y: auto; background: #FFFFFF;
+    }
+    .lv-section { border-bottom: 1px solid #D8DCE3; padding: 16px; }
+    .lv-section-title {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .08em; color: #9D9FA2; margin-bottom: 14px;
+    }
+    .lv-section-title svg { width: 13px; height: 13px; stroke: #182A55; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* ── Contador de personas ──────────────────────────────── */
+    .lv-count-big { text-align: center; padding: 8px 0 12px; }
+    .lv-count-num { font-size: 3.5rem; font-weight: 800; line-height: 1; color: #182A55; font-variant-numeric: tabular-nums; }
+    .lv-count-lbl { font-size: 0.72rem; color: #9D9FA2; text-transform: uppercase; letter-spacing: .06em; margin-top: 4px; }
+    /* ── Alertas en escena ─────────────────────────────── */
+    .alert-grid { display: flex; flex-direction: column; gap: 9px; }
+    .alert-row  { display: flex; align-items: center; }
+    .alert-dot  { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .alert-name { font-size: 0.78rem; font-weight: 500; flex: 1; margin-left: 9px; }
+    .alert-cnt  { font-size: 1.5rem; font-weight: 800; font-variant-numeric: tabular-nums; min-width: 30px; text-align: right; }
+    /* ── Leyenda del esqueleto ─────────────────────────────── */
+    .skeleton-legend { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+    .sk-row { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; color: #9D9FA2; }
+    .sk-line { width: 22px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+
+    /* ── Funciones ─────────────────────────────────────────── */
+    .lv-func-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 8px 0;
+    }
+    .lv-func-row + .lv-func-row { border-top: 1px solid #E5E7EB; }
+    .lv-func-info { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+    .lv-func-lbl { font-size: 0.82rem; font-weight: 500; }
+    .lv-func-sub { font-size: 0.68rem; color: #9D9FA2; }
+
+    /* ── Info footer ───────────────────────────────────────── */
+    .lv-info-row {
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 0.72rem; color: #9D9FA2; padding: 10px 16px;
+      margin-top: auto; border-top: 1px solid #D8DCE3;
+    }
+    .lv-info-id { color: #182A55; font-weight: 600; }
+    /* ── Galeria de capturas ────────────────────────────── */
+    .cap-person   { margin-bottom: 12px; }
+    .cap-tid-lbl  { font-size: 0.68rem; color: #182A55; font-weight: 700; margin-bottom: 6px; }
+    .cap-sub-lbl  { font-size: 0.62rem; color: #9D9FA2; text-transform: uppercase;
+                    letter-spacing: .06em; margin: 5px 0 3px; }
+    .cap-thumb-row{ display: flex; flex-wrap: wrap; gap: 4px; }
+    .cap-thumb    { width: 58px; height: 58px; object-fit: cover; border-radius: 5px;
+                    cursor: pointer; border: 1px solid #D8DCE3;
+                    transition: opacity .15s, border-color .15s; }
+    .cap-thumb:hover { opacity: .85; border-color: #D8DCE3; }
+    .cap-empty    { font-size: 0.72rem; color: #9D9FA2; font-style: italic; }
+
+    /* ── Lightbox ────────────────────────────────────────── */
+    .lb-overlay {
+      display: none; position: fixed; inset: 0; z-index: 9999;
+      background: rgba(0,0,0,0.85); align-items: center; justify-content: center;
+    }
+    .lb-overlay.open { display: flex; }
+    .lb-overlay img  { max-width: 90vw; max-height: 90vh; min-width: 280px;
+                       border-radius: 8px; box-shadow: 0 8px 40px rgba(0,0,0,0.3); }
+  </style>
+</head>
+<body>
+
+<!-- ── Topbar ────────────────────────────────────────────────── -->
+<header class="lv-topbar">
+  <a class="lv-back" href="/module/acciones">
+    <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    Volver
+  </a>
+  <div class="lv-sep"></div>
+  <span class="lv-source-name">{{ source.name }}</span>
+  <span class="lv-badge {{ source.type }}">{{ source.type }}</span>
+
+  <div class="lv-status">
+    <span class="lv-dot on" id="lv-dot"></span>
+    <span id="lv-status-txt">Iniciando…</span>
+  </div>
+
+  <span style="font-size:0.72rem;color:#7a90a8;margin-left:4px" id="lv-fps">— fps</span>
+
+  <button class="lv-btn-stop" id="btn-stop">
+    <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/></svg>
+    Detener
+  </button>
+</header>
+
+<!-- ── Cuerpo ─────────────────────────────────────────────────── -->
+<div class="lv-body">
+
+  <!-- Video feed -->
+  <div class="lv-feed">
+    <div class="lv-feed-placeholder" id="feed-placeholder">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0 1 12 0v2"/></svg>
+      <p id="feed-placeholder-msg">Conectando con la fuente…</p>
+      <span>{{ source.path }}</span>
+    </div>
+    <img class="lv-feed-img" id="lv-feed-img" src="" alt="Live feed" style="display:none">
+    <span class="lv-feed-ts" id="lv-ts"></span>
+  </div>
+
+  <!-- Panel -->
+  <div class="lv-panel">
+
+    <!-- ── 1. Personas detectadas ───────────────────────── -->
+    <div class="lv-section">
+      <div class="lv-section-title">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0 1 12 0v2"/></svg>
+        Personas en escena
+      </div>
+      <div class="lv-count-big">
+        <div class="lv-count-num" id="cnt-persons">0</div>
+        <div class="lv-count-lbl">personas detectadas</div>
+      </div>
+    </div>
+
+
+    <!-- ── 2. Galería de capturas ─────────────────────────── -->
+    <div class="lv-section" style="height:600px;overflow-y:auto">
+      <div class="lv-section-title">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        Capturas por persona
+      </div>
+      <div id="cap-gallery">
+        <span class="cap-empty">Esperando alerta…</span>
+      </div>
+    </div>
+
+    <!-- ── 3. Alertas en escena ─────────────────────────── -->
+    <div class="lv-section">
+      <div class="lv-section-title">
+        <svg viewBox="0 0 24 24" style="stroke:#ef4444"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Alertas activas
+      </div>
+      <div class="alert-grid">
+        <div class="alert-row">
+          <span class="alert-dot" style="background:#eb2828"></span>
+          <span class="alert-name" style="color:#f87171">Violencia</span>
+          <span class="alert-cnt" id="cnt-violencia" style="color:#f87171">0</span>
+        </div>
+        <div class="alert-row">
+          <span class="alert-dot" style="background:#ff6e1a"></span>
+          <span class="alert-name" style="color:#fb923c">Robo / amenaza</span>
+          <span class="alert-cnt" id="cnt-robo" style="color:#fb923c">0</span>
+        </div>
+        <div class="alert-row">
+          <span class="alert-dot" style="background:#ffe600"></span>
+          <span class="alert-name" style="color:#ffe600">Sospechoso</span>
+          <span class="alert-cnt" id="cnt-sospechoso" style="color:#ffe600">0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 4. Funciones ──────────────────────────────────── -->
+    <div class="lv-section">
+      <div class="lv-section-title">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Funciones
+      </div>
+      <div class="lv-func-row">
+        <div class="lv-func-info">
+          <span class="lv-func-lbl">Detección de acciones</span>
+          <span class="lv-func-sub">Dibuja esqueleto de pose sobre cada persona</span>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" class="toggle-func-live"
+                 data-func="deteccion_acciones"
+                 {% if func_state.get('deteccion_acciones') %}checked{% endif %}>
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="lv-func-row">
+        <div class="lv-func-info">
+          <span class="lv-func-lbl" style="color:#f87171">Alertas de violencia</span>
+          <span class="lv-func-sub">Golpes, patadas y agresión física</span>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" class="toggle-func-live"
+                 data-func="deteccion_violencia"
+                 {% if func_state.get('deteccion_violencia') %}checked{% endif %}>
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="lv-func-row">
+        <div class="lv-func-info">
+          <span class="lv-func-lbl" style="color:#fb923c">Alertas de robo / amenaza</span>
+          <span class="lv-func-sub">Brazo apuntando y posturas de amenaza</span>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" class="toggle-func-live"
+                 data-func="deteccion_robo"
+                 {% if func_state.get('deteccion_robo') %}checked{% endif %}>
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="lv-func-row">
+        <div class="lv-func-info">
+          <span class="lv-func-lbl" style="color:#4ade80">Actividad sospechosa</span>
+          <span class="lv-func-sub">Agachado, rastreo y movimientos furtivos</span>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" class="toggle-func-live"
+                 data-func="deteccion_sospechosa"
+                 {% if func_state.get('deteccion_sospechosa') %}checked{% endif %}>
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+    <!-- ── 5. Galería de capturas ─────────────────────────── -->
+    <div class="lv-section" style="flex:1;overflow-y:auto">
+      <div class="lv-section-title">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        Capturas por persona
+      </div>
+      <div id="cap-gallery">
+        <span class="cap-empty">Esperando alerta…</span>
+      </div>
+    </div>
+    <!-- ── Info footer ─────────────────────────────────────── -->
+    <div class="lv-info-row">
+      <span>model11n-pose</span>
+    </div>
+
+  </div><!-- /lv-panel -->
+</div><!-- /lv-body -->
+
+<!-- Lightbox -->
+<div class="lb-overlay" id="lb-overlay" onclick="closeLb()">
+  <img id="lb-img" src="" alt="Captura">
+</div>
+
+<script>
+const SOURCE_ID = {{ source.id }};
+let poll = null;
+let frameCount = 0;
+let fpsTimer   = null;
+
+// ── Iniciar pipeline ──────────────────────────────────────────────────────
+(async () => {
+  document.getElementById("feed-placeholder-msg").textContent = "Iniciando pipeline…";
+  const r = await fetch(`/api/acciones/sources/${SOURCE_ID}/start`, { method: "POST" });
+  if (r.ok) {
+    document.getElementById("feed-placeholder-msg").textContent = "Cargando modelo de pose…";
+    startStream();
+    poll = setInterval(fetchStats, 1500);
+    fpsTimer = setInterval(() => {
+      document.getElementById("lv-fps").textContent = `${frameCount} fps`;
+      frameCount = 0;
+    }, 1000);
+  } else {
+    document.getElementById("feed-placeholder-msg").textContent = "Error al iniciar el pipeline";
+    document.getElementById("lv-dot").classList.remove("on");
+    document.getElementById("lv-status-txt").textContent = "Error";
+  }
+})();
+
+function startStream() {
+  const img = document.getElementById("lv-feed-img");
+  img.onload = () => {
+    document.getElementById("feed-placeholder").style.display = "none";
+    img.style.display = "block";
+    document.getElementById("lv-status-txt").textContent = "En línea";
+    frameCount++;
+  };
+  img.onerror = () => {
+    document.getElementById("feed-placeholder").style.display = "flex";
+    document.getElementById("feed-placeholder-msg").textContent = "Error de conexión";
+    img.style.display = "none";
+    document.getElementById("lv-dot").classList.remove("on");
+    document.getElementById("lv-status-txt").textContent = "Sin señal";
+  };
+  img.src = `/api/acciones/stream/${SOURCE_ID}`;
+}
+
+// ── Stats polling ─────────────────────────────────────────────────────────
+async function fetchStats() {
+  try {
+    const r = await fetch(`/api/acciones/sources/${SOURCE_ID}/stats`);
+    if (!r.ok) return;
+    const d = await r.json();
+    document.getElementById("cnt-persons").textContent = d.current_persons ?? 0;
+    const al = d.alerts || {};
+    document.getElementById("cnt-violencia").textContent  = al.violencia  ?? 0;
+    document.getElementById("cnt-robo").textContent       = al.robo       ?? 0;
+    document.getElementById("cnt-sospechoso").textContent = al.sospechoso ?? 0;
+    renderGallery(d.captures || {});
+    const now = new Date();
+    document.getElementById("lv-ts").textContent =
+      now.toLocaleTimeString("es-MX", {hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  } catch (_) {}
+}
+
+// ── Galería de capturas ───────────────────────────────────────────────────
+const _knownCaps = {};  // {tid: {face: Set, body: Set}}
+
+function renderGallery(captures) {
+  const gallery = document.getElementById("cap-gallery");
+  const tids = Object.keys(captures);
+  if (!tids.length) return;
+  gallery.innerHTML = "";
+
+  for (const tid of tids.sort((a,b) => +a - +b)) {
+    const data = captures[tid];
+    const face = data.face || [];
+    const body = data.body || [];
+    if (!face.length && !body.length) continue;
+
+    const block = document.createElement("div");
+    block.className = "cap-person";
+    let html = `<div class="cap-tid-lbl">Persona #${tid}</div>`;
+    if (face.length) {
+      html += `<div class="cap-sub-lbl">Rostro (${face.length}/3)</div><div class="cap-thumb-row">`;
+      for (const url of face)
+        html += `<img class="cap-thumb" src="${url}" loading="lazy" onclick="openLb('${url}')">`;
+      html += "</div>";
+    }
+    if (body.length) {
+      html += `<div class="cap-sub-lbl">Cuerpo (${body.length}/3)</div><div class="cap-thumb-row">`;
+      for (const url of body)
+        html += `<img class="cap-thumb" src="${url}" loading="lazy" onclick="openLb('${url}')">`;
+      html += "</div>";
+    }
+    block.innerHTML = html;
+    gallery.appendChild(block);
+  }
+}
+
+function openLb(url) {
+  document.getElementById("lb-img").src = url;
+  document.getElementById("lb-overlay").classList.add("open");
+}
+function closeLb() {
+  document.getElementById("lb-overlay").classList.remove("open");
+}
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeLb(); });
+
+// ── Toggle funciones en vivo ──────────────────────────────────────────────
+document.querySelectorAll(".toggle-func-live").forEach(input => {
+  input.addEventListener("change", async () => {
+    const funcId = input.dataset.func;
+    const res = await fetch(`/api/modules/acciones/functions/${funcId}/toggle`, { method: "POST" });
+    if (!res.ok) input.checked = !input.checked;
+  });
+});
+
+// ── Detener ───────────────────────────────────────────────────────────────
+document.getElementById("btn-stop").addEventListener("click", async () => {
+  clearInterval(poll);
+  clearInterval(fpsTimer);
+  await fetch(`/api/acciones/sources/${SOURCE_ID}/stop`, { method: "POST" });
+  document.getElementById("lv-feed-img").src = "";
+  document.getElementById("lv-feed-img").style.display = "none";
+  document.getElementById("feed-placeholder").style.display = "flex";
+  document.getElementById("feed-placeholder-msg").textContent = "Análisis detenido";
+  document.getElementById("lv-dot").classList.remove("on");
+  document.getElementById("lv-status-txt").textContent = "Detenido";
+  document.getElementById("lv-fps").textContent = "— fps";
+});
+
+// ── Cleanup al salir ──────────────────────────────────────────────────────
+window.addEventListener("pagehide", () => {
+  navigator.sendBeacon(`/api/acciones/sources/${SOURCE_ID}/stop`);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ source.name }} · CVVision Live</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #F4F5F7; color: #182A55;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      height: 100dvh; overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    .lv-topbar {
+      display: flex; align-items: center; gap: 14px;
+      padding: 0 20px; height: 52px;
+      background: #FFFFFF; border-bottom: 1px solid #D8DCE3;
+      flex-shrink: 0; z-index: 10;
+    }
+    .lv-back {
+      display: inline-flex; align-items: center; gap: 7px;
+      color: #9D9FA2; text-decoration: none;
+      font-size: 0.8rem; font-weight: 500; transition: color .18s;
+    }
+    .lv-back:hover { color: #182A55; }
+    .lv-back svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    .lv-sep { width: 1px; height: 22px; background: #D8DCE3; }
+    .lv-source-name { font-size: 0.9rem; font-weight: 600; }
+    .lv-badge { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: 3px 9px; border-radius: 20px; }
+    .lv-badge.stream { background: rgba(255,222,0,0.15); color: #182A55; }
+    .lv-badge.video  { background: rgba(24,42,85,0.08); color: #182A55; }
+    .lv-status {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 0.75rem; color: #9D9FA2; margin-left: auto;
+    }
+    .lv-dot { width: 7px; height: 7px; border-radius: 50%; background: #9D9FA2; }
+    .lv-dot.on { background: #22C55E; box-shadow: 0 0 6px rgba(34,197,94,0.5); animation: pulse-dot 2s infinite; }
+    @keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
+    .lv-btn-stop {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(239,68,68,0.10); border: 1px solid #D8DCE3;
+      color: #EF4444; font-size: 0.75rem; font-weight: 600;
+      font-family: inherit; padding: 6px 14px; border-radius: 7px; cursor: pointer;
+      transition: background .18s;
+    }
+    .lv-btn-stop:hover { background: rgba(239,68,68,0.18); }
+    .lv-btn-stop svg { width: 12px; height: 12px; stroke: currentColor; fill: currentColor; stroke-width: 0; }
+    .lv-btn-reset {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: rgba(24,42,85,0.06); border: 1px solid #D8DCE3;
+      color: #9D9FA2; font-size: 0.75rem; font-family: inherit;
+      padding: 6px 12px; border-radius: 7px; cursor: pointer; transition: color .18s;
+    }
+    .lv-btn-reset:hover { color: #182A55; }
+    .lv-btn-reset svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; }
+    .lv-body { display: flex; flex: 1; min-height: 0; }
+    .lv-feed {
+      flex: 1; min-width: 0; background: #000;
+      display: flex; align-items: center; justify-content: center;
+      position: relative; border-right: 1px solid #D8DCE3;
+    }
+    .lv-feed-img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+    .lv-feed-placeholder {
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+      color: #9D9FA2; text-align: center; padding: 32px;
+    }
+    .lv-feed-placeholder svg { width: 64px; height: 64px; stroke: #D8DCE3; fill: none; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; }
+    .lv-feed-placeholder p    { font-size: 0.88rem; color: #9D9FA2; }
+    .lv-feed-placeholder span { font-size: 0.72rem; color: #9D9FA2; word-break: break-all; }
+    .lv-feed-ts {
+      position: absolute; bottom: 10px; right: 14px;
+      font-size: 0.68rem; font-family: "SF Mono","Fira Code",monospace;
+      color: rgba(255,255,255,0.4); pointer-events: none;
+    }
+    .lv-panel {
+      width: 320px; flex-shrink: 0; display: flex; flex-direction: column;
+      gap: 0; overflow-y: auto; background: #FFFFFF;
+    }
+    .lv-section { border-bottom: 1px solid #D8DCE3; padding: 16px; }
+    .lv-section-title {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .08em; color: #9D9FA2; margin-bottom: 14px;
+    }
+    .lv-section-title svg { width: 13px; height: 13px; stroke: #182A55; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    .lv-inout { display: flex; gap: 10px; }
+    .lv-inout-card {
+      flex: 1; background: #F0F1F3; border: 1px solid #D8DCE3;
+      border-radius: 10px; padding: 12px 10px; text-align: center;
+    }
+    .lv-inout-val { font-size: 1.6rem; font-weight: 700; color: #182A55; font-variant-numeric: tabular-nums; }
+    .lv-inout-card.in  .lv-inout-val { color: #22C55E; }
+    .lv-inout-card.out .lv-inout-val { color: #EF4444; }
+    .lv-inout-lbl { font-size: 0.62rem; text-transform: uppercase; letter-spacing: .08em; color: #9D9FA2; margin-top: 3px; }
+    .lv-count-big { text-align: center; padding: 4px 0 8px; }
+    .lv-count-num { font-size: 2.8rem; font-weight: 800; line-height: 1; color: #182A55; font-variant-numeric: tabular-nums; }
+    .lv-count-lbl { font-size: 0.7rem; color: #9D9FA2; text-transform: uppercase; letter-spacing: .06em; margin-top: 2px; }
+    .lv-line-config { margin-top: 12px; padding-top: 12px; border-top: 1px solid #D8DCE3; }
+    .lv-line-lbl { font-size: 0.68rem; color: #9D9FA2; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+    .lv-line-row { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+    .lv-line-row input[type="range"] {
+      -webkit-appearance: none; appearance: none; flex: 1; height: 4px;
+      border-radius: 2px; background: #D8DCE3; outline: none; cursor: pointer;
+    }
+    .lv-line-row input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none; width: 14px; height: 14px;
+      border-radius: 50%; background: #C800C8; cursor: pointer;
+    }
+    .lv-line-row input[type="range"]::-moz-range-thumb {
+      width: 14px; height: 14px; border-radius: 50%; border: none; background: #C800C8; cursor: pointer;
+    }
+    .lv-line-val { font-size: 0.82rem; font-weight: 700; color: #182A55; min-width: 42px; text-align: right; font-variant-numeric: tabular-nums; }
+    .lv-switch-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 0; font-size: 0.72rem; color: #9D9FA2;
+    }
+    .lv-switch {
+      position: relative; width: 38px; height: 20px; flex-shrink: 0;
+    }
+    .lv-switch input { opacity: 0; width: 0; height: 0; }
+    .lv-slider {
+      position: absolute; inset: 0; cursor: pointer;
+      background: #D8DCE3; border-radius: 20px; transition: .2s;
+    }
+    .lv-slider::before {
+      content: ""; position: absolute; width: 16px; height: 16px;
+      left: 2px; bottom: 2px; background: #FFF; border-radius: 50%; transition: .2s;
+    }
+    .lv-switch input:checked + .lv-slider { background: #C800C8; }
+    .lv-switch input:checked + .lv-slider::before { transform: translateX(18px); }
+    .lv-model-select {
+      width: 100%; padding: 6px 8px; font-size: 0.72rem; font-family: inherit;
+      border: 1px solid #D8DCE3; border-radius: 6px; background: #FFF;
+      color: #182A55; margin-top: 8px;
+    }
+    .lv-tabs {
+      display: flex; gap: 0; border-bottom: 1px solid #D8DCE3;
+      background: #FAFAFA;
+    }
+    .lv-tab {
+      flex: 1; text-align: center; padding: 10px 6px;
+      font-size: 0.72rem; font-weight: 600; color: #9D9FA2;
+      cursor: pointer; border-bottom: 2px solid transparent; transition: all .18s;
+    }
+    .lv-tab.active { color: #C800C8; border-bottom-color: #C800C8; background: #FFF; }
+    .lv-tab:hover { color: #182A55; }
+    .lv-analytics-chart { padding: 8px 0; }
+    .lv-analytics-chart canvas { max-height: 180px; }
+    .lv-chart-row { display: flex; gap: 8px; }
+    .lv-chart-row > div { flex: 1; min-width: 0; }
+    .lv-info-row {
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 0.72rem; color: #9D9FA2;
+      padding: 10px 16px; border-top: 1px solid #D8DCE3;
+    }
+    .lv-info-row span { font-variant-numeric: tabular-nums; }
+    .lv-info-id { color: #182A55; font-weight: 600; }
+  </style>
+</head>
+<body>
+<header class="lv-topbar">
+  <a class="lv-back" href="/module/carga_descarga">
+    <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    Volver
+  </a>
+  <div class="lv-sep"></div>
+  <span class="lv-source-name">{{ source.name }}</span>
+  <span class="lv-badge {{ source.type }}">{{ source.type }}</span>
+  <div class="lv-status">
+    <span class="lv-dot on" id="lv-dot"></span>
+    <span id="lv-status-txt">Iniciando…</span>
+  </div>
+  <button class="lv-btn-reset" id="btn-reset">
+    <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+    Reiniciar conteos
+  </button>
+  <button class="lv-btn-stop" id="btn-stop">
+    <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/></svg>
+    Detener
+  </button>
+</header>
+
+<div class="lv-body">
+  <div class="lv-feed">
+    <div class="lv-feed-placeholder" id="feed-placeholder">
+      <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      <p id="feed-placeholder-msg">Conectando con la fuente…</p>
+      <span>{{ source.path }}</span>
+    </div>
+    <img class="lv-feed-img" id="lv-feed-img" src="" alt="Live feed" style="display:none">
+    <span class="lv-feed-ts" id="lv-ts"></span>
+  </div>
+
+  <div class="lv-panel" id="lv-panel">
+    <div class="lv-tabs">
+      <div class="lv-tab active" data-tab="live">En Vivo</div>
+      <div class="lv-tab" data-tab="analytics">Analytics</div>
+    </div>
+
+    <div id="tab-live">
+      <div class="lv-section">
+        <div class="lv-section-title">
+          <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3 8 12 13 21 8"/></svg>
+          Carga y Descarga
+        </div>
+        <div class="lv-count-big">
+          <div class="lv-count-num" id="cnt-cur">0</div>
+          <div class="lv-count-lbl">objetos en escena</div>
+        </div>
+        <div class="lv-inout">
+          <div class="lv-inout-card in">
+            <div class="lv-inout-val" id="cnt-in">0</div>
+            <div class="lv-inout-lbl">Carga (IN)</div>
+          </div>
+          <div class="lv-inout-card out">
+            <div class="lv-inout-val" id="cnt-out">0</div>
+            <div class="lv-inout-lbl">Descarga (OUT)</div>
+          </div>
+        </div>
+        <select class="lv-model-select" id="model-select">
+          <option value="">Cargando modelos…</option>
+        </select>
+        <div class="lv-line-config">
+          <div class="lv-line-lbl">Línea de conteo</div>
+          <div class="lv-switch-row">
+            <span>Horizontal</span>
+            <label class="lv-switch">
+              <input type="checkbox" id="line-mode-toggle">
+              <span class="lv-slider"></span>
+            </label>
+            <span>Vertical</span>
+          </div>
+          <div class="lv-line-row">
+            <span class="lv-area-label" id="line-pos-label">Pos</span>
+            <input type="range" id="line-pos" min="5" max="95" step="1" value="{{ settings.get('carga_descarga_line_pos', '50') }}">
+            <span class="lv-line-val" id="line-pos-val">{{ settings.get('carga_descarga_line_pos', '50') }}%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-analytics" style="display:none">
+      <div class="lv-section">
+        <div class="lv-section-title">
+          <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Analytics
+        </div>
+        <div style="margin-bottom:10px">
+          <label style="font-size:0.65rem;color:#9D9FA2;text-transform:uppercase;letter-spacing:.06em;">Días</label>
+          <select id="analytics-days" style="margin-left:8px;font-size:0.75rem;padding:3px 8px;border:1px solid #D8DCE3;border-radius:5px;">
+            <option value="1">Hoy</option>
+            <option value="7" selected>7 días</option>
+            <option value="30">30 días</option>
+            <option value="90">90 días</option>
+          </select>
+        </div>
+        <div class="lv-chart-row">
+          <div class="lv-analytics-chart">
+            <canvas id="chart-dist"></canvas>
+          </div>
+          <div class="lv-analytics-chart">
+            <canvas id="chart-trend" style="max-height:200px"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="lv-info-row">
+      <span>Fuente #<span class="lv-info-id">{{ source.id }}</span></span>
+      <span id="lv-fps">— fps</span>
+    </div>
+  </div>
+</div>
+
+<script>
+const SOURCE_ID = {{ source.id }};
+let poll = null;
+let frameCount = 0;
+let fpsTimer = null;
+let chartDist = null;
+let chartTrend = null;
+let models = [];
+
+(async () => {
+  document.getElementById("feed-placeholder-msg").textContent = "Iniciando pipeline…";
+  const r = await fetch(`/api/carga_descarga/sources/${SOURCE_ID}/start`, { method: "POST" });
+  if (r.ok) {
+    document.getElementById("feed-placeholder-msg").textContent = "Cargando modelo de IA…";
+    document.getElementById("lv-status-txt").textContent = "Cargando…";
+    const img = document.getElementById("lv-feed-img");
+    img.onload = () => {
+      img.style.display = "block";
+      document.getElementById("feed-placeholder").style.display = "none";
+      document.getElementById("lv-status-txt").textContent = "En vivo";
+    };
+    img.onerror = () => {
+      document.getElementById("feed-placeholder-msg").textContent = "Error al conectar con la fuente";
+      document.getElementById("lv-dot").classList.remove("on");
+      document.getElementById("lv-status-txt").textContent = "Error";
+    };
+    img.src = `/api/carga_descarga/stream/${SOURCE_ID}`;
+    startPoll();
+    startFpsCounter();
+    loadModels();
+  } else {
+    document.getElementById("feed-placeholder-msg").textContent = "Error al iniciar el análisis";
+    document.getElementById("lv-status-txt").textContent = "Error al iniciar";
+    document.getElementById("lv-dot").classList.remove("on");
+  }
+})();
+
+function startPoll() {
+  if (poll) clearInterval(poll);
+  poll = setInterval(async () => {
+    const r = await fetch(`/api/carga_descarga/sources/${SOURCE_ID}/stats`);
+    if (!r.ok) return;
+    const d = await r.json();
+    document.getElementById("cnt-cur").textContent = d.current_objects || 0;
+    document.getElementById("cnt-in").textContent  = d.in_count || 0;
+    document.getElementById("cnt-out").textContent = d.out_count || 0;
+    document.getElementById("lv-ts").textContent =
+      new Date().toLocaleTimeString("es-MX", { hour12: false });
+    if (document.getElementById("tab-analytics").style.display !== "none") {
+      fetchAnalytics();
+    }
+  }, 1500);
+}
+
+function startFpsCounter() {
+  document.getElementById("lv-feed-img").addEventListener("load", () => frameCount++);
+  fpsTimer = setInterval(() => {
+    document.getElementById("lv-fps").textContent = `${frameCount} fps`;
+    frameCount = 0;
+  }, 1000);
+}
+
+async function loadModels() {
+  try {
+    const r = await fetch(`/api/carga_descarga/sources/${SOURCE_ID}/models`);
+    if (!r.ok) return;
+    models = await r.json();
+    const sel = document.getElementById("model-select");
+    sel.innerHTML = models.map(m =>
+      `<option value="${m.idx}" ${m.active ? 'selected' : ''}>${m.name}</option>`
+    ).join("");
+  } catch (e) {}
+}
+
+document.getElementById("model-select").addEventListener("change", async () => {
+  const idx = parseInt(document.getElementById("model-select").value);
+  if (isNaN(idx)) return;
+  await fetch(`/api/carga_descarga/sources/${SOURCE_ID}/reload-model`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model_idx: idx }),
+  });
+});
+
+document.getElementById("line-mode-toggle").addEventListener("change", async () => {
+  const mode = document.getElementById("line-mode-toggle").checked ? "vertical" : "horizontal";
+  document.getElementById("line-pos-label").textContent = mode === "horizontal" ? "Y" : "X";
+  await fetch(`/api/carga_descarga/sources/${SOURCE_ID}/line-mode`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode }),
+  });
+});
+
+const linePosEl = document.getElementById("line-pos");
+let linePosDebounce;
+linePosEl.addEventListener("input", () => {
+  document.getElementById("line-pos-val").textContent = linePosEl.value + "%";
+  clearTimeout(linePosDebounce);
+  linePosDebounce = setTimeout(async () => {
+    await fetch(`/api/carga_descarga/sources/${SOURCE_ID}/line-pos`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pct: parseInt(linePosEl.value) }),
+    });
+  }, 150);
+});
+
+document.querySelectorAll(".lv-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".lv-tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    const target = tab.dataset.tab;
+    document.getElementById("tab-live").style.display = target === "live" ? "" : "none";
+    document.getElementById("tab-analytics").style.display = target === "analytics" ? "" : "none";
+    if (target === "analytics") fetchAnalytics();
+  });
+});
+
+async function fetchAnalytics() {
+  const days = document.getElementById("analytics-days").value;
+  const r = await fetch(`/api/carga_descarga/sources/${SOURCE_ID}/analytics?days=${days}`);
+  if (!r.ok) return;
+  const data = await r.json();
+  renderAnalytics(data);
+}
+
+function renderAnalytics(data) {
+  const summary = data.summary || [];
+  const daily = data.daily || [];
+  let entradas = 0, salidas = 0;
+  summary.forEach(s => {
+    if (s.direction === 'in') entradas = parseInt(s.count);
+    if (s.direction === 'out') salidas = parseInt(s.count);
+  });
+
+  if (chartDist) { chartDist.destroy(); chartDist = null; }
+  if (chartTrend) { chartTrend.destroy(); chartTrend = null; }
+
+  const ctxDist = document.getElementById("chart-dist").getContext("2d");
+  chartDist = new Chart(ctxDist, {
+    type: "doughnut",
+    data: {
+      labels: ["Carga (IN)", "Descarga (OUT)"],
+      datasets: [{
+        data: [entradas, salidas],
+        backgroundColor: ["#22C55E", "#EF4444"],
+        borderWidth: 0,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: {
+        legend: { display: false },
+        title: { display: true, text: "Total", font: { size: 10 }, color: "#9D9FA2" },
+      },
+    },
+  });
+
+  if (daily.length > 0) {
+    const ctxTrend = document.getElementById("chart-trend").getContext("2d");
+    chartTrend = new Chart(ctxTrend, {
+      type: "bar",
+      data: {
+        labels: daily.map(d => d.day.slice(5)),
+        datasets: [
+          { label: "Carga", data: daily.map(d => parseInt(d.entradas) || 0),
+            backgroundColor: "#22C55E", borderRadius: 3 },
+          { label: "Descarga", data: daily.map(d => parseInt(d.salidas) || 0),
+            backgroundColor: "#EF4444", borderRadius: 3 },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: true,
+        plugins: {
+          legend: { position: "top", labels: { boxWidth: 10, padding: 8, font: { size: 9 } } },
+          title: { display: true, text: "Tendencia diaria", font: { size: 10 }, color: "#9D9FA2" },
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 8 } } },
+          y: { beginAtZero: true, grid: { color: "#E8E8EC" }, ticks: { font: { size: 8 }, stepSize: 1 } },
+        },
+      },
+    });
+  }
+}
+
+document.getElementById("analytics-days").addEventListener("change", fetchAnalytics);
+
+document.getElementById("btn-reset").addEventListener("click", async () => {
+  await fetch(`/api/carga_descarga/sources/${SOURCE_ID}/reset`, { method: "POST" });
+  ["cnt-cur","cnt-in","cnt-out"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = "0";
+  });
+});
+
+document.getElementById("btn-stop").addEventListener("click", async () => {
+  clearInterval(poll);
+  clearInterval(fpsTimer);
+  await fetch(`/api/carga_descarga/sources/${SOURCE_ID}/stop`, { method: "POST" });
+  window.location.href = "/module/carga_descarga";
+});
+
+window.addEventListener("pagehide", () => {
+  navigator.sendBeacon(`/api/carga_descarga/sources/${SOURCE_ID}/stop`);
+});
+</script>
+</body>
+</html>

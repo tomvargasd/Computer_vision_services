@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ source.name }} · CVVision Live</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #F4F5F7; color: #182A55;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      height: 100dvh; overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    .lv-topbar {
+      display: flex; align-items: center; gap: 14px;
+      padding: 0 20px; height: 52px;
+      background: #FFFFFF; border-bottom: 1px solid #D8DCE3;
+      flex-shrink: 0; z-index: 10;
+    }
+    .lv-back {
+      display: inline-flex; align-items: center; gap: 7px;
+      color: #9D9FA2; text-decoration: none;
+      font-size: 0.8rem; font-weight: 500; transition: color .18s;
+    }
+    .lv-back:hover { color: #182A55; }
+    .lv-back svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    .lv-sep { width: 1px; height: 22px; background: #D8DCE3; }
+    .lv-source-name { font-size: 0.9rem; font-weight: 600; }
+    .lv-badge { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: 3px 9px; border-radius: 20px; }
+    .lv-badge.stream { background: rgba(255,222,0,0.15); color: #182A55; }
+    .lv-badge.video  { background: rgba(24,42,85,0.08); color: #182A55; }
+    .lv-status {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 0.75rem; color: #9D9FA2; margin-left: auto;
+    }
+    .lv-dot { width: 7px; height: 7px; border-radius: 50%; background: #9D9FA2; }
+    .lv-dot.on { background: #22C55E; box-shadow: 0 0 6px rgba(34,197,94,0.5); animation: pulse-dot 2s infinite; }
+    @keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
+    .lv-btn-stop {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(239,68,68,0.10); border: 1px solid #D8DCE3;
+      color: #EF4444; font-size: 0.75rem; font-weight: 600;
+      font-family: inherit; padding: 6px 14px; border-radius: 7px; cursor: pointer;
+      transition: background .18s;
+    }
+    .lv-btn-stop:hover { background: rgba(239,68,68,0.18); }
+    .lv-btn-stop svg { width: 12px; height: 12px; stroke: currentColor; fill: currentColor; stroke-width: 0; }
+    .lv-btn-reset {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: rgba(24,42,85,0.06); border: 1px solid #D8DCE3;
+      color: #9D9FA2; font-size: 0.75rem; font-family: inherit;
+      padding: 6px 12px; border-radius: 7px; cursor: pointer; transition: color .18s;
+    }
+    .lv-btn-reset:hover { color: #182A55; }
+    .lv-btn-reset svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; }
+    .lv-body { display: flex; flex: 1; min-height: 0; }
+    .lv-feed {
+      flex: 1; min-width: 0; background: #000;
+      display: flex; align-items: center; justify-content: center;
+      position: relative; border-right: 1px solid #D8DCE3;
+    }
+    .lv-feed-img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+    .lv-feed-placeholder {
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+      color: #9D9FA2; text-align: center; padding: 32px;
+    }
+    .lv-feed-placeholder svg { width: 64px; height: 64px; stroke: #D8DCE3; fill: none; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; }
+    .lv-feed-placeholder p    { font-size: 0.88rem; color: #9D9FA2; }
+    .lv-feed-placeholder span { font-size: 0.72rem; color: #9D9FA2; word-break: break-all; }
+    .lv-feed-ts {
+      position: absolute; bottom: 10px; right: 14px;
+      font-size: 0.68rem; font-family: "SF Mono","Fira Code",monospace;
+      color: rgba(255,255,255,0.4); pointer-events: none;
+    }
+    .lv-panel {
+      width: 340px; flex-shrink: 0; display: flex; flex-direction: column;
+      gap: 0; overflow-y: auto; background: #FFFFFF;
+    }
+    .lv-section { border-bottom: 1px solid #D8DCE3; padding: 16px; }
+    .lv-section-title {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .08em; color: #9D9FA2; margin-bottom: 14px;
+    }
+    .lv-section-title svg { width: 13px; height: 13px; stroke: #182A55; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    .lv-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .lv-stat-card {
+      background: #F0F1F3; border: 1px solid #D8DCE3;
+      border-radius: 10px; padding: 12px 10px; text-align: center;
+    }
+    .lv-stat-val { font-size: 1.6rem; font-weight: 700; color: #182A55; font-variant-numeric: tabular-nums; }
+    .lv-stat-lbl { font-size: 0.62rem; text-transform: uppercase; letter-spacing: .07em; color: #9D9FA2; margin-top: 3px; }
+    .lv-stat-card.green .lv-stat-val { color: #22C55E; }
+    .lv-stat-card.red .lv-stat-val   { color: #EF4444; }
+    .lv-switch-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 0; font-size: 0.78rem; color: #182A55;
+    }
+    .lv-switch-row .toggle { transform: scale(0.75); transform-origin: right center; }
+    .lv-master-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 16px; background: #F0F1F3; border-radius: 8px; margin-bottom: 10px;
+      font-size: 0.82rem; font-weight: 600; color: #182A55;
+    }
+    .lv-master-row .toggle { transform: scale(0.85); transform-origin: right center; }
+    .lv-tabs {
+      display: flex; gap: 0; border-bottom: 1px solid #D8DCE3;
+      background: #FAFAFA;
+    }
+    .lv-tab {
+      flex: 1; text-align: center; padding: 10px 6px;
+      font-size: 0.72rem; font-weight: 600; color: #9D9FA2;
+      cursor: pointer; border-bottom: 2px solid transparent; transition: all .18s;
+    }
+    .lv-tab.active { color: #182A55; border-bottom-color: #182A55; background: #FFF; }
+    .lv-tab:hover { color: #182A55; }
+    .lv-evidence-list {
+      display: flex; flex-direction: column; gap: 8px;
+      max-height: 400px; overflow-y: auto;
+    }
+    .lv-evidence-item {
+      display: flex; gap: 10px; align-items: flex-start;
+      background: #F8F8FA; border: 1px solid #E8E8EC;
+      border-radius: 8px; padding: 8px; cursor: pointer;
+      transition: background .15s;
+    }
+    .lv-evidence-item:hover { background: #F0F0F5; }
+    .lv-evidence-item img {
+      width: 70px; height: 54px; object-fit: cover; border-radius: 4px;
+      flex-shrink: 0; background: #000;
+    }
+    .lv-evidence-info { flex: 1; min-width: 0; }
+    .lv-evidence-info .e-label { font-size: 0.68rem; font-weight: 600; color: #182A55; }
+    .lv-evidence-info .e-meta  { font-size: 0.6rem; color: #9D9FA2; margin-top: 2px; }
+    .lv-evidence-empty {
+      text-align: center; color: #9D9FA2; font-size: 0.75rem;
+      padding: 24px 0;
+    }
+    .lv-ranking-list { font-size: 0.78rem; }
+    .lv-ranking-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 4px 0; border-bottom: 1px solid #F0F1F3;
+    }
+    .lv-ranking-item:last-child { border-bottom: none; }
+    .lv-ranking-num { font-weight: 700; color: #182A55; }
+    .lv-toast {
+      position: fixed; top: 16px; right: 16px; z-index: 9999;
+      background: #FFF; border: 1px solid #D8DCE3;
+      border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+      padding: 14px; max-width: 320px; display: none;
+      animation: slideIn 0.25s ease-out;
+    }
+    .lv-toast.show { display: block; }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+    .lv-toast-img { width: 100%; height: 120px; object-fit: cover; border-radius: 8px; background: #000; margin-bottom: 8px; }
+    .lv-toast-body { font-size: 0.75rem; color: #182A55; }
+    .lv-toast-body strong { font-weight: 700; }
+    .lv-toast-close {
+      position: absolute; top: 6px; right: 8px;
+      background: none; border: none; color: #9D9FA2;
+      font-size: 1.1rem; cursor: pointer; line-height: 1;
+    }
+    .lv-info-row {
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 0.72rem; color: #9D9FA2;
+      padding: 10px 16px; border-top: 1px solid #D8DCE3;
+    }
+    .lv-info-row span { font-variant-numeric: tabular-nums; }
+    .lv-info-id { color: #182A55; font-weight: 600; }
+  </style>
+</head>
+<body>
+<header class="lv-topbar">
+  <a class="lv-back" href="/module/epp">
+    <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    Volver
+  </a>
+  <div class="lv-sep"></div>
+  <span class="lv-source-name">{{ source.name }}</span>
+  <span class="lv-badge {{ source.type }}">{{ source.type }}</span>
+  <div class="lv-status">
+    <span class="lv-dot on" id="lv-dot"></span>
+    <span id="lv-status-txt">Iniciando…</span>
+  </div>
+  <button class="lv-btn-reset" id="btn-reset">
+    <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+    Reiniciar conteos
+  </button>
+  <button class="lv-btn-stop" id="btn-stop">
+    <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/></svg>
+    Detener
+  </button>
+</header>
+
+<div class="lv-body">
+  <div class="lv-feed">
+    <div class="lv-feed-placeholder" id="feed-placeholder">
+      <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      <p id="feed-placeholder-msg">Conectando con la fuente…</p>
+      <span>{{ source.path }}</span>
+    </div>
+    <img class="lv-feed-img" id="lv-feed-img" src="" alt="Live feed" style="display:none">
+    <span class="lv-feed-ts" id="lv-ts"></span>
+  </div>
+
+  <div class="lv-panel" id="lv-panel">
+    <div class="lv-tabs">
+      <div class="lv-tab active" data-tab="live">En Vivo</div>
+      <div class="lv-tab" data-tab="analytics">Analytics</div>
+    </div>
+
+    <div id="tab-live">
+      <div class="lv-section">
+        <div class="lv-section-title">
+          <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 11 12 14 15 9"/></svg>
+          Detección de EPP
+        </div>
+        <div class="lv-master-row">
+          <span>Análisis de EPP</span>
+          <label class="toggle">
+            <input type="checkbox" id="master-switch" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="lv-grid-2">
+          <div class="lv-stat-card green">
+            <div class="lv-stat-val" id="cnt-protected">0</div>
+            <div class="lv-stat-lbl">Protegidos</div>
+          </div>
+          <div class="lv-stat-card red">
+            <div class="lv-stat-val" id="cnt-unprotected">0</div>
+            <div class="lv-stat-lbl">Sin EPP</div>
+          </div>
+        </div>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid #D8DCE3;">
+          <div style="font-size:0.65rem;color:#9D9FA2;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">EPP requerido</div>
+          <div class="lv-switch-row">
+            <span>Casco</span>
+            <label class="toggle"><input type="checkbox" class="epp-req" data-cls="4" checked><span class="slider"></span></label>
+          </div>
+          <div class="lv-switch-row">
+            <span>Chaleco</span>
+            <label class="toggle"><input type="checkbox" class="epp-req" data-cls="6" checked><span class="slider"></span></label>
+          </div>
+          <div class="lv-switch-row">
+            <span>Botas</span>
+            <label class="toggle"><input type="checkbox" class="epp-req" data-cls="0"><span class="slider"></span></label>
+          </div>
+          <div class="lv-switch-row">
+            <span>Protectores auditivos</span>
+            <label class="toggle"><input type="checkbox" class="epp-req" data-cls="1"><span class="slider"></span></label>
+          </div>
+          <div class="lv-switch-row">
+            <span>Lentes</span>
+            <label class="toggle"><input type="checkbox" class="epp-req" data-cls="2"><span class="slider"></span></label>
+          </div>
+          <div class="lv-switch-row">
+            <span>Guantes</span>
+            <label class="toggle"><input type="checkbox" class="epp-req" data-cls="3"><span class="slider"></span></label>
+          </div>
+        </div>
+      </div>
+      <div class="lv-section">
+        <div class="lv-section-title">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Alertas
+        </div>
+        <div id="evidence-list" class="lv-evidence-list">
+          <div class="lv-evidence-empty">Sin alertas aún</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-analytics" style="display:none">
+      <div class="lv-section">
+        <div class="lv-section-title">
+          <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Analytics
+        </div>
+        <div style="margin-bottom:10px">
+          <label style="font-size:0.65rem;color:#9D9FA2;text-transform:uppercase;letter-spacing:.06em;">Vista</label>
+          <select id="analytics-days" style="margin-left:8px;font-size:0.75rem;padding:3px 8px;border:1px solid #D8DCE3;border-radius:5px;">
+            <option value="1" selected>En vivo</option>
+          </select>
+        </div>
+        <div id="epp-ranking-container">
+          <div style="font-size:0.72rem;font-weight:600;color:#182A55;margin-bottom:8px;">EPP más usado</div>
+          <div id="epp-ranking" class="lv-ranking-list">
+            <div style="color:#9D9FA2;font-size:0.72rem;">Sin datos aún</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="lv-info-row">
+      <span>Fuente #<span class="lv-info-id">{{ source.id }}</span></span>
+      <span id="lv-fps">— fps</span>
+    </div>
+  </div>
+</div>
+
+<div class="lv-toast" id="lv-toast">
+  <button class="lv-toast-close" id="toast-close">&times;</button>
+  <img class="lv-toast-img" id="toast-img" src="" alt="Alerta">
+  <div class="lv-toast-body" id="toast-body"></div>
+</div>
+
+<script>
+const SOURCE_ID = {{ source.id }};
+let poll = null;
+let frameCount = 0;
+let fpsTimer = null;
+let prevToastData = null;
+
+(async () => {
+  document.getElementById("feed-placeholder-msg").textContent = "Iniciando pipeline…";
+  const r = await fetch(`/api/epp/sources/${SOURCE_ID}/start`, { method: "POST" });
+  if (r.ok) {
+    document.getElementById("feed-placeholder-msg").textContent = "Cargando modelo de IA…";
+    document.getElementById("lv-status-txt").textContent = "Cargando…";
+    const img = document.getElementById("lv-feed-img");
+    img.onload = () => {
+      img.style.display = "block";
+      document.getElementById("feed-placeholder").style.display = "none";
+      document.getElementById("lv-status-txt").textContent = "En vivo";
+    };
+    img.onerror = () => {
+      document.getElementById("feed-placeholder-msg").textContent = "Error al conectar con la fuente";
+      document.getElementById("lv-dot").classList.remove("on");
+      document.getElementById("lv-status-txt").textContent = "Error";
+    };
+    img.src = `/api/epp/stream/${SOURCE_ID}`;
+    startPoll();
+    startFpsCounter();
+  } else {
+    document.getElementById("feed-placeholder-msg").textContent = "Error al iniciar el análisis";
+    document.getElementById("lv-status-txt").textContent = "Error al iniciar";
+    document.getElementById("lv-dot").classList.remove("on");
+  }
+})();
+
+function startPoll() {
+  if (poll) clearInterval(poll);
+  poll = setInterval(async () => {
+    const r = await fetch(`/api/epp/sources/${SOURCE_ID}/stats`);
+    if (!r.ok) return;
+    const d = await r.json();
+    document.getElementById("cnt-protected").textContent = d.protected;
+    document.getElementById("cnt-unprotected").textContent = d.unprotected;
+    document.getElementById("lv-ts").textContent =
+      new Date().toLocaleTimeString("es-MX", { hour12: false });
+
+    const ev = d.evidencias;
+    if (ev && ev.length > 0) {
+      renderEvidencias(ev);
+      const latest = ev[0];
+      const toastKey = latest.track_id + "-" + latest.timestamp;
+      if (toastKey !== prevToastData) {
+        showToast(latest);
+        prevToastData = toastKey;
+      }
+    }
+
+    const ranking = d.epp_ranking;
+    if (ranking && ranking.length > 0) {
+      renderRanking(ranking);
+    }
+  }, 1500);
+}
+
+function startFpsCounter() {
+  document.getElementById("lv-feed-img").addEventListener("load", () => frameCount++);
+  fpsTimer = setInterval(() => {
+    document.getElementById("lv-fps").textContent = `${frameCount} fps`;
+    frameCount = 0;
+  }, 1000);
+}
+
+function renderEvidencias(evidencias) {
+  const container = document.getElementById("evidence-list");
+  if (!evidencias || evidencias.length === 0) {
+    container.innerHTML = '<div class="lv-evidence-empty">Sin alertas aún</div>';
+    return;
+  }
+  container.innerHTML = evidencias.map(e => `
+    <div class="lv-evidence-item" onclick="showEvidence(this)" data-json='${JSON.stringify(e).replace(/'/g,"&#39;")}'>
+      <img src="${e.capture_path}" alt="Alerta" loading="lazy">
+      <div class="lv-evidence-info">
+        <div class="e-label">ID[${e.track_id}] ${e.status === 'sin_epp' ? 'SIN EPP' : e.status}</div>
+        <div class="e-meta">${e.date} ${e.timestamp}</div>
+      </div>
+    </div>
+  `).join("");
+}
+
+function renderRanking(ranking) {
+  const container = document.getElementById("epp-ranking");
+  if (!ranking || ranking.length === 0) {
+    container.innerHTML = '<div style="color:#9D9FA2;font-size:0.72rem;">Sin datos aún</div>';
+    return;
+  }
+  container.innerHTML = ranking.map((item, i) => `
+    <div class="lv-ranking-item">
+      <span>${i + 1}. ${item[0].charAt(0).toUpperCase() + item[0].slice(1)}</span>
+      <span class="lv-ranking-num">${item[1]}</span>
+    </div>
+  `).join("");
+}
+
+function showEvidence(el) {
+  let data;
+  try { data = JSON.parse(el.dataset.json); } catch(e) { return; }
+  showToast(data);
+}
+
+function showToast(data) {
+  if (typeof data === "string") {
+    try { data = JSON.parse(data); } catch(e) { return; }
+  }
+  const toast = document.getElementById("lv-toast");
+  document.getElementById("toast-img").src = data.capture_path || "";
+  document.getElementById("toast-body").innerHTML =
+    `<strong>ID[${data.track_id}]</strong> · SIN EPP<br>
+     ${data.date} ${data.timestamp}`;
+  toast.classList.add("show");
+}
+
+document.getElementById("toast-close").addEventListener("click", () => {
+  document.getElementById("lv-toast").classList.remove("show");
+});
+
+document.querySelectorAll(".lv-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".lv-tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    const target = tab.dataset.tab;
+    document.getElementById("tab-live").style.display = target === "live" ? "" : "none";
+    document.getElementById("tab-analytics").style.display = target === "analytics" ? "" : "none";
+  });
+});
+
+let masterDebounce = null;
+document.getElementById("master-switch").addEventListener("change", function() {
+  clearTimeout(masterDebounce);
+  masterDebounce = setTimeout(async () => {
+    await fetch(`/api/epp/sources/${SOURCE_ID}/master`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled: this.checked }),
+    });
+  }, 100);
+});
+
+let reqDebounce = null;
+document.querySelectorAll(".epp-req").forEach(cb => {
+  cb.addEventListener("change", () => {
+    clearTimeout(reqDebounce);
+    reqDebounce = setTimeout(async () => {
+      const checked = Array.from(document.querySelectorAll(".epp-req:checked")).map(c => parseInt(c.dataset.cls));
+      await fetch(`/api/epp/sources/${SOURCE_ID}/required-epp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ classes: checked }),
+      });
+    }, 200);
+  });
+});
+
+document.getElementById("btn-reset").addEventListener("click", async () => {
+  await fetch(`/api/epp/sources/${SOURCE_ID}/reset`, { method: "POST" });
+  ["cnt-protected","cnt-unprotected"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = "0";
+  });
+  document.getElementById("evidence-list").innerHTML =
+    '<div class="lv-evidence-empty">Sin alertas aún</div>';
+  document.getElementById("epp-ranking").innerHTML =
+    '<div style="color:#9D9FA2;font-size:0.72rem;">Sin datos aún</div>';
+  document.getElementById("lv-toast").classList.remove("show");
+});
+
+document.getElementById("btn-stop").addEventListener("click", async () => {
+  clearInterval(poll);
+  clearInterval(fpsTimer);
+  await fetch(`/api/epp/sources/${SOURCE_ID}/stop`, { method: "POST" });
+  window.location.href = "/module/epp";
+});
+
+window.addEventListener("pagehide", () => {
+  navigator.sendBeacon(`/api/epp/sources/${SOURCE_ID}/stop`);
+});
+</script>
+</body>
+</html>

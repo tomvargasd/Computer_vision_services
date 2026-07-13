@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ source.name }} · CVVision Live</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    /* ── Live view fullscreen ─────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #F4F5F7;
+      color: #182A55;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      height: 100dvh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Topbar ───────────────────────────────────────────────── */
+    .lv-topbar {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 0 20px;
+      height: 52px;
+      background: #FFFFFF;
+      border-bottom: 1px solid #D8DCE3;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .lv-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: #9D9FA2;
+      text-decoration: none;
+      font-size: 0.8rem;
+      font-weight: 500;
+      transition: color .18s;
+    }
+    .lv-back:hover { color: #182A55; }
+    .lv-back svg {
+      width: 15px; height: 15px;
+      stroke: currentColor; fill: none;
+      stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
+    }
+
+    .lv-sep { width: 1px; height: 22px; background: #D8DCE3; }
+
+    .lv-source-name {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .lv-badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      padding: 3px 9px;
+      border-radius: 20px;
+    }
+    .lv-badge.stream { background: rgba(255,222,0,0.15); color: #182A55; }
+    .lv-badge.video  { background: rgba(24,42,85,0.08); color: #182A55; }
+
+    .lv-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      color: #9D9FA2;
+      margin-left: auto;
+    }
+    .lv-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #9D9FA2;
+    }
+    .lv-dot.on {
+      background: #22C55E;
+      box-shadow: 0 0 6px rgba(34,197,94,0.5);
+      animation: pulse-dot 2s infinite;
+    }
+    @keyframes pulse-dot {
+      0%,100% { opacity: 1; }
+      50%      { opacity: .5; }
+    }
+
+    .lv-btn-stop {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(239,68,68,0.10);
+      border: 1px solid #D8DCE3;
+      color: #EF4444;
+      font-size: 0.75rem;
+      font-weight: 600;
+      font-family: inherit;
+      padding: 6px 14px;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: background .18s;
+    }
+    .lv-btn-stop:hover { background: rgba(239,68,68,0.18); }
+    .lv-btn-stop svg {
+      width: 12px; height: 12px;
+      stroke: currentColor; fill: currentColor; stroke-width: 0;
+    }
+
+    .lv-btn-reset {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(24,42,85,0.06);
+      border: 1px solid #D8DCE3;
+      color: #9D9FA2;
+      font-size: 0.75rem;
+      font-family: inherit;
+      padding: 6px 12px;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: color .18s;
+    }
+    .lv-btn-reset:hover { color: #182A55; }
+    .lv-btn-reset svg {
+      width: 12px; height: 12px;
+      stroke: currentColor; fill: none;
+      stroke-width: 2.2; stroke-linecap: round;
+    }
+
+    /* ── Layout: feed izq + panel der ────────────────────────── */
+    .lv-body {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* Feed de video */
+    .lv-feed {
+      flex: 1;
+      min-width: 0;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      border-right: 1px solid #D8DCE3;
+    }
+
+    .lv-feed-img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .lv-feed-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      color: #9D9FA2;
+      text-align: center;
+      padding: 32px;
+    }
+    .lv-feed-placeholder svg {
+      width: 64px; height: 64px;
+      stroke: #D8DCE3; fill: none;
+      stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round;
+    }
+    .lv-feed-placeholder p    { font-size: 0.88rem; color: #9D9FA2; }
+    .lv-feed-placeholder span { font-size: 0.72rem; color: #9D9FA2; word-break: break-all; }
+
+    /* Overlay timestamp en el feed */
+    .lv-feed-ts {
+      position: absolute;
+      bottom: 10px;
+      right: 14px;
+      font-size: 0.68rem;
+      font-family: "SF Mono", "Fira Code", monospace;
+      color: rgba(255,255,255,0.4);
+      pointer-events: none;
+    }
+
+    /* Panel lateral */
+    .lv-panel {
+      width: 300px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      overflow-y: auto;
+      background: #FFFFFF;
+    }
+
+    .lv-section {
+      border-bottom: 1px solid #D8DCE3;
+      padding: 16px;
+    }
+
+    .lv-section-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: #9D9FA2;
+      margin-bottom: 14px;
+    }
+    .lv-section-title svg {
+      width: 13px; height: 13px;
+      stroke: #182A55; fill: none;
+      stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
+    }
+
+    /* ── Conteo ─────────────────────────────────────────────── */
+    .lv-count-big {
+      text-align: center;
+      padding: 8px 0 12px;
+    }
+    .lv-count-num {
+      font-size: 3.5rem;
+      font-weight: 800;
+      line-height: 1;
+      color: #182A55;
+      font-variant-numeric: tabular-nums;
+    }
+    .lv-count-lbl {
+      font-size: 0.72rem;
+      color: #9D9FA2;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-top: 4px;
+    }
+
+    /* ── Línea de conteo ─────────────────────────── */
+    .lv-line-config {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #D8DCE3;
+    }
+    .lv-line-lbl {
+      font-size: 0.68rem;
+      color: #9D9FA2;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 6px;
+    }
+    .lv-line-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .lv-line-row input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      flex: 1;
+      height: 4px;
+      border-radius: 2px;
+      background: #D8DCE3;
+      outline: none;
+      cursor: pointer;
+    }
+    .lv-line-row input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #C800C8;
+      cursor: pointer;
+    }
+    .lv-line-row input[type="range"]::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: none;
+      background: #C800C8;
+      cursor: pointer;
+    }
+    .lv-line-val {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #182A55;
+      min-width: 42px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .lv-inout {
+      display: flex;
+      gap: 10px;
+    }
+
+    .lv-inout-card {
+      flex: 1;
+      background: #F0F1F3;
+      border: 1px solid #D8DCE3;
+      border-radius: 10px;
+      padding: 12px 10px;
+      text-align: center;
+    }
+    .lv-inout-val {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #182A55;
+      font-variant-numeric: tabular-nums;
+    }
+    .lv-inout-card.in  .lv-inout-val { color: #22C55E; }
+    .lv-inout-card.out .lv-inout-val { color: #EF4444; }
+    .lv-inout-lbl {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: #9D9FA2;
+      margin-top: 3px;
+    }
+
+    /* ── Permanencia ────────────────────────────────────────── */
+    .lv-dwell-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .lv-dwell-card {
+      background: #F0F1F3;
+      border: 1px solid #D8DCE3;
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .lv-dwell-tag {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .lv-dwell-icon {
+      width: 30px; height: 30px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .lv-dwell-icon.max { background: rgba(255,222,0,0.15); }
+    .lv-dwell-icon.min { background: rgba(34,197,94,0.10); }
+    .lv-dwell-icon svg {
+      width: 15px; height: 15px;
+      stroke: currentColor; fill: none;
+      stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    }
+    .lv-dwell-icon.max svg { stroke: #FFDE00; }
+    .lv-dwell-icon.min svg { stroke: #22C55E; }
+
+    .lv-dwell-lbl  { font-size: 0.7rem; color: #9D9FA2; margin-bottom: 2px; }
+    .lv-dwell-val  {
+      font-size: 1.4rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+    .lv-dwell-card.max .lv-dwell-val { color: #182A55; }
+    .lv-dwell-card.min .lv-dwell-val { color: #22C55E; }
+    .lv-dwell-none { font-size: 0.75rem; color: #9D9FA2; font-style: italic; }
+
+    /* ── Mapa de calor ──────────────────────────────────────── */
+    .lv-heatmap-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .lv-heatmap-info {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .lv-heatmap-lbl  { font-size: 0.82rem; font-weight: 500; }
+    .lv-heatmap-sub  { font-size: 0.7rem; color: #9D9FA2; }
+
+    /* Reutilizamos .toggle / .slider del CSS global */
+
+    /* ── Info row ───────────────────────────────────────────── */
+    .lv-info-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      color: #9D9FA2;
+      padding: 10px 16px;
+      border-top: 1px solid #D8DCE3;
+    }
+    .lv-info-row span { font-variant-numeric: tabular-nums; }
+    .lv-info-id { color: #182A55; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<!-- ── Topbar ───────────────────────────────────────────────── -->
+<header class="lv-topbar">
+  <a class="lv-back" href="/module/personas">
+    <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    Volver
+  </a>
+  <div class="lv-sep"></div>
+  <span class="lv-source-name">{{ source.name }}</span>
+  <span class="lv-badge {{ source.type }}">{{ source.type }}</span>
+
+  <div class="lv-status">
+    <span class="lv-dot on" id="lv-dot"></span>
+    <span id="lv-status-txt">Iniciando…</span>
+  </div>
+
+  <button class="lv-btn-reset" id="btn-reset">
+    <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+    Reiniciar conteos
+  </button>
+
+  <button class="lv-btn-stop" id="btn-stop">
+    <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/></svg>
+    Detener
+  </button>
+</header>
+
+<!-- ── Cuerpo ────────────────────────────────────────────────── -->
+<div class="lv-body">
+
+  <!-- Video feed -->
+  <div class="lv-feed">
+    <div class="lv-feed-placeholder" id="feed-placeholder">
+      <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      <p id="feed-placeholder-msg">Conectando con la fuente…</p>
+      <span>{{ source.path }}</span>
+    </div>
+    <img class="lv-feed-img" id="lv-feed-img" src="" alt="Live feed" style="display:none">
+    <span class="lv-feed-ts" id="lv-ts"></span>
+  </div>
+
+  <!-- Panel de análisis -->
+  <div class="lv-panel">
+
+    <!-- ── 1. Conteo de personas ──────────────────────────── -->
+    {% if module.functions.conteo is defined %}
+    <div class="lv-section" id="sec-conteo">
+      <div class="lv-section-title">
+        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Conteo de Personas
+      </div>
+
+      <div class="lv-count-big">
+        <div class="lv-count-num" id="cnt-cur">0</div>
+        <div class="lv-count-lbl">personas en escena</div>
+      </div>
+
+      <div class="lv-inout">
+        <div class="lv-inout-card in">
+          <div class="lv-inout-val" id="cnt-in">0</div>
+          <div class="lv-inout-lbl">Entradas</div>
+        </div>
+        <div class="lv-inout-card out">
+          <div class="lv-inout-val" id="cnt-out">0</div>
+          <div class="lv-inout-lbl">Salidas</div>
+        </div>
+      </div>
+
+      <!-- ── Línea de conteo ──────────────────── -->
+      <div class="lv-line-config">
+        <div class="lv-line-lbl">Línea de conteo</div>
+        <div class="lv-line-row">
+          <input type="range" id="line-y-slider" min="10" max="95" step="1" value="{{ settings.get('personas_line_y', '85') }}">
+          <span class="lv-line-val" id="line-y-val">{{ settings.get('personas_line_y', '85') }}%</span>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- ── 2. Tiempo de permanencia ───────────────────────── -->
+    {% if module.functions.permanencia is defined %}
+    <div class="lv-section" id="sec-permanencia">
+      <div class="lv-section-title">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Tiempo de Permanencia
+      </div>
+
+      <div class="lv-dwell-cards">
+        <div class="lv-dwell-card max">
+          <div class="lv-dwell-tag">
+            <div class="lv-dwell-icon max">
+              <svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg>
+            </div>
+            <div>
+              <div class="lv-dwell-lbl">Máximo en escena</div>
+              <div class="lv-dwell-val" id="dwell-max"><span class="lv-dwell-none">—</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="lv-dwell-card min">
+          <div class="lv-dwell-tag">
+            <div class="lv-dwell-icon min">
+              <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+            <div>
+              <div class="lv-dwell-lbl">Mínimo en escena</div>
+              <div class="lv-dwell-val" id="dwell-min"><span class="lv-dwell-none">—</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- ── 3. Mapa de calor ───────────────────────────────── -->
+    {% if module.functions.heatmap is defined %}
+    <div class="lv-section" id="sec-heatmap">
+      <div class="lv-section-title">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/></svg>
+        Mapa de Calor
+      </div>
+      <div class="lv-heatmap-row">
+        <div class="lv-heatmap-info">
+          <span class="lv-heatmap-lbl">Overlay de densidad</span>
+          <span class="lv-heatmap-sub">Visualiza zonas de mayor actividad</span>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="heatmap-toggle"
+                 {% if func_state.get('heatmap') %}checked{% endif %}>
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- ── Info footer ────────────────────────────────────── -->
+    <div class="lv-info-row">
+      <span>Fuente #<span class="lv-info-id">{{ source.id }}</span></span>
+      <span id="lv-fps">— fps</span>
+    </div>
+
+  </div><!-- /lv-panel -->
+</div><!-- /lv-body -->
+
+<script>
+const SOURCE_ID = {{ source.id }};
+let poll = null;
+let frameCount = 0;
+let fpsTimer   = null;
+
+// ── Iniciar pipeline al cargar ─────────────────────────────────────────────
+(async () => {
+  document.getElementById("feed-placeholder-msg").textContent = "Iniciando pipeline…";
+  const r = await fetch(`/api/personas/sources/${SOURCE_ID}/start`, { method: "POST" });
+  if (r.ok) {
+    document.getElementById("feed-placeholder-msg").textContent = "Cargando modelo de IA…";
+    document.getElementById("lv-status-txt").textContent = "Cargando…";
+
+    const img = document.getElementById("lv-feed-img");
+
+    // Mostrar video cuando llegue el primer frame real
+    img.onload = () => {
+      img.style.display = "block";
+      document.getElementById("feed-placeholder").style.display = "none";
+      document.getElementById("lv-status-txt").textContent = "En vivo";
+    };
+
+    img.onerror = () => {
+      document.getElementById("feed-placeholder-msg").textContent = "Error al conectar con la fuente";
+      document.getElementById("lv-dot").classList.remove("on");
+      document.getElementById("lv-status-txt").textContent = "Error";
+    };
+
+    img.src = `/api/personas/stream/${SOURCE_ID}`;
+    startPoll();
+    startFpsCounter();
+  } else {
+    document.getElementById("feed-placeholder-msg").textContent = "Error al iniciar el análisis";
+    document.getElementById("lv-status-txt").textContent = "Error al iniciar";
+    document.getElementById("lv-dot").classList.remove("on");
+  }
+})();
+
+// ── Polling de stats ────────────────────────────────────────────────────────
+function fmtSecs(s) {
+  if (s === null || s === undefined) return null;
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return m ? `${m}m ${sec}s` : `${sec}s`;
+}
+
+function startPoll() {
+  if (poll) clearInterval(poll);
+  poll = setInterval(async () => {
+    const r = await fetch(`/api/personas/sources/${SOURCE_ID}/stats`);
+    if (!r.ok) return;
+    const d = await r.json();
+
+    // Conteo
+    const curEl = document.getElementById("cnt-cur");
+    if (curEl) curEl.textContent = d.current_persons;
+    const inEl  = document.getElementById("cnt-in");
+    if (inEl)  inEl.textContent  = d.in_count;
+    const outEl = document.getElementById("cnt-out");
+    if (outEl) outEl.textContent = d.out_count;
+
+    // Permanencia max
+    const maxEl = document.getElementById("dwell-max");
+    if (maxEl) {
+      const t = fmtSecs(d.max_dwell);
+      maxEl.innerHTML = t ? t : '<span class="lv-dwell-none">—</span>';
+    }
+    // Permanencia min
+    const minEl = document.getElementById("dwell-min");
+    if (minEl) {
+      const t = fmtSecs(d.min_dwell);
+      minEl.innerHTML = t ? t : '<span class="lv-dwell-none">—</span>';
+    }
+
+    // Timestamp
+    const now = new Date();
+    document.getElementById("lv-ts").textContent =
+      now.toLocaleTimeString("es-MX", { hour12: false });
+  }, 1500);
+}
+
+// ── Contador FPS (frames de imagen cargados) ────────────────────────────────
+function startFpsCounter() {
+  const img = document.getElementById("lv-feed-img");
+  img.addEventListener("load", () => frameCount++);
+  fpsTimer = setInterval(() => {
+    document.getElementById("lv-fps").textContent = `${frameCount} fps`;
+    frameCount = 0;
+  }, 1000);
+}
+
+// ── Línea de conteo en tiempo real ──────────────────────────────────────────
+const lineSlider = document.getElementById("line-y-slider");
+const lineVal    = document.getElementById("line-y-val");
+if (lineSlider) {
+  let lineDebounce;
+  lineSlider.addEventListener("input", () => {
+    lineVal.textContent = lineSlider.value + "%";
+    clearTimeout(lineDebounce);
+    lineDebounce = setTimeout(async () => {
+      await fetch(`/api/personas/sources/${SOURCE_ID}/line-y`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pct: parseInt(lineSlider.value) }),
+      });
+    }, 150);
+  });
+}
+
+// ── Toggle heatmap en caliente ──────────────────────────────────────────────
+const heatToggle = document.getElementById("heatmap-toggle");
+if (heatToggle) {
+  heatToggle.addEventListener("change", async () => {
+    await fetch(`/api/modules/personas/functions/heatmap/toggle`, { method: "POST" });
+  });
+}
+
+// ── Reiniciar conteos ───────────────────────────────────────────────────────
+document.getElementById("btn-reset").addEventListener("click", async () => {
+  await fetch(`/api/personas/sources/${SOURCE_ID}/reset`, { method: "POST" });
+  ["cnt-cur","cnt-in","cnt-out"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = "0";
+  });
+  ["dwell-max","dwell-min"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '<span class="lv-dwell-none">—</span>';
+  });
+});
+
+// ── Detener pipeline y volver ───────────────────────────────────────────────
+document.getElementById("btn-stop").addEventListener("click", async () => {
+  clearInterval(poll);
+  clearInterval(fpsTimer);
+  await fetch(`/api/personas/sources/${SOURCE_ID}/stop`, { method: "POST" });
+  window.location.href = "/module/personas";
+});
+
+// ── Limpiar al cerrar/navegar ───────────────────────────────────────────────
+window.addEventListener("pagehide", () => {
+  navigator.sendBeacon(`/api/personas/sources/${SOURCE_ID}/stop`);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}CV Dashboard{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
+</head>
+<body>
+
+<!-- ── SIDEBAR ─────────────────────────────── -->
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <div class="logo">
+      {% if settings.logo %}
+        <img class="logo-img" src="{{ url_for('static', filename='uploads/' ~ settings.logo) }}" alt="Logo"/>
+      {% else %}
+        <span class="logo-icon">◈</span>
+      {% endif %}
+      
+    </div>
+    <p class="logo-sub">{{ settings.system_name }}</p>
+  </div>
+
+  <nav class="sidebar-nav">
+    <a href="{{ url_for('index') }}" class="nav-item {% if request.endpoint == 'index' %}active{% endif %}">
+      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Dashboard
+    </a>
+
+    <div class="nav-section-label">Módulos</div>
+
+    <a href="{{ url_for('module_view', module_id='reglamento') }}"
+       class="nav-item {% if request.endpoint == 'module_view' and module_id == 'reglamento' %}active{% endif %}">
+      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 11 12 14 15 9"/></svg>
+      <span>Reglamento</span>
+      <span class="status-dot {% if modules['reglamento']['enabled'] %}on{% endif %}"></span>
+    </a>
+    <a href="{{ url_for('module_view', module_id='epp') }}"
+       class="nav-item {% if request.endpoint == 'module_view' and module_id == 'epp' %}active{% endif %}">
+      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+      <span>EPP</span>
+      <span class="status-dot {% if modules['epp']['enabled'] %}on{% endif %}"></span>
+    </a>
+    <a href="{{ url_for('module_view', module_id='vehiculos') }}"
+       class="nav-item {% if request.endpoint == 'module_view' and module_id == 'vehiculos' %}active{% endif %}">
+      <svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="14" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+      <span>Vehículos</span>
+      <span class="status-dot {% if modules['vehiculos']['enabled'] %}on{% endif %}"></span>
+    </a>
+    <a href="{{ url_for('module_view', module_id='carga_descarga') }}"
+       class="nav-item {% if request.endpoint == 'module_view' and module_id == 'carga_descarga' %}active{% endif %}">
+      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3 8 12 13 21 8"/></svg>
+      Carga y Descarga
+      <span class="status-dot {% if modules['carga_descarga']['enabled'] %}on{% endif %}"></span>
+    </a>
+
+    <a href="{{ url_for('module_view', module_id='personas') }}"
+       class="nav-item {% if request.endpoint == 'module_view' and module_id == 'personas' %}active{% endif %}">
+      <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0 1 12 0v2"/></svg>
+      Detección de Personas
+      <span class="status-dot {% if modules['personas']['enabled'] %}on{% endif %}"></span>
+    </a>
+
+    <a href="{{ url_for('module_view', module_id='armas') }}"
+       class="nav-item {% if request.endpoint == 'module_view' and module_id == 'armas' %}active{% endif %}">
+      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Detección de Armas
+      <span class="status-dot {% if modules['armas']['enabled'] %}on{% endif %}"></span>
+    </a>
+
+    <a href="{{ url_for('module_view', module_id='acciones') }}"
+       class="nav-item {% if request.endpoint == 'module_view' and module_id == 'acciones' %}active{% endif %}">
+      <svg class="nav-icon" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Detección de Acciones
+      <span class="status-dot {% if modules['acciones']['enabled'] %}on{% endif %}"></span>
+    </a>
+
+    <a href="{{ url_for('module_view', module_id='troncos') }}"
+       class="nav-item {% if request.endpoint == 'module_view' and module_id == 'troncos' %}active{% endif %}">
+      <svg class="nav-icon" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="12" y1="6" x2="12" y2="18"/><line x1="6" y1="10" x2="10" y2="10"/><line x1="14" y1="14" x2="18" y2="14"/></svg>
+      Conteo de Troncos
+      <span class="status-dot {% if modules['troncos']['enabled'] %}on{% endif %}"></span>
+    </a>
+
+    <a href="{{ url_for('module_view', module_id='pallets') }}"
+       class="nav-item {% if request.endpoint == 'module_view' and module_id == 'pallets' %}active{% endif %}">
+      <svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 12h18M12 3v18"/></svg>
+      Conteo de Pallets
+      <span class="status-dot {% if modules['pallets']['enabled'] %}on{% endif %}"></span>
+    </a>
+
+    <a href="{{ url_for('module_view', module_id='cajas') }}"
+       class="nav-item {% if request.endpoint == 'module_view' and module_id == 'cajas' %}active{% endif %}">
+      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+      Conteo de Cajas
+      <span class="status-dot {% if modules['cajas']['enabled'] %}on{% endif %}"></span>
+    </a>
+
+    <a href="{{ url_for('module_view', module_id='smoke') }}"
+       class="nav-item {% if request.endpoint == 'module_view' and module_id == 'smoke' %}active{% endif %}">
+      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span>Humo/Fuego</span>
+      <span class="status-dot {% if modules['smoke']['enabled'] %}on{% endif %}"></span>
+    </a>
+  </nav>
+
+  <!-- Sistema — separado al fondo -->
+  <div class="sidebar-sistema">
+    <div class="nav-section-label">Sistema</div>
+    <a href="{{ url_for('settings_view') }}"
+       class="nav-item {% if request.endpoint == 'settings_view' %}active{% endif %}">
+      <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Configuración
+    </a>
+  </div>
+
+  <div class="sidebar-footer">
+    
+    <div class="footer-version">
+      Sistema &nbsp;<strong>{{ settings.version }}</strong>
+    </div>
+  </div>
+</aside>
+
+<!-- ── MAIN CONTENT ─────────────────────────── -->
+<main class="main">
+  <header class="topbar">
+    <h1 class="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
+    <div class="topbar-right">
+      <span class="online-badge">En línea</span>
+    </div>
+  </header>
+
+  <div class="content">
+    {% block content %}{% endblock %}
+  </div>
+</main>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

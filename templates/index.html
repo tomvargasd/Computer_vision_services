@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · CVVision{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+
+<!-- Acción rápida -->
+<div class="dashboard-actions">
+  <button class="btn-action" id="btn-register-source">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+    Registrar video / stream
+  </button>
+</div>
+
+<!-- Tarjetas de módulos (solo lectura) -->
+<section class="dashboard-grid">
+  {% for mod_id, mod in modules.items() %}
+  <a href="{{ url_for('module_view', module_id=mod_id) }}" class="module-card {% if mod.enabled %}active{% endif %}" id="card-{{ mod_id }}">
+
+    <div class="card-header">
+      <div class="card-info">
+        {% if mod_id == 'personas' %}
+        <svg class="card-icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0 1 12 0v2"/></svg>
+        {% elif mod_id == 'armas' %}
+        <svg class="card-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        {% else %}
+        <svg class="card-icon" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        {% endif %}
+        <div>
+          <h3 class="card-title">{{ mod.label }}</h3>
+          <p class="card-sub">{{ mod.functions | length }} funciones</p>
+        </div>
+      </div>
+      <span class="mod-status-badge {% if mod.enabled %}on{% endif %}">
+        {{ 'Activo' if mod.enabled else 'Inactivo' }}
+      </span>
+    </div>
+
+    <!-- Funciones activas -->
+    <ul class="func-list-ro">
+      {% for func_id, func in mod.functions.items() %}
+      <li class="func-item-ro {% if func.enabled %}active{% endif %}">
+        <span class="func-dot {% if func.enabled %}on{% endif %}"></span>
+        <span class="func-label-ro">{{ func.label }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+
+    <!-- Stats -->
+    <div class="card-stats">
+      <div class="stat">
+        <span class="stat-val">{{ mod.functions.values() | selectattr('enabled') | list | length }}</span>
+        <span class="stat-lbl">funciones activas</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">{{ sources_count.get(mod_id, 0) }}</span>
+        <span class="stat-lbl">fuentes</span>
+      </div>
+    </div>
+
+    <span class="card-cta">Ver módulo →</span>
+  </a>
+  {% endfor %}
+</section>
+
+<!-- ══ MODAL: Registrar recurso ══════════════════════ -->
+<div class="modal-backdrop" id="modal-source" hidden>
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Registrar video / stream</h3>
+      <button class="modal-close" id="modal-close">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-field">
+        <label class="modal-label">Módulo destino</label>
+        <select class="modal-select" id="src-module">
+          {% for mod_id, mod in modules.items() %}
+          <option value="{{ mod_id }}">{{ mod.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="modal-field">
+        <label class="modal-label">Tipo de recurso</label>
+        <div class="type-toggle">
+          <button class="type-btn active" data-type="video">
+            <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+            Video
+          </button>
+          <button class="type-btn" data-type="stream">
+            <svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>
+            Stream / RTSP
+          </button>
+        </div>
+      </div>
+      <div class="modal-field">
+        <label class="modal-label">Nombre</label>
+        <input class="modal-input" id="src-name" type="text" placeholder="Ej: Cámara entrada 1"/>
+      </div>
+      <div class="modal-field">
+        <label class="modal-label" id="src-path-label">Ruta del archivo</label>
+        <input class="modal-input" id="src-path" type="text" placeholder="/ruta/video.mp4"/>
+      </div>
+      <div class="modal-error" id="modal-error" hidden></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" id="btn-cancel-source">Cancelar</button>
+      <button class="btn-confirm" id="btn-confirm-source">Registrar</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Modal ────────────────────────────────────────────────────────────────────
+const modal      = document.getElementById("modal-source");
+const btnOpen    = document.getElementById("btn-register-source");
+const btnClose   = document.getElementById("modal-close");
+const btnCancel  = document.getElementById("btn-cancel-source");
+const btnConfirm = document.getElementById("btn-confirm-source");
+const errorBox   = document.getElementById("modal-error");
+const pathLabel  = document.getElementById("src-path-label");
+const pathInput  = document.getElementById("src-path");
+
+let selectedType = "video";
+
+btnOpen.addEventListener("click",  () => { modal.hidden = false; errorBox.hidden = true; });
+btnClose.addEventListener("click", () => { modal.hidden = true; });
+btnCancel.addEventListener("click",() => { modal.hidden = true; });
+modal.addEventListener("click", (e) => { if (e.target === modal) modal.hidden = true; });
+
+// Tipo toggle
+document.querySelectorAll(".type-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".type-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    selectedType = btn.dataset.type;
+    pathLabel.textContent = selectedType === "stream" ? "URL / RTSP" : "Ruta del archivo";
+    pathInput.placeholder = selectedType === "stream" ? "rtsp://192.168.1.1/stream" : "/ruta/video.mp4";
+  });
+});
+
+// Confirmar
+btnConfirm.addEventListener("click", async () => {
+  const module_id = document.getElementById("src-module").value;
+  const name      = document.getElementById("src-name").value.trim();
+  const path      = pathInput.value.trim();
+
+  if (!name || !path) {
+    showError("Por favor completa todos los campos.");
+    return;
+  }
+
+  try {
+    const res  = await fetch("/api/sources", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ module_id, name, type: selectedType, path }),
+    });
+    const data = await res.json();
+    if (!res.ok) { showError(data.error || "Error al registrar"); return; }
+
+    modal.hidden = true;
+    // Actualizar contador en la card del módulo
+    const card = document.getElementById(`card-${module_id}`);
+    if (card) {
+      const statVals = card.querySelectorAll(".stat-val");
+      if (statVals[1]) statVals[1].textContent = parseInt(statVals[1].textContent || 0) + 1;
+    }
+    // Limpiar form
+    document.getElementById("src-name").value = "";
+    pathInput.value = "";
+  } catch (err) {
+    showError("Error de conexión.");
+  }
+});
+
+function showError(msg) {
+  errorBox.textContent = msg;
+  errorBox.hidden = false;
+}
+</script>
+{% endblock %}
+

@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ source.name }} · CVVision Live — Armas</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #F4F5F7;
+      color: #182A55;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      height: 100dvh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Topbar ────────────────────────────────────────────── */
+    .lv-topbar {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 0 20px;
+      height: 52px;
+      background: #FFFFFF;
+      border-bottom: 1px solid #D8DCE3;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+    .lv-back {
+      display: inline-flex; align-items: center; gap: 7px;
+      color: #9D9FA2; text-decoration: none;
+      font-size: 0.8rem; font-weight: 500; transition: color .18s;
+    }
+    .lv-back:hover { color: #182A55; }
+    .lv-back svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    .lv-sep { width: 1px; height: 22px; background: #D8DCE3; }
+    .lv-source-name { font-size: 0.9rem; font-weight: 600; }
+    .lv-badge { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: 3px 9px; border-radius: 20px; }
+    .lv-badge.stream { background: rgba(255,222,0,0.15); color: #182A55; }
+    .lv-badge.video  { background: rgba(24,42,85,0.08); color: #182A55; }
+    .lv-status { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: #9D9FA2; margin-left: auto; }
+    .lv-dot { width: 7px; height: 7px; border-radius: 50%; background: #9D9FA2; }
+    .lv-dot.on { background: #22C55E; box-shadow: 0 0 6px rgba(34,197,94,0.5); animation: pulse-dot 2s infinite; }
+    @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.5} }
+    .lv-btn-stop {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(239,68,68,0.10); border: 1px solid #D8DCE3;
+      color: #EF4444; font-size: 0.75rem; font-weight: 600; font-family: inherit;
+      padding: 6px 14px; border-radius: 7px; cursor: pointer; transition: background .18s;
+    }
+    .lv-btn-stop:hover { background: rgba(239,68,68,0.18); }
+    .lv-btn-stop svg { width: 12px; height: 12px; stroke: currentColor; fill: currentColor; stroke-width: 0; }
+    .lv-btn-reset {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: rgba(24,42,85,0.06); border: 1px solid #D8DCE3; color: #9D9FA2;
+      font-size: 0.75rem; font-family: inherit; padding: 6px 12px; border-radius: 7px; cursor: pointer; transition: color .18s;
+    }
+    .lv-btn-reset:hover { color: #182A55; }
+    .lv-btn-reset svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; }
+
+    /* ── Layout ────────────────────────────────────────────── */
+    .lv-body { display: flex; flex: 1; min-height: 0; }
+
+    .lv-feed {
+      flex: 1; min-width: 0; background: #000;
+      display: flex; align-items: center; justify-content: center;
+      position: relative; border-right: 1px solid #D8DCE3;
+    }
+    .lv-feed-img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+    .lv-feed-placeholder {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 12px; color: #9D9FA2; text-align: center; padding: 32px;
+    }
+    .lv-feed-placeholder svg { width: 64px; height: 64px; stroke: #D8DCE3; fill: none; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; }
+    .lv-feed-placeholder p    { font-size: 0.88rem; color: #9D9FA2; }
+    .lv-feed-placeholder span { font-size: 0.72rem; color: #9D9FA2; word-break: break-all; }
+    .lv-feed-ts { position: absolute; bottom: 10px; right: 14px; font-size: 0.68rem; font-family: "SF Mono","Fira Code",monospace; color: rgba(255,255,255,0.4); pointer-events: none; }
+
+    /* ── Panel lateral ─────────────────────────────────────── */
+    .lv-panel {
+      width: 320px; flex-shrink: 0;
+      display: flex; flex-direction: column; gap: 0;
+      overflow-y: auto; background: #FFFFFF;
+    }
+    .lv-section { border-bottom: 1px solid #D8DCE3; padding: 16px; }
+    .lv-section-title {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .08em; color: #9D9FA2; margin-bottom: 14px;
+    }
+    .lv-section-title svg { width: 13px; height: 13px; stroke: #182A55; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* ── Contador de armas ─────────────────────────────────── */
+    .lv-count-big { text-align: center; padding: 8px 0 12px; }
+    .lv-count-num { font-size: 3.5rem; font-weight: 800; line-height: 1; color: #182A55; font-variant-numeric: tabular-nums; }
+    .lv-count-lbl { font-size: 0.72rem; color: #9D9FA2; text-transform: uppercase; letter-spacing: .06em; margin-top: 4px; }
+
+    .lv-tipo-row { display: flex; gap: 10px; margin-top: 4px; }
+    .lv-tipo-card {
+      flex: 1; background: #F0F1F3; border: 1px solid #D8DCE3;
+      border-radius: 10px; padding: 12px 10px; text-align: center;
+    }
+    .lv-tipo-val { font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .lv-tipo-card.blanca  .lv-tipo-val { color: #D97706; }
+    .lv-tipo-card.fuego   .lv-tipo-val { color: #EF4444; }
+    .lv-tipo-lbl { font-size: 0.62rem; text-transform: uppercase; letter-spacing: .07em; color: #9D9FA2; margin-top: 3px; }
+
+    /* ── Capturas ──────────────────────────────────────────── */
+    .lv-cap-total { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .lv-cap-total-num { font-size: 1.8rem; font-weight: 700; color: #182A55; font-variant-numeric: tabular-nums; }
+    .lv-cap-total-lbl { font-size: 0.72rem; color: #9D9FA2; text-transform: uppercase; letter-spacing: .06em; }
+
+    .cap-groups { display: flex; flex-direction: column; gap: 14px; }
+
+    .cap-group {}
+    .cap-group-header {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .08em; color: #9D9FA2; margin-bottom: 7px;
+    }
+    .cap-group-header .cap-id-badge {
+      background: rgba(255,222,0,0.15); color: #182A55;
+      padding: 2px 8px; border-radius: 12px; font-size: 0.65rem;
+    }
+
+    .cap-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 4px;
+    }
+    .cap-thumb {
+      aspect-ratio: 3/4;
+      width: 100%;
+      object-fit: cover;
+      border-radius: 4px;
+      background: #F0F1F3;
+      border: 1px solid #D8DCE3;
+      cursor: pointer;
+      transition: transform .15s, border-color .15s;
+    }
+    .cap-thumb:hover { transform: scale(1.05); border-color: #D8DCE3; z-index: 2; }
+
+    /* Lightbox */
+    .lb-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.85); z-index: 1000;
+      align-items: center; justify-content: center;
+    }
+    .lb-overlay.open { display: flex; }
+    .lb-overlay img { max-width: 90vw; max-height: 90vh; min-width: 500px; border-radius: 8px; border: 1px solid #D8DCE3; }
+    .lb-close { position: absolute; top: 20px; right: 24px; font-size: 2rem; color: #fff; cursor: pointer; line-height: 1; }
+
+    /* ── Funciones (toggles) ───────────────────────────────── */
+    .lv-func-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 8px 0;
+    }
+    .lv-func-row + .lv-func-row { border-top: 1px solid #E5E7EB; }
+    .lv-func-info { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+    .lv-func-lbl  { font-size: 0.82rem; font-weight: 500; }
+    .lv-func-sub  { font-size: 0.68rem; color: #9D9FA2; }
+
+    /* Locked badge */
+    .lv-lock-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: rgba(255,222,0,0.12); color: #182A55;
+      font-size: 0.62rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .06em; padding: 3px 8px; border-radius: 12px;
+      white-space: nowrap;
+    }
+    .lv-lock-badge svg { width: 10px; height: 10px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; }
+
+    /* ── Info footer ───────────────────────────────────────── */
+    .lv-info-row {
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 0.72rem; color: #9D9FA2; padding: 10px 16px;
+      border-top: 1px solid #D8DCE3;
+    }
+    .lv-info-id { color: #182A55; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<!-- ── Topbar ────────────────────────────────────────────────── -->
+<header class="lv-topbar">
+  <a class="lv-back" href="/module/armas">
+    <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    Volver
+  </a>
+  <div class="lv-sep"></div>
+  <span class="lv-source-name">{{ source.name }}</span>
+  <span class="lv-badge {{ source.type }}">{{ source.type }}</span>
+
+  <div class="lv-status">
+    <span class="lv-dot on" id="lv-dot"></span>
+    <span id="lv-status-txt">Iniciando…</span>
+  </div>
+
+  <button class="lv-btn-reset" id="btn-reset">
+    <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+    Reiniciar
+  </button>
+
+  <button class="lv-btn-stop" id="btn-stop">
+    <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/></svg>
+    Detener
+  </button>
+</header>
+
+<!-- ── Cuerpo ─────────────────────────────────────────────────── -->
+<div class="lv-body">
+
+  <!-- Video feed -->
+  <div class="lv-feed">
+    <div class="lv-feed-placeholder" id="feed-placeholder">
+      <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <p id="feed-placeholder-msg">Conectando con la fuente…</p>
+      <span>{{ source.path }}</span>
+    </div>
+    <img class="lv-feed-img" id="lv-feed-img" src="" alt="Live feed" style="display:none">
+    <span class="lv-feed-ts" id="lv-ts"></span>
+  </div>
+
+  <!-- Panel -->
+  <div class="lv-panel">
+
+    <!-- ── 1. Detección de Armas ─────────────────────────── -->
+    <div class="lv-section" id="sec-armas">
+      <div class="lv-section-title">
+        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Armas Detectadas
+      </div>
+
+      <div class="lv-count-big">
+        <div class="lv-count-num" id="cnt-armas">0</div>
+        <div class="lv-count-lbl">armas únicas en escena</div>
+      </div>
+
+      <div class="lv-tipo-row">
+        <div class="lv-tipo-card blanca">
+          <div class="lv-tipo-val" id="cnt-blanca">0</div>
+          <div class="lv-tipo-lbl">Arma Blanca</div>
+        </div>
+        <div class="lv-tipo-card fuego">
+          <div class="lv-tipo-val" id="cnt-fuego">0</div>
+          <div class="lv-tipo-lbl">Arma de Fuego</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 2. Capturas de Rostros ────────────────────────── -->
+    <div class="lv-section" id="sec-capturas">
+      <div class="lv-section-title">
+        <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        Capturas de Rostros
+      </div>
+
+      <div class="lv-cap-total">
+        <div>
+          <div class="lv-cap-total-num" id="cnt-capturas">0</div>
+          <div class="lv-cap-total-lbl">capturas totales</div>
+        </div>
+      </div>
+
+      <!-- Grupos por tracker ID, renderizados por JS -->
+      <div class="cap-groups" id="cap-groups">
+        <p style="font-size:0.75rem;color:#9D9FA2;font-style:italic" id="cap-empty-msg">
+          Las capturas aparecerán aquí cuando se detecte un arma y se active la captura de rostro.
+        </p>
+      </div>
+    </div>
+
+    <!-- ── 3. Funciones activas ──────────────────────────── -->
+    <div class="lv-section" id="sec-funciones">
+      <div class="lv-section-title">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Funciones
+      </div>
+
+      <!-- Detección de arma -->
+      <div class="lv-func-row">
+        <div class="lv-func-info">
+          <span class="lv-func-lbl">Detección de arma</span>
+          <span class="lv-func-sub">Detecta presencia de armas en escena</span>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" class="toggle-func-live"
+                 data-func="deteccion_arma"
+                 {% if func_state.get('deteccion_arma') %}checked{% endif %}>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <!-- Captura de rostro -->
+      <div class="lv-func-row">
+        <div class="lv-func-info">
+          <span class="lv-func-lbl">Captura de rostro</span>
+          <span class="lv-func-sub">Guarda foto del portador del arma</span>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" class="toggle-func-live"
+                 data-func="captura_rostro"
+                 {% if func_state.get('captura_rostro') %}checked{% endif %}>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <!-- Tipo de arma — LOCKED, siempre activo -->
+      <div class="lv-func-row">
+        <div class="lv-func-info">
+          <span class="lv-func-lbl">Clasificar tipo de arma</span>
+          <span class="lv-func-sub">Clasifica arma blanca o de fuego</span>
+        </div>
+        <span class="lv-lock-badge">
+          <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Siempre activa
+        </span>
+      </div>
+    </div>
+
+    <!-- ── Info footer ─────────────────────────────────────── -->
+    <div class="lv-info-row">
+      <span>Fuente #<span class="lv-info-id">{{ source.id }}</span></span>
+      <span id="lv-fps">— fps</span>
+    </div>
+
+  </div><!-- /lv-panel -->
+</div><!-- /lv-body -->
+
+<!-- Lightbox -->
+<div class="lb-overlay" id="lb-overlay">
+  <span class="lb-close" id="lb-close">×</span>
+  <img id="lb-img" src="" alt="Captura">
+</div>
+
+<script>
+const SOURCE_ID = {{ source.id }};
+let poll = null;
+let frameCount = 0;
+let fpsTimer   = null;
+
+// Estado local de capturas (para no redibujar si no cambia)
+let capturesSnapshot = {};
+
+// ── Iniciar pipeline ──────────────────────────────────────────────────────
+(async () => {
+  document.getElementById("feed-placeholder-msg").textContent = "Iniciando pipeline…";
+  const r = await fetch(`/api/armas/sources/${SOURCE_ID}/start`, { method: "POST" });
+  if (r.ok) {
+    document.getElementById("feed-placeholder-msg").textContent = "Cargando modelo de IA…";
+    startStream();
+    poll = setInterval(fetchStats, 2000);
+    startFpsMeter();
+  } else {
+    document.getElementById("feed-placeholder-msg").textContent = "Error al iniciar el pipeline";
+    document.getElementById("lv-dot").classList.remove("on");
+    document.getElementById("lv-status-txt").textContent = "Error";
+  }
+})();
+
+function startStream() {
+  const img = document.getElementById("lv-feed-img");
+  img.onload = () => {
+    document.getElementById("feed-placeholder").style.display = "none";
+    img.style.display = "block";
+    document.getElementById("lv-status-txt").textContent = "En línea";
+    frameCount++;
+  };
+  img.onerror = () => {
+    document.getElementById("feed-placeholder").style.display = "flex";
+    document.getElementById("feed-placeholder-msg").textContent = "Error de conexión con la fuente";
+    img.style.display = "none";
+    document.getElementById("lv-dot").classList.remove("on");
+    document.getElementById("lv-status-txt").textContent = "Sin señal";
+  };
+  img.src = `/api/armas/stream/${SOURCE_ID}`;
+}
+
+function startFpsMeter() {
+  frameCount = 0;
+  fpsTimer = setInterval(() => {
+    document.getElementById("lv-fps").textContent = `${frameCount} fps`;
+    frameCount = 0;
+  }, 1000);
+}
+
+// ── Stats polling ─────────────────────────────────────────────────────────
+async function fetchStats() {
+  try {
+    const r = await fetch(`/api/armas/sources/${SOURCE_ID}/stats`);
+    if (!r.ok) return;
+    const d = await r.json();
+    updateStats(d);
+  } catch (_) {}
+}
+
+function updateStats(d) {
+  document.getElementById("cnt-armas").textContent    = d.weapon_count ?? 0;
+  document.getElementById("cnt-capturas").textContent = d.capture_count ?? 0;
+
+  // Tipo de armas (cuenta los IDs con al menos 1 captura como heurística;
+  // el servidor no envía desglose per-type directamente pero lo podemos omitir)
+  // Por ahora mostramos el total en ambas cartas (se puede refinar con backend)
+  // document.getElementById("cnt-blanca").textContent = ...
+  // document.getElementById("cnt-fuego").textContent  = ...
+
+  // Galería de capturas
+  renderCaptures(d.captures || {});
+
+  // Actualizar timestamp
+  const now = new Date();
+  document.getElementById("lv-ts").textContent =
+    now.toLocaleTimeString("es-MX", {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+}
+
+// ── Galería de capturas ───────────────────────────────────────────────────
+function renderCaptures(captures) {
+  const container = document.getElementById("cap-groups");
+  const emptyMsg  = document.getElementById("cap-empty-msg");
+  const ids = Object.keys(captures);
+
+  if (ids.length === 0) {
+    emptyMsg && (emptyMsg.style.display = "");
+    return;
+  }
+  emptyMsg && (emptyMsg.style.display = "none");
+
+  // Detectar cambios: sólo actualizar grupos que cambien
+  for (const tid of ids) {
+    const urls  = captures[tid];
+    const prev  = capturesSnapshot[tid] || [];
+    if (urls.length === prev.length) continue;   // sin cambios
+
+    capturesSnapshot[tid] = [...urls];
+
+    // Crear/actualizar grupo
+    let groupEl = document.getElementById(`cap-group-${tid}`);
+    if (!groupEl) {
+      groupEl = document.createElement("div");
+      groupEl.className = "cap-group";
+      groupEl.id = `cap-group-${tid}`;
+      groupEl.innerHTML = `
+        <div class="cap-group-header">
+          <span class="cap-id-badge">ID #${tid}</span>
+          <span class="cap-group-count">${urls.length} / 6</span>
+        </div>
+        <div class="cap-grid" id="cap-grid-${tid}"></div>`;
+      container.appendChild(groupEl);
+    } else {
+      const countEl = groupEl.querySelector(".cap-group-count");
+      if (countEl) countEl.textContent = `${urls.length} / 6`;
+    }
+
+    const grid = document.getElementById(`cap-grid-${tid}`);
+    if (!grid) continue;
+    grid.innerHTML = "";
+    for (const url of urls.slice(0, 6)) {
+      const img = document.createElement("img");
+      img.className = "cap-thumb";
+      img.src = url;
+      img.alt = `Captura ID #${tid}`;
+      img.loading = "lazy";
+      img.addEventListener("click", () => openLightbox(url));
+      grid.appendChild(img);
+    }
+  }
+}
+
+// ── Lightbox ──────────────────────────────────────────────────────────────
+const lbOverlay = document.getElementById("lb-overlay");
+const lbImg     = document.getElementById("lb-img");
+
+function openLightbox(url) {
+  lbImg.src = url;
+  lbOverlay.classList.add("open");
+}
+document.getElementById("lb-close").addEventListener("click", () => lbOverlay.classList.remove("open"));
+lbOverlay.addEventListener("click", e => { if (e.target === lbOverlay) lbOverlay.classList.remove("open"); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") lbOverlay.classList.remove("open"); });
+
+// ── Toggle funciones en vivo ──────────────────────────────────────────────
+document.querySelectorAll(".toggle-func-live").forEach(input => {
+  input.addEventListener("change", async () => {
+    const funcId = input.dataset.func;
+    const res = await fetch(`/api/modules/armas/functions/${funcId}/toggle`, { method: "POST" });
+    if (!res.ok) {
+      input.checked = !input.checked; // revertir
+    }
+  });
+});
+
+// ── Reiniciar ─────────────────────────────────────────────────────────────
+document.getElementById("btn-reset").addEventListener("click", async () => {
+  await fetch(`/api/armas/sources/${SOURCE_ID}/reset`, { method: "POST" });
+  // Limpiar galería local
+  capturesSnapshot = {};
+  document.getElementById("cap-groups").innerHTML = `
+    <p style="font-size:0.75rem;color:#1a3050;font-style:italic" id="cap-empty-msg">
+      Las capturas aparecerán aquí cuando se detecte un arma y se active la captura de rostro.
+    </p>`;
+  document.getElementById("cnt-armas").textContent    = "0";
+  document.getElementById("cnt-capturas").textContent = "0";
+  document.getElementById("cnt-blanca").textContent   = "0";
+  document.getElementById("cnt-fuego").textContent    = "0";
+});
+
+// ── Detener ───────────────────────────────────────────────────────────────
+document.getElementById("btn-stop").addEventListener("click", async () => {
+  clearInterval(poll);
+  clearInterval(fpsTimer);
+  await fetch(`/api/armas/sources/${SOURCE_ID}/stop`, { method: "POST" });
+  document.getElementById("lv-feed-img").src = "";
+  document.getElementById("lv-feed-img").style.display = "none";
+  document.getElementById("feed-placeholder").style.display = "flex";
+  document.getElementById("feed-placeholder-msg").textContent = "Análisis detenido";
+  document.getElementById("lv-dot").classList.remove("on");
+  document.getElementById("lv-status-txt").textContent = "Detenido";
+  document.getElementById("lv-fps").textContent = "— fps";
+});
+
+// ── Cleanup al salir ──────────────────────────────────────────────────────
+window.addEventListener("pagehide", () => {
+  navigator.sendBeacon(`/api/armas/sources/${SOURCE_ID}/stop`);
+});
+</script>
+</body>
+</html>

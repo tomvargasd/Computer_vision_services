@@ -1,0 +1,672 @@
+{% extends "base.html" %}
+{% block title %}Configuración · CVVision{% endblock %}
+{% block page_title %}Configuración{% endblock %}
+
+{% block content %}
+<div class="settings-page">
+
+  <!-- ══ Tabs principales ════════════════════════════ -->
+  <div class="settings-tabs">
+    <button class="settings-tab active" data-tab="general">General</button>
+    <button class="settings-tab" data-tab="modulos">Módulos</button>
+  </div>
+
+  <!-- ══ PANEL: General ═══════════════════════════════ -->
+  <div class="settings-tab-panel active" id="panel-general">
+
+    <!-- Logo -->
+    <div class="settings-section">
+      <div class="settings-section-header">
+        <svg class="settings-section-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        <span class="settings-section-title">Logo del sistema</span>
+      </div>
+      <div class="settings-section-body">
+        <div class="logo-preview-wrap">
+          <div class="logo-preview-box" id="logo-preview-box">
+            {% if settings.logo %}
+              <img id="logo-preview-img"
+                   src="{{ url_for('static', filename='uploads/' ~ settings.logo) }}"
+                   alt="Logo actual"/>
+            {% else %}
+              <svg id="logo-preview-placeholder" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            {% endif %}
+          </div>
+          <div class="upload-area">
+            <label class="upload-label" for="logo-file-input">
+              <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Subir logo
+            </label>
+            <input type="file" id="logo-file-input" accept=".png,.jpg,.jpeg,.svg,.webp,.gif"/>
+            <span class="upload-hint">PNG, JPG, SVG o WEBP · máx. 2 MB</span>
+            <div class="settings-toast" id="logo-toast">✓ Logo actualizado correctamente</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nombre -->
+    <div class="settings-section">
+      <div class="settings-section-header">
+        <svg class="settings-section-icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        <span class="settings-section-title">Identidad del sistema</span>
+      </div>
+      <div class="settings-section-body">
+        <div class="settings-field">
+          <label class="settings-label" for="system-name-input">Texto bajo el logo (sidebar)</label>
+          <input class="settings-input" id="system-name-input" type="text"
+                 value="{{ settings.system_name }}" maxlength="40"
+                 placeholder="Ej: Computer Vision"/>
+        </div>
+        <button class="settings-save-btn" id="save-name-btn">Guardar</button>
+        <div class="settings-toast" id="name-toast">✓ Nombre actualizado</div>
+      </div>
+    </div>
+
+    <!-- Versión -->
+    <div class="settings-section">
+      <div class="settings-section-header">
+        <svg class="settings-section-icon" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        <span class="settings-section-title">Versión del sistema</span>
+      </div>
+      <div class="settings-section-body">
+        <div class="settings-field">
+          <label class="settings-label">Versión actual</label>
+          <input class="settings-input" type="text" value="{{ settings.version }}" readonly/>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /panel-general -->
+
+  <!-- ══ PANEL: Módulos ═══════════════════════════════ -->
+  <div class="settings-tab-panel" id="panel-modulos">
+
+    <!-- Sub-tabs de módulos -->
+    <div class="settings-subtabs">
+      {% for mid in ('personas', 'armas', 'acciones', 'troncos', 'pallets', 'cajas', 'reglamento', 'carga_descarga', 'epp', 'smoke', 'vehiculos') %}      <button class="settings-subtab {% if loop.first %}active{% endif %}" data-module="{{ mid }}">
+        {{ modules[mid].label }}
+      </button>
+      {% endfor %}
+    </div>
+
+        {% for mid in ('personas', 'armas', 'acciones', 'troncos', 'pallets', 'cajas', 'reglamento', 'carga_descarga', 'epp', 'smoke', 'vehiculos') %}    {% set model_key = mid + '_model' %}
+    {% set conf_key = mid + '_conf' %}
+    {% set half_key = mid + '_half' %}
+    {% set conf_val = ((settings.get(conf_key) or '0.35') | float * 100) | int %}
+    {% set half_on = settings.get(half_key, '0') == '1' %}
+    {% set pallets_classes_list = settings.get('pallets_classes', '0,1,2,3').split(',') %}
+    <div class="settings-module-panel {% if loop.first %}active{% endif %}" id="mod-panel-{{ mid }}">
+
+      <!-- Modelo -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <svg class="settings-section-icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+          <span class="settings-section-title">Modelo de detección</span>
+        </div>
+        <div class="settings-section-body">
+          <div class="model-info-row">
+            <div class="model-current">
+              <span class="model-current-lbl">Modelo activo:</span>
+              <span class="model-current-val" id="model-name-{{ mid }}">
+                {% if settings.get(model_key) %}
+                  {{ settings.get(model_key).split('/')[-1] }}
+                {% else %}
+                  Modelo por defecto
+                {% endif %}
+              </span>
+            </div>
+            <button class="btn-model-remove" id="btn-model-remove-{{ mid }}"
+                    style="{% if not settings.get(model_key) %}display:none{% endif %}"
+                    title="Eliminar modelo personalizado">
+              <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+              Quitar modelo
+            </button>
+          </div>
+          <input type="file" id="model-file-{{ mid }}" accept=".pt" style="display:none"/>
+          <label for="model-file-{{ mid }}" class="upload-area upload-area-model" id="upload-model-area-{{ mid }}">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <span id="model-upload-label-{{ mid }}">Haz clic o arrastra un archivo .pt aquí</span>
+          </label>
+          <div class="upload-progress" id="model-upload-progress-{{ mid }}" hidden>
+            <div class="upload-progress-bar" id="model-upload-bar-{{ mid }}"></div>
+          </div>
+        </div>
+      </div>
+
+      {% if mid == 'vehiculos' %}
+      <!-- Modelo de Placas -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <svg class="settings-section-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="14" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <span class="settings-section-title">Modelo de Placas</span>
+        </div>
+        <div class="settings-section-body">
+          <div class="model-info-row">
+            <div class="model-current">
+              <span class="model-current-lbl">Modelo activo:</span>
+              <span class="model-current-val" id="plate-model-name-vehiculos">
+                {% if settings.get('vehiculos_plate_model') %}
+                  {{ settings.get('vehiculos_plate_model').split('/')[-1] }}
+                {% else %}
+                  No hay modelo de placas
+                {% endif %}
+              </span>
+            </div>
+            <button class="btn-model-remove" id="btn-plate-model-remove-vehiculos"
+                    style="{% if not settings.get('vehiculos_plate_model') %}display:none{% endif %}"
+                    title="Eliminar modelo de placas">
+              <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+              Quitar modelo
+            </button>
+          </div>
+          <input type="file" id="plate-model-file-vehiculos" accept=".pt" style="display:none"/>
+          <label for="plate-model-file-vehiculos" class="upload-area upload-area-model" id="upload-plate-model-area-vehiculos">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <span id="plate-model-upload-label-vehiculos">Subir modelo .pt para detección de placas</span>
+          </label>
+          <div class="upload-progress" id="plate-model-upload-progress-vehiculos" hidden>
+            <div class="upload-progress-bar" id="plate-model-upload-bar-vehiculos"></div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Confianza -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <svg class="settings-section-icon" viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+          <span class="settings-section-title">Parámetros de detección</span>
+        </div>
+        <div class="settings-section-body">
+          <div class="param-row">
+            <div class="param-info">
+              <span class="param-label">Umbral de confianza</span>
+              <span class="param-desc">Confianza mínima para aceptar una detección (0 – 100 %)</span>
+            </div>
+            <div class="param-control">
+              <input type="range" class="conf-slider" id="conf-slider-{{ mid }}"
+                     min="1" max="99" step="1" value="{{ conf_val }}">
+              <span class="conf-value" id="conf-value-{{ mid }}">{{ conf_val }}%</span>
+            </div>
+          </div>
+          <div class="param-row param-row-divider">
+            <div class="param-info">
+              <span class="param-label">Precisión media (FP16)</span>
+              <span class="param-desc">Reduce uso de memoria y acelera inferencia en GPU/MPS compatible</span>
+            </div>
+            <div class="param-control">
+              <label class="toggle">
+                <input type="checkbox" class="half-toggle" data-module="{{ mid }}"
+                       {% if half_on %}checked{% endif %}>
+                <span class="slider"></span>
+              </label>
+          </div>
+          {% if mid == 'vehiculos' %}
+          {% set plate_conf_val = ((settings.get('vehiculos_plate_conf') or '0.35') | float * 100) | int %}
+          <div class="param-row" style="border-top:1px solid #E8E8EC;padding-top:14px;margin-top:6px">
+            <div class="param-info">
+              <span class="param-label">Umbral de placas</span>
+              <span class="param-desc">Confianza mínima para detectar una placa (0 – 100 %)</span>
+            </div>
+            <div class="param-control">
+              <input type="range" class="conf-slider" id="plate-conf-slider-vehiculos"
+                     min="1" max="99" step="1" value="{{ plate_conf_val }}">
+              <span class="conf-value" id="plate-conf-value-vehiculos">{{ plate_conf_val }}%</span>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      </div>
+
+      {% if mid == 'pallets' %}
+      <!-- Clases a detectar -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <svg class="settings-section-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          <span class="settings-section-title">Clases a detectar</span>
+        </div>
+        <div class="settings-section-body">
+          <span class="settings-label" style="margin-bottom:-6px">Selecciona qué clases detectar y dibujar en pantalla:</span>
+          {% for cid, clbl in {'0': 'Pallet', '1': 'Montacargas', '2': 'Montacargas ocupado', '3': 'Pass / Peatón'}.items() %}
+          <div class="param-row" style="min-height:0;padding-top:0">
+            <div class="param-info">
+              <span class="param-label">{{ clbl }} <span class="param-desc" style="display:inline">(clase {{ cid }})</span></span>
+            </div>
+            <div class="param-control">
+              <label class="toggle">
+                <input type="checkbox" class="pallets-class-toggle" data-class="{{ cid }}"
+                       {% if cid in pallets_classes_list %}checked{% endif %}>
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if mid == 'carga_descarga' %}
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <svg class="settings-section-icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3 8 12 13 21 8"/></svg>
+          <span class="settings-section-title">Modelos de carga</span>
+        </div>
+        <div class="settings-section-body" id="carga-models-list">
+          <span class="settings-label">Agrega modelos .pt con nombre y selecciona las clases a contar:</span>
+          <div id="carga-models-container"></div>
+          <button class="btn" id="add-carga-model" style="margin-top:10px">+ Agregar modelo</button>
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+    {% endfor %}
+
+  </div><!-- /panel-modulos -->
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ══ Tabs principales ═══════════════════════════════════════════════
+document.querySelectorAll(".settings-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".settings-tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".settings-tab-panel").forEach(p => p.classList.remove("active"));
+    tab.classList.add("active");
+    document.getElementById("panel-" + tab.dataset.tab).classList.add("active");
+  });
+});
+
+// ══ Sub-tabs de módulos ═══════════════════════════════════════════
+document.querySelectorAll(".settings-subtab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".settings-subtab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".settings-module-panel").forEach(p => p.classList.remove("active"));
+    tab.classList.add("active");
+    document.getElementById("mod-panel-" + tab.dataset.module).classList.add("active");
+  });
+});
+
+// ── Logo upload ───────────────────────────────────────────────────
+document.getElementById("logo-file-input").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const form = new FormData();
+  form.append("logo", file);
+  try {
+    const res  = await fetch("/api/settings/logo", { method: "POST", body: form });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || "Error al subir logo"); return; }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const box = document.getElementById("logo-preview-box");
+      box.innerHTML = `<img id="logo-preview-img" src="${ev.target.result}" alt="Logo"/>`;
+    };
+    reader.readAsDataURL(file);
+    const sidebarLogoWrap = document.querySelector(".sidebar .logo");
+    if (sidebarLogoWrap) {
+      const url = `/static/uploads/${data.logo}`;
+      const existing = sidebarLogoWrap.querySelector(".logo-img, .logo-icon");
+      if (existing) existing.outerHTML = `<img class="logo-img" src="${url}" alt="Logo"/>`;
+    }
+    showToast("logo-toast");
+  } catch (err) { console.error(err); }
+});
+
+// ── Guardar nombre ────────────────────────────────────────────────
+document.getElementById("save-name-btn").addEventListener("click", async () => {
+  const name = document.getElementById("system-name-input").value.trim();
+  if (!name) return;
+  try {
+    const res = await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ system_name: name })
+    });
+    if (!res.ok) return;
+    const sub = document.querySelector(".sidebar .logo-sub");
+    if (sub) sub.textContent = name;
+    showToast("name-toast");
+  } catch (err) { console.error(err); }
+});
+
+function showToast(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.add("show");
+  setTimeout(() => el.classList.remove("show"), 3000);
+}
+
+// ══ Model upload per module ═══════════════════════════════════════
+const ALL_MIDS = ['personas', 'armas', 'acciones', 'troncos', 'pallets', 'cajas', 'reglamento', 'carga_descarga', 'epp', 'smoke', 'vehiculos'];
+
+ALL_MIDS.forEach(mid => {
+  const modelArea   = document.getElementById("upload-model-area-" + mid);
+  const modelFile   = document.getElementById("model-file-" + mid);
+  const modelLabel  = document.getElementById("model-upload-label-" + mid);
+  const modelProg   = document.getElementById("model-upload-progress-" + mid);
+  const modelBar    = document.getElementById("model-upload-bar-" + mid);
+  const modelName   = document.getElementById("model-name-" + mid);
+  const btnRemove   = document.getElementById("btn-model-remove-" + mid);
+
+  if (!modelArea) return;
+
+  modelArea.addEventListener("dragover",  e => { e.preventDefault(); e.stopPropagation(); modelArea.classList.add("drag-over"); });
+  modelArea.addEventListener("dragleave", e => { e.stopPropagation(); modelArea.classList.remove("drag-over"); });
+  modelArea.addEventListener("drop", e => {
+    e.preventDefault(); e.stopPropagation();
+    modelArea.classList.remove("drag-over");
+    const file = e.dataTransfer.files[0];
+    if (file) doUploadModel(mid, file);
+  });
+  modelFile.addEventListener("change", () => { if (modelFile.files[0]) doUploadModel(mid, modelFile.files[0]); });
+});
+
+function doUploadModel(modId, file) {
+  const modelLabel  = document.getElementById("model-upload-label-" + modId);
+  const modelProg   = document.getElementById("model-upload-progress-" + modId);
+  const modelBar    = document.getElementById("model-upload-bar-" + modId);
+  const modelName   = document.getElementById("model-name-" + modId);
+  const btnRemove   = document.getElementById("btn-model-remove-" + modId);
+
+  if (!file.name.endsWith(".pt")) { alert("Solo se permiten archivos .pt"); return; }
+  modelLabel.textContent = `Subiendo: ${file.name}…`;
+  modelProg.hidden = false;
+  modelBar.style.width = "0%";
+
+  const fd = new FormData();
+  fd.append("model", file);
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", `/api/${modId}/upload-model`);
+  xhr.upload.onprogress = e => {
+    if (e.lengthComputable) modelBar.style.width = Math.round(e.loaded / e.total * 100) + "%";
+  };
+  xhr.onload = () => {
+    if (xhr.status === 200) {
+      const d = JSON.parse(xhr.responseText);
+      modelBar.style.width = "100%";
+      modelLabel.textContent = "Haz clic para cambiar el modelo";
+      if (modelName) modelName.textContent = d.model;
+      if (btnRemove) btnRemove.style.display = "";
+    } else {
+      modelLabel.textContent = "Error al subir el modelo";
+      modelProg.hidden = true;
+    }
+  };
+  xhr.onerror = () => { modelLabel.textContent = "Error de red"; };
+  xhr.send(fd);
+}
+
+ALL_MIDS.forEach(mid => {
+  const btnRemove = document.getElementById("btn-model-remove-" + mid);
+  if (btnRemove) {
+    btnRemove.addEventListener("click", async () => {
+      if (!confirm("¿Eliminar el modelo personalizado y usar el modelo por defecto?")) return;
+      const r = await fetch(`/api/${mid}/model`, { method: "DELETE" });
+      if (r.ok) {
+        const modelName = document.getElementById("model-name-" + mid);
+        const modelLabel = document.getElementById("model-upload-label-" + mid);
+        const modelProg = document.getElementById("model-upload-progress-" + mid);
+        if (modelName) modelName.textContent = "Modelo por defecto";
+        if (modelLabel) modelLabel.textContent = "Subir modelo .pt personalizado";
+        if (modelProg) modelProg.hidden = true;
+        btnRemove.style.display = "none";
+      }
+    });
+  }
+});
+
+// ══ Confianza sliders ══════════════════════════════════════════════
+ALL_MIDS.forEach(mid => {
+  const slider  = document.getElementById("conf-slider-" + mid);
+  const display = document.getElementById("conf-value-" + mid);
+  if (!slider) return;
+  let debounceTimer;
+  slider.addEventListener("input", () => {
+    display.textContent = slider.value + "%";
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(async () => {
+      const conf = parseFloat(slider.value) / 100;
+      try {
+        const r = await fetch(`/api/${mid}/settings/conf`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ conf }),
+        });
+        if (!r.ok) throw new Error(await r.text());
+      } catch (e) { console.error("Error guardando umbral:", e); }
+    }, 600);
+  });
+});
+
+// ══ Precision FP16 toggles ════════════════════════════════════════
+document.querySelectorAll(".half-toggle").forEach(toggle => {
+  toggle.addEventListener("change", async () => {
+    const mid = toggle.dataset.module;
+    try {
+      const r = await fetch(`/api/${mid}/settings/half`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ half: toggle.checked }),
+      });
+      if (!r.ok) throw new Error(await r.text());
+    } catch (e) {
+      console.error("Error guardando FP16:", e);
+      toggle.checked = !toggle.checked;
+    }
+  });
+});
+
+// ══ Plate model upload (vehiculos) ═══════════════════════════════
+const plateArea   = document.getElementById("upload-plate-model-area-vehiculos");
+const plateFile   = document.getElementById("plate-model-file-vehiculos");
+const plateLabel  = document.getElementById("plate-model-upload-label-vehiculos");
+const plateProg   = document.getElementById("plate-model-upload-progress-vehiculos");
+const plateBar    = document.getElementById("plate-model-upload-bar-vehiculos");
+const plateName   = document.getElementById("plate-model-name-vehiculos");
+const plateRemove = document.getElementById("btn-plate-model-remove-vehiculos");
+
+if (plateArea) {
+  plateArea.addEventListener("dragover",  e => { e.preventDefault(); e.stopPropagation(); plateArea.classList.add("drag-over"); });
+  plateArea.addEventListener("dragleave", e => { e.stopPropagation(); plateArea.classList.remove("drag-over"); });
+  plateArea.addEventListener("drop", e => {
+    e.preventDefault(); e.stopPropagation();
+    plateArea.classList.remove("drag-over");
+    const file = e.dataTransfer.files[0];
+    if (file) uploadPlateModel(file);
+  });
+  plateFile.addEventListener("change", () => { if (plateFile.files[0]) uploadPlateModel(plateFile.files[0]); });
+}
+
+function uploadPlateModel(file) {
+  if (!file.name.endsWith(".pt")) { alert("Solo se permiten archivos .pt"); return; }
+  plateLabel.textContent = `Subiendo: ${file.name}…`;
+  plateProg.hidden = false;
+  plateBar.style.width = "0%";
+  const fd = new FormData();
+  fd.append("model", file);
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", "/api/vehiculos/upload-plate-model");
+  xhr.upload.onprogress = e => {
+    if (e.lengthComputable) plateBar.style.width = Math.round(e.loaded / e.total * 100) + "%";
+  };
+  xhr.onload = () => {
+    if (xhr.status === 200) {
+      const d = JSON.parse(xhr.responseText);
+      plateBar.style.width = "100%";
+      plateLabel.textContent = "Haz clic para cambiar el modelo";
+      if (plateName) plateName.textContent = d.model;
+      if (plateRemove) plateRemove.style.display = "";
+    } else {
+      plateLabel.textContent = "Error al subir el modelo";
+      plateProg.hidden = true;
+    }
+  };
+  xhr.onerror = () => { plateLabel.textContent = "Error de red"; };
+  xhr.send(fd);
+}
+
+if (plateRemove) {
+  plateRemove.addEventListener("click", async () => {
+    if (!confirm("¿Eliminar el modelo de placas y usar detección por visión?")) return;
+    const r = await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ vehiculos_plate_model: "" }),
+    });
+    if (r.ok) {
+      if (plateName) plateName.textContent = "No hay modelo de placas";
+      if (plateLabel) plateLabel.textContent = "Subir modelo .pt para detección de placas";
+      if (plateProg) plateProg.hidden = true;
+      plateRemove.style.display = "none";
+    }
+  });
+}
+
+// ══ Plate confidence slider ══════════════════════════════════════
+const plateSlider  = document.getElementById("plate-conf-slider-vehiculos");
+const plateDisplay = document.getElementById("plate-conf-value-vehiculos");
+if (plateSlider) {
+  let debounceTimer;
+  plateSlider.addEventListener("input", () => {
+    plateDisplay.textContent = plateSlider.value + "%";
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(async () => {
+      const conf = parseFloat(plateSlider.value) / 100;
+      try {
+        const r = await fetch("/api/settings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ vehiculos_plate_conf: String(conf) }),
+        });
+        if (!r.ok) throw new Error(await r.text());
+      } catch (e) { console.error("Error guardando umbral de placas:", e); }
+    }, 600);
+  });
+}
+
+// ══ Pallets class toggles ════════════════════════════════════════
+document.querySelectorAll(".pallets-class-toggle").forEach(toggle => {
+  toggle.addEventListener("change", async () => {
+    const checked = Array.from(document.querySelectorAll(".pallets-class-toggle:checked"))
+      .map(t => t.dataset.class)
+      .sort((a,b) => parseInt(a) - parseInt(b));
+    if (checked.length === 0) {
+      toggle.checked = true; // never allow all classes to be off
+      return;
+    }
+    try {
+      const r = await fetch("/api/pallets/settings/classes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ classes: checked.join(",") }),
+      });
+      if (!r.ok) throw new Error(await r.text());
+    } catch (e) {
+      console.error("Error guardando clases:", e);
+      toggle.checked = !toggle.checked;
+    }
+  });
+});
+
+// ══ Carga / Descarga models ══════════════════════════════════════
+let cargaModels = [];
+
+async function loadCargaModels() {
+  try {
+    const r = await fetch("/api/carga_descarga/settings/models");
+    if (!r.ok) return;
+    cargaModels = await r.json();
+    renderCargaModels();
+  } catch (e) {
+    console.error("Error cargando modelos:", e);
+  }
+}
+
+function renderCargaModels() {
+  const container = document.getElementById("carga-models-container");
+  if (!container) return;
+  if (cargaModels.length === 0) {
+    container.innerHTML = '<p style="font-size:0.75rem;color:#9D9FA2;padding:8px 0">No hay modelos agregados aún.</p>';
+    return;
+  }
+  container.innerHTML = cargaModels.map((m, i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #E8E8EC">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:0.78rem;font-weight:600;color:#182A55">${m.name}</div>
+        <div style="font-size:0.65rem;color:#9D9FA2">${m.path.split('/').pop()} · Clases: ${m.classes || 'todas'}</div>
+      </div>
+      <button class="btn" style="font-size:0.65rem;padding:4px 10px" onclick="editCargaModel(${i})">Editar</button>
+      <button class="btn" style="font-size:0.65rem;padding:4px 10px;color:#EF4444" onclick="deleteCargaModel(${i})">✕</button>
+    </div>
+  `).join("");
+}
+
+async function addCargaModel() {
+  const name = prompt("Nombre del modelo (ej: Cajas pequeñas):");
+  if (!name || !name.trim()) return;
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".pt";
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const r = await fetch("/api/carga_descarga/settings/upload-model", {
+        method: "POST", body: fd,
+      });
+      if (!r.ok) throw new Error(await r.text());
+      const data = await r.json();
+      const classes = prompt("Clases a contar (separadas por coma, ej: 0,1,2). Vacío = todas:") || "";
+      cargaModels.push({ name: name.trim(), path: data.path, classes });
+      await saveCargaModels();
+      loadCargaModels();
+    } catch (e) {
+      alert("Error subiendo modelo: " + e.message);
+    }
+  };
+  input.click();
+}
+
+function editCargaModel(idx) {
+  const m = cargaModels[idx];
+  if (!m) return;
+  const name = prompt("Nombre del modelo:", m.name);
+  if (!name || !name.trim()) return;
+  const classes = prompt("Clases a contar (separadas por coma):", m.classes);
+  cargaModels[idx] = { ...m, name: name.trim(), classes: classes ?? "" };
+  saveCargaModels();
+  loadCargaModels();
+}
+
+async function deleteCargaModel(idx) {
+  if (!confirm("¿Eliminar este modelo?")) return;
+  cargaModels.splice(idx, 1);
+  await saveCargaModels();
+  loadCargaModels();
+}
+
+async function saveCargaModels() {
+  try {
+    await fetch("/api/carga_descarga/settings/models", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ models: cargaModels }),
+    });
+  } catch (e) {
+    console.error("Error guardando modelos:", e);
+  }
+}
+
+// Inicializar
+loadCargaModels();
+document.addEventListener("click", (e) => {
+  if (e.target.id === "add-carga-model") addCargaModel();
+});
+</script>
+{% endblock %}
