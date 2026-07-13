@@ -92,6 +92,53 @@ pip install -r requirements.txt
    ```
 6. Abre tu navegador en [http://localhost:5001](http://localhost:5001) (o el puerto configurado).
 
+## Despliegue con Docker y Aceleración GPU (CUDA)
+
+El proyecto cuenta con soporte para Docker y Docker Compose, facilitando su ejecución tanto en entornos locales con CPU (como macOS o Windows) como en servidores con aceleración por GPU NVIDIA (Linux).
+
+El script de despliegue (`deploy.sh`) autodetecta el sistema operativo, la presencia de GPUs NVIDIA y la versión de CUDA en el host para descargar automáticamente la versión de PyTorch adecuada dentro del contenedor.
+
+### Requisitos previos para Linux con GPU (CUDA)
+
+Para que el procesamiento se realice en la GPU de NVIDIA dentro del contenedor Docker en Linux, debes cumplir con los siguientes requisitos en el host:
+
+1. **Controladores de NVIDIA**: Tener instalados los drivers oficiales y actualizados en el sistema operativo host.
+2. **Docker y Docker Compose**: Tener instalado el motor Docker (versión 20.10+) y el plugin Docker Compose.
+3. **NVIDIA Container Toolkit**: Es el componente crítico que permite a Docker interactuar con la GPU de la máquina host.
+   - Instálalo siguiendo la guía oficial: [NVIDIA Container Toolkit Installation Guide](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+   - Configura el runtime de NVIDIA para Docker y reinicia el servicio daemon:
+     ```bash
+     sudo nvidia-ctk runtime configure --runtime=docker
+     sudo systemctl restart docker
+     ```
+
+*Nota: Si estás en macOS o Windows/Linux sin GPU NVIDIA, el script detectará la ausencia de CUDA y desplegará de forma segura en modo **CPU** utilizando la librería optimizada para ello.*
+
+### Despliegue rápido con Docker
+
+1. **Modelos y videos**: Asegúrate de tener los modelos YOLO `.pt` en `static/uploads/models/` y los videos de prueba en `static/uploads/videos/`.
+2. **Ejecutar script de despliegue**:
+   ```bash
+   ./deploy.sh
+   ```
+3. El script creará la base de datos `cvvision.db` vacía en el host (si no existe), creará las carpetas necesarias en `static/uploads`, compilará la imagen de Docker adecuada e iniciará el contenedor en segundo plano.
+4. **Acceder a la aplicación**: Abre tu navegador en [http://localhost:5001](http://localhost:5001).
+
+### Comandos útiles de Docker
+
+* **Ver logs del contenedor**:
+  ```bash
+  docker compose logs -f
+  ```
+* **Detener la aplicación**:
+  ```bash
+  docker compose down
+  ```
+* **Reconstruir contenedores**:
+  ```bash
+  docker compose build --no-cache
+  ```
+
 ## Configuración y módulos
 
 - El sistema cuenta con múltiples módulos de visión artificial que se pueden activar o desactivar independientemente desde la UI:

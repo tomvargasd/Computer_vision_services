@@ -1,0 +1,13 @@
+services:
+  web:
+    build:
+      context: .
+      args:
+        CUDA_VERSION: ${CUDA_TAG:-cpu}
+    container_name: cvvision_app
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./cvvision.db:/app/cvvision.db
+      - ./static/uploads:/app/static/uploads
+    restart: unless-stopped

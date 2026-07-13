@@ -1,0 +1,28 @@
+# Ignore virtual environments
+venv/
+.env/
+env/
+
+# Ignore Python caches and temporary files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Ignore databases and sqlite temporary files
+*.db
+*.db-shm
+*.db-wal
+
+# Ignore git repository details
+.git/
+.gitignore
+
+# Ignore IDE and agent config directories
+.idea/
+.vscode/
+.agents/
+.gemini/
+*.log
