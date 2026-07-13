@@ -1,0 +1,8 @@
+# ByteTrack config ajustado para detección de armas
+tracker_type: bytetrack
+track_high_thresh: 0.20   # igual al conf_thresh_custom para no perder detecciones
+track_low_thresh: 0.07    # segunda pasada agresiva — recupera objetos parcialmente ocultos
+new_track_thresh: 0.20    # coherente con el umbral principal
+track_buffer: 90          # 3 s a 30 fps — aguanta oclusiones más largas sin cambiar ID
+match_thresh: 0.70        # más tolerante a movimiento rápido del portador
+fuse_score: true
