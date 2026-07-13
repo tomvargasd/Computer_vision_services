@@ -1,0 +1,43 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# SQLite databases (local dev state)
+*.db
+*.db-shm
+*.db-wal
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Models and videos (User request: Modelos y videos no deben entrar en el repo)
+*.pt
+*.onnx
+*.engine
+*.weights
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.webm
+
+# Folders for models and videos uploads
+static/uploads/models/
+static/uploads/videos/
+static/uploads/captures/
