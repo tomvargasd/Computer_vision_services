@@ -303,7 +303,7 @@ class ArmasPipeline:
                 self._round_buffer = []
                 if len(self._round_results) >= 3:
                     avg_ratio = sum(self._round_results) / 3.0
-                    if avg_ratio >= 0.3:
+                    if avg_ratio >= 0.2:
                         self._alert_active = True
                         self._alert_timestamp = time.time()
                         # Capturar portadores visibles en este frame
