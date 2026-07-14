@@ -325,6 +325,10 @@ class ArmasPipeline:
                 ty = wy1 - 8 if wy1 > 20 else wy2 + 18
                 cv2.putText(annotated, f"{type_label}  {wconf:.0%}",
                             (wx1, ty), cv2.FONT_HERSHEY_SIMPLEX, 0.50, color, 2, cv2.LINE_AA)
+                # Capturar arma suelta si la alerta ya está activa
+                if self._alert_active:
+                    virtual_id = f"arma_{wid}" if wid is not None else f"arma_{wx1}_{wy1}"
+                    self._capture_bbox(frame, virtual_id, wx1, wy1, wx2, wy2)
 
             # Persona armada — ID estable de la persona
             for (tid, px1, py1, px2, py2, pconf) in armed_persons:
@@ -346,6 +350,34 @@ class ArmasPipeline:
         )
 
         return annotated
+
+    def _capture_bbox(
+        self, frame: np.ndarray, label: str,
+        x1: int, y1: int, x2: int, y2: int,
+    ) -> None:
+        """Guarda la región del bbox completo con throttle de 1s y max 12 por label."""
+        MAX_WEAPON_CAPS = 12
+        WEAPON_THROTTLE = 1.0
+        if len(self._captures.get(label, [])) >= MAX_WEAPON_CAPS:
+            return
+        now = time.time()
+        if now - self._last_cap_ts.get(label, 0.0) < WEAPON_THROTTLE:
+            return
+        crop = frame[max(0, y1):min(frame.shape[0], y2),
+                     max(0, x1):min(frame.shape[1], x2)]
+        if crop.size == 0 or crop.shape[0] < 15 or crop.shape[1] < 15:
+            return
+        tid_dir = os.path.join(self._cap_dir, label)
+        os.makedirs(tid_dir, exist_ok=True)
+        ts = int(time.time() * 1000)
+        filename = f"cap_{ts}.jpg"
+        cv2.imwrite(os.path.join(tid_dir, filename), crop, [cv2.IMWRITE_JPEG_QUALITY, 88])
+        url = f"/static/uploads/captures/{self.source_id}/{label}/{filename}"
+        if label not in self._captures:
+            self._captures[label] = []
+        self._captures[label].append(url)
+        self._last_cap_ts[label] = now
+        self.capture_count += 1
 
     def _try_capture(
         self,

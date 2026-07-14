@@ -465,36 +465,38 @@ function renderCaptures(captures) {
   for (const tid of ids) {
     const urls  = captures[tid];
     const prev  = capturesSnapshot[tid] || [];
-    if (urls.length === prev.length) continue;   // sin cambios
+    if (urls.length === prev.length) continue;
 
     capturesSnapshot[tid] = [...urls];
 
-    // Crear/actualizar grupo
     let groupEl = document.getElementById(`cap-group-${tid}`);
+    const isArma = String(tid).startsWith("arma_");
+    const idLabel = isArma ? `Arma #${tid.replace("arma_","")}` : `ID #${tid}`;
+
     if (!groupEl) {
       groupEl = document.createElement("div");
       groupEl.className = "cap-group";
       groupEl.id = `cap-group-${tid}`;
       groupEl.innerHTML = `
         <div class="cap-group-header">
-          <span class="cap-id-badge">ID #${tid}</span>
-          <span class="cap-group-count">${urls.length} / 6</span>
+          <span class="cap-id-badge">${idLabel}</span>
+          <span class="cap-group-count">${urls.length}</span>
         </div>
         <div class="cap-grid" id="cap-grid-${tid}"></div>`;
       container.appendChild(groupEl);
     } else {
       const countEl = groupEl.querySelector(".cap-group-count");
-      if (countEl) countEl.textContent = `${urls.length} / 6`;
+      if (countEl) countEl.textContent = urls.length;
     }
 
     const grid = document.getElementById(`cap-grid-${tid}`);
     if (!grid) continue;
     grid.innerHTML = "";
-    for (const url of urls.slice(0, 6)) {
+    for (const url of urls) {
       const img = document.createElement("img");
       img.className = "cap-thumb";
       img.src = url;
-      img.alt = `Captura ID #${tid}`;
+      img.alt = `Captura ${idLabel}`;
       img.loading = "lazy";
       img.addEventListener("click", () => openLightbox(url));
       grid.appendChild(img);
