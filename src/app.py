@@ -30,6 +30,24 @@ from src.modules.smoke import SmokeManager
 from src.modules.vehiculos import VehiculosManager
 
 
+def _normalize_path(path, src_type):
+    if src_type != "video":
+        return path
+    if path.startswith(("http://", "https://", "rtsp://", "rtmp://")):
+        return path
+    abspath = os.path.abspath(path)
+    if os.path.exists(abspath):
+        rel = os.path.relpath(abspath, BASE_DIR)
+        if not rel.startswith(".."):
+            return rel
+    return path
+
+
+def _get_fps_limit(module_id, src_type, settings):
+    key = f"{module_id}_fps_limit_{src_type}"
+    return float(settings.get(key, "0.02" if src_type == "video" else "0.0"))
+
+
 app = Flask(__name__, template_folder=os.path.join(BASE_DIR, "templates"),
             static_folder=os.path.join(BASE_DIR, "static"))
 CORS(app)
@@ -427,12 +445,14 @@ def personas_start(source_id):
     if not src:
         return jsonify({"error": "Fuente no encontrada"}), 404
     s = get_settings()
+    fps_limit = _get_fps_limit("personas", src["type"], s)
     PersonasManager.get().start(source_id, src["path"],
         _func_state_for("personas"),
         float(s.get("personas_conf", "0.35")),
         s.get("personas_half", "0") == "1",
         s.get("personas_model") or None,
-        int(s.get("personas_line_y", "85")))
+        int(s.get("personas_line_y", "85")),
+        fps_limit=fps_limit)
     return jsonify({"started": source_id})
 
 
@@ -481,11 +501,13 @@ def armas_start(source_id):
     if not src:
         return jsonify({"error": "Fuente no encontrada"}), 404
     s = get_settings()
+    fps_limit = _get_fps_limit("armas", src["type"], s)
     ArmasManager.get().start(source_id, src["path"],
         _func_state_for("armas"),
         float(s.get("armas_conf", "0.20")),
         s.get("armas_half", "0") == "1",
-        s.get("armas_model") or None)
+        s.get("armas_model") or None,
+        fps_limit=fps_limit)
     return jsonify({"started": source_id})
 
 
@@ -525,11 +547,13 @@ def acciones_start(source_id):
     if not src:
         return jsonify({"error": "Fuente no encontrada"}), 404
     s = get_settings()
+    fps_limit = _get_fps_limit("acciones", src["type"], s)
     AccionesManager.get().start(source_id, src["path"],
         _func_state_for("acciones"),
         float(s.get("acciones_conf", "0.35")),
         s.get("acciones_half", "0") == "1",
-        s.get("acciones_model") or None)
+        s.get("acciones_model") or None,
+        fps_limit=fps_limit)
     return jsonify({"started": source_id})
 
 
@@ -609,12 +633,14 @@ def troncos_start(source_id):
     if not src:
         return jsonify({"error": "Fuente no encontrada"}), 404
     s = get_settings()
+    fps_limit = _get_fps_limit("troncos", src["type"], s)
     TroncosManager.get().start(source_id, src["path"],
         _func_state_for("troncos"),
         float(s.get("troncos_conf", "0.35")),
         s.get("troncos_half", "0") == "1",
         s.get("troncos_model") or None,
-        int(s.get("troncos_line_x", "50")))
+        int(s.get("troncos_line_x", "50")),
+        fps_limit=fps_limit)
     return jsonify({"started": source_id})
 
 
@@ -665,6 +691,7 @@ def pallets_start(source_id):
     s = get_settings()
     classes_str = s.get("pallets_classes", "0,1,2,3")
     classes = [int(c.strip()) for c in classes_str.split(",") if c.strip()]
+    fps_limit = _get_fps_limit("pallets", src["type"], s)
     PalletsManager.get().start(source_id, src["path"],
         _func_state_for("pallets"),
         float(s.get("pallets_conf", "0.35")),
@@ -674,7 +701,8 @@ def pallets_start(source_id):
         int(s.get("pallets_area_y1", "25")),
         int(s.get("pallets_area_x2", "75")),
         int(s.get("pallets_area_y2", "75")),
-        classes=classes)
+        classes=classes,
+        fps_limit=fps_limit)
     return jsonify({"started": source_id})
 
 
@@ -725,12 +753,14 @@ def cajas_start(source_id):
     if not src:
         return jsonify({"error": "Fuente no encontrada"}), 404
     s = get_settings()
+    fps_limit = _get_fps_limit("cajas", src["type"], s)
     CajasManager.get().start(source_id, src["path"],
         _func_state_for("cajas"),
         float(s.get("cajas_conf", "0.35")),
         s.get("cajas_half", "0") == "1",
         s.get("cajas_model") or None,
-        int(s.get("cajas_line_y", "85")))
+        int(s.get("cajas_line_y", "85")),
+        fps_limit=fps_limit)
     return jsonify({"started": source_id})
 
 
@@ -779,6 +809,7 @@ def reglamento_start(source_id):
     if not src:
         return jsonify({"error": "Fuente no encontrada"}), 404
     s = get_settings()
+    fps_limit = _get_fps_limit("reglamento", src["type"], s)
     ReglamentoManager.get().start(source_id, src["path"],
         _func_state_for("reglamento"),
         float(s.get("reglamento_conf", "0.45")),
@@ -788,7 +819,8 @@ def reglamento_start(source_id):
         int(s.get("reglamento_area_x1", "30")),
         int(s.get("reglamento_area_y1", "30")),
         int(s.get("reglamento_area_x2", "70")),
-        int(s.get("reglamento_area_y2", "70")))
+        int(s.get("reglamento_area_y2", "70")),
+        fps_limit=fps_limit)
     return jsonify({"started": source_id})
 
 
@@ -877,11 +909,13 @@ def carga_descarga_start(source_id):
         model_path = m.get("path")
         cls_str = m.get("classes", "")
         classes = [int(c.strip()) for c in cls_str.split(",") if c.strip()] if cls_str else None
+    fps_limit = _get_fps_limit("carga_descarga", src["type"], s)
     CargaDescargaManager.get().start(source_id, src["path"],
         _func_state_for("carga_descarga"),
         float(s.get("carga_descarga_conf", "0.35")),
         s.get("carga_descarga_half", "0") == "1",
-        model_path, classes, line_mode, line_pos)
+        model_path, classes, line_mode, line_pos,
+        fps_limit=fps_limit)
     return jsonify({"started": source_id})
 
 
@@ -980,11 +1014,13 @@ def epp_start(source_id):
     if not src:
         return jsonify({"error": "Fuente no encontrada"}), 404
     s = get_settings()
+    fps_limit = _get_fps_limit("epp", src["type"], s)
     EppManager.get().start(source_id, src["path"],
         _func_state_for("epp"),
         float(s.get("epp_conf", "0.35")),
         s.get("epp_half", "0") == "1",
-        s.get("epp_model") or None)
+        s.get("epp_model") or None,
+        fps_limit=fps_limit)
     return jsonify({"started": source_id})
 
 
@@ -1040,11 +1076,13 @@ def smoke_start(source_id):
     if not src:
         return jsonify({"error": "Fuente no encontrada"}), 404
     s = get_settings()
+    fps_limit = _get_fps_limit("smoke", src["type"], s)
     SmokeManager.get().start(source_id, src["path"],
         _func_state_for("smoke"),
         float(s.get("smoke_conf", "0.35")),
         s.get("smoke_half", "0") == "1",
-        s.get("smoke_model") or None)
+        s.get("smoke_model") or None,
+        fps_limit=fps_limit)
     return jsonify({"started": source_id})
 
 
@@ -1084,6 +1122,7 @@ def vehiculos_start(source_id):
     if not src:
         return jsonify({"error": "Fuente no encontrada"}), 404
     s = get_settings()
+    fps_limit = _get_fps_limit("vehiculos", src["type"], s)
     VehiculosManager.get().start(source_id, src["path"],
         _func_state_for("vehiculos"),
         float(s.get("vehiculos_conf", "0.35")),
@@ -1093,7 +1132,8 @@ def vehiculos_start(source_id):
         plate_conf_thresh=float(s.get("vehiculos_plate_conf", "0.35")),
         classes=None,
         line_mode=s.get("vehiculos_line_mode", "horizontal"),
-        line_pos=int(s.get("vehiculos_line_pos", "50")))
+        line_pos=int(s.get("vehiculos_line_pos", "50")),
+        fps_limit=fps_limit)
     return jsonify({"started": source_id})
 
 
@@ -1181,6 +1221,7 @@ def api_add_source():
         return jsonify({"error": "Nombre y ruta requeridos"}), 400
     if src_type not in ("video", "stream"):
         return jsonify({"error": "Tipo inválido"}), 400
+    path = _normalize_path(path, src_type)
     src = add_source(module_id, name, src_type, path)
     return jsonify(src), 201
 
@@ -1193,6 +1234,11 @@ def api_source_crud(source_id):
     data = request.get_json(silent=True) or {}
     name = data.get("name")
     path = data.get("path")
+    if path is not None:
+        sources = get_sources()
+        existing = next((s for s in sources if s["id"] == source_id), None)
+        src_type = existing["type"] if existing else "stream"
+        path = _normalize_path(path, src_type)
     src = update_source(source_id, name=name, path=path)
     if not src:
         return jsonify({"error": "Fuente no encontrada"}), 404

@@ -9,6 +9,7 @@ import numpy as np
 from typing import Optional, Dict
 from ultralytics import YOLO
 
+from src.config import BASE_DIR
 from src.utils import get_device
 
 MODEL_NAME  = "yolo11n.pt"
@@ -35,17 +36,17 @@ CLASSIFY_THRESHOLD    = 0.65
 REVERIFY_SECONDS      = 5.0
 
 CAPTURES_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-    "static", "uploads", "captures", "reglamento",
+    BASE_DIR, "static", "uploads", "captures", "reglamento",
 )
 
 
-class ReglamentoPipeline:
+class AreaPipeline:
     def __init__(self, source_id: int, source_path: str, func_state: dict,
                  conf_thresh: float = CONF_THRESH, half: bool = False,
                  model_path: str = None, min_time: int = 10,
                  area_x1: int = 30, area_y1: int = 30,
-                 area_x2: int = 70, area_y2: int = 70):
+                 area_x2: int = 70, area_y2: int = 70,
+                 fps_limit: float = 0.0):
         self.source_id   = source_id
         self.source_path = source_path
         self.func_state  = func_state
@@ -57,6 +58,7 @@ class ReglamentoPipeline:
         self.area_y1     = area_y1
         self.area_x2     = area_x2
         self.area_y2     = area_y2
+        self.fps_limit   = fps_limit
 
         self.model = None
         self._frame: Optional[np.ndarray] = None
@@ -251,6 +253,7 @@ class ReglamentoPipeline:
             annotated = self._process(frame)
             with self._lock:
                 self._frame = annotated
+            time.sleep(self.fps_limit)
 
         cap.release()
 
@@ -483,7 +486,7 @@ class ReglamentoManager:
     _class_lock = threading.Lock()
 
     def __init__(self) -> None:
-        self.pipelines: Dict[int, ReglamentoPipeline] = {}
+        self.pipelines: Dict[int, AreaPipeline] = {}
         self._lock = threading.Lock()
 
     @classmethod
@@ -497,12 +500,14 @@ class ReglamentoManager:
               conf_thresh: float = CONF_THRESH, half: bool = False,
               model_path: str = None, min_time: int = 10,
               area_x1: int = 30, area_y1: int = 30,
-              area_x2: int = 70, area_y2: int = 70) -> None:
+              area_x2: int = 70, area_y2: int = 70,
+              fps_limit: float = 0.0) -> None:
         self.stop_all()
         with self._lock:
-            p = ReglamentoPipeline(source_id, source_path, func_state.copy(),
+            p = AreaPipeline(source_id, source_path, func_state.copy(),
                                    conf_thresh, half, model_path, min_time,
-                                   area_x1, area_y1, area_x2, area_y2)
+                                   area_x1, area_y1, area_x2, area_y2,
+                                   fps_limit=fps_limit)
             p.start()
             self.pipelines[source_id] = p
 

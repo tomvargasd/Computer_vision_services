@@ -22,7 +22,8 @@ WHITE  = (255, 255, 255)
 class TroncosPipeline:
     def __init__(self, source_id: int, source_path: str, func_state: dict,
                  conf_thresh: float = CONF_THRESH, half: bool = False,
-                 model_path: str = None, line_x_pct: int = 50):
+                 model_path: str = None, line_x_pct: int = 50,
+                 fps_limit: float = 0.0):
         self.source_id   = source_id
         self.source_path = source_path
         self.func_state  = func_state
@@ -30,6 +31,7 @@ class TroncosPipeline:
         self.half        = half
         self.model_path  = model_path or MODEL_NAME
         self.line_x_pct  = line_x_pct
+        self.fps_limit   = fps_limit
 
         self.model = None
         self._frame: Optional[np.ndarray] = None
@@ -110,6 +112,7 @@ class TroncosPipeline:
             annotated = self._process(frame)
             with self._lock:
                 self._frame = annotated
+            time.sleep(self.fps_limit)
 
         cap.release()
 
@@ -220,11 +223,13 @@ class TroncosManager:
 
     def start(self, source_id: int, source_path: str, func_state: dict,
               conf_thresh: float = CONF_THRESH, half: bool = False,
-              model_path: str = None, line_x_pct: int = 50) -> None:
+              model_path: str = None, line_x_pct: int = 50,
+              fps_limit: float = 0.0) -> None:
         self.stop_all()
         with self._lock:
             p = TroncosPipeline(source_id, source_path, func_state.copy(),
-                                conf_thresh, half, model_path, line_x_pct)
+                                conf_thresh, half, model_path, line_x_pct,
+                                fps_limit=fps_limit)
             p.start()
             self.pipelines[source_id] = p
 

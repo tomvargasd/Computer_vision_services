@@ -33,7 +33,8 @@ class SmokePipeline:
     def __init__(self, source_id: int, source_path: str, func_state: dict,
                  conf_thresh: float = CONF_THRESH, half: bool = False,
                  model_path: str = None,
-                 target_classes: Optional[list] = None):
+                 target_classes: Optional[list] = None,
+                 fps_limit: float = 0.0):
         self.source_id   = source_id
         self.source_path = source_path
         self.func_state  = func_state
@@ -41,6 +42,7 @@ class SmokePipeline:
         self.half        = half
         self.model_path  = model_path or MODEL_NAME
         self.target_classes = target_classes or SMOKE_CLASSES
+        self.fps_limit   = fps_limit
 
         self.model: Optional[YOLO] = None
         self._frame: Optional[np.ndarray] = None
@@ -122,6 +124,7 @@ class SmokePipeline:
             annotated = self._process(frame)
             with self._lock:
                 self._frame = annotated
+            time.sleep(self.fps_limit)
 
         cap.release()
 
@@ -236,11 +239,12 @@ class SmokeManager:
 
     def start(self, source_id: int, source_path: str, func_state: dict,
               conf_thresh: float = CONF_THRESH, half: bool = False,
-              model_path: str = None) -> None:
+              model_path: str = None, fps_limit: float = 0.0) -> None:
         self.stop_all()
         with self._lock:
             p = SmokePipeline(source_id, source_path, func_state.copy(),
-                              conf_thresh, half, model_path)
+                              conf_thresh, half, model_path,
+                              fps_limit=fps_limit)
             p.start()
             self.pipelines[source_id] = p
 

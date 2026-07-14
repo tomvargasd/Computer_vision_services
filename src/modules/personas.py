@@ -20,6 +20,7 @@ from typing import Optional, Dict
 from ultralytics import YOLO
 
 from src.utils import get_device
+from src.config import BASE_DIR
 
 MODEL_NAME  = "yolo11n.pt"   # descarga automática en ~/.ultralytics/ la 1ª vez
 PERSON_CLS  = 0              # clase "person" en COCO
@@ -42,7 +43,7 @@ class PersonasPipeline:
     el pipeline.
     """
 
-    def __init__(self, source_id: int, source_path: str, func_state: dict, conf_thresh: float = CONF_THRESH, half: bool = False, model_path: str = None, line_y_pct: int = 85):
+    def __init__(self, source_id: int, source_path: str, func_state: dict, conf_thresh: float = CONF_THRESH, half: bool = False, model_path: str = None, line_y_pct: int = 85, fps_limit: float = 0.0):
         self.source_id   = source_id
         self.source_path = source_path
         self.func_state  = func_state          # dict compartido, se actualiza externamente
@@ -50,6 +51,7 @@ class PersonasPipeline:
         self.half        = half
         self.model_path  = model_path or MODEL_NAME
         self.line_y_pct  = line_y_pct
+        self.fps_limit   = fps_limit
 
         # Modelo — se carga en el hilo para que /start responda de inmediato
         self.model = None
@@ -164,6 +166,7 @@ class PersonasPipeline:
 
             with self._lock:
                 self._frame = annotated
+            time.sleep(self.fps_limit)
 
         cap.release()
 
@@ -368,11 +371,11 @@ class PersonasManager:
 
     # ── Control de pipelines ─────────────────────────────────────────────────
 
-    def start(self, source_id: int, source_path: str, func_state: dict, conf_thresh: float = CONF_THRESH, half: bool = False, model_path: str = None, line_y_pct: int = 85) -> None:
+    def start(self, source_id: int, source_path: str, func_state: dict, conf_thresh: float = CONF_THRESH, half: bool = False, model_path: str = None, line_y_pct: int = 85, fps_limit: float = 0.0) -> None:
         # Single-pipeline policy: detener todo antes de iniciar uno nuevo
         self.stop_all()
         with self._lock:
-            p = PersonasPipeline(source_id, source_path, func_state.copy(), conf_thresh, half, model_path, line_y_pct)
+            p = PersonasPipeline(source_id, source_path, func_state.copy(), conf_thresh, half, model_path, line_y_pct, fps_limit)
             p.start()
             self.pipelines[source_id] = p
 

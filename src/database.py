@@ -91,8 +91,21 @@ MODULES_META = {
 }
 
 
+_FPS_MODULES = [
+    "personas", "armas", "acciones", "troncos", "pallets",
+    "cajas", "reglamento", "carga_descarga", "epp", "smoke", "vehiculos",
+]
+FPS_DEFAULTS = [
+    (f"{m}_fps_limit_video", "0.02")
+    for m in _FPS_MODULES
+] + [
+    (f"{m}_fps_limit_stream", "0.0")
+    for m in _FPS_MODULES
+]
+
 DEFAULT_SETTINGS = [
     ("system_name", "Computer Vision"), ("version", APP_VERSION), ("logo", ""),
+    *FPS_DEFAULTS,
     ("armas_model", ""), ("personas_model", ""), ("acciones_model", ""),
     ("troncos_model", ""), ("pallets_model", ""), ("cajas_model", ""),
     ("reglamento_model", ""),

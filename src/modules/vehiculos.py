@@ -282,13 +282,15 @@ class VehiculosPipeline:
                  plate_model_path: str = None,
                  plate_conf_thresh: float = PLATE_CONF,
                  classes: Optional[list] = None,
-                 line_mode: str = "horizontal", line_pos: int = 50):
+                 line_mode: str = "horizontal", line_pos: int = 50,
+                 fps_limit: float = 0.0):
         self.source_id   = source_id
         self.source_path = source_path
         self.func_state  = func_state
         self.conf_thresh = conf_thresh
         self.half        = half
         self.model_path  = model_path or MODEL_NAME
+        self.fps_limit   = fps_limit
         self.plate_model_path = plate_model_path
         self.plate_conf_thresh = plate_conf_thresh
         self.classes     = classes or DEFAULT_VEHICLE_CLASSES
@@ -404,6 +406,7 @@ class VehiculosPipeline:
             annotated = self._process(frame)
             with self._lock:
                 self._frame = annotated
+            time.sleep(self.fps_limit)
         cap.release()
 
     def _process(self, frame: np.ndarray) -> np.ndarray:
@@ -682,7 +685,8 @@ class VehiculosManager:
               plate_model_path: str = None,
               plate_conf_thresh: float = PLATE_CONF,
               classes: Optional[list] = None,
-              line_mode: str = "horizontal", line_pos: int = 50) -> None:
+              line_mode: str = "horizontal", line_pos: int = 50,
+              fps_limit: float = 0.0) -> None:
         self.stop_all()
         with self._lock:
             p = VehiculosPipeline(
@@ -692,6 +696,7 @@ class VehiculosManager:
                 plate_conf_thresh=plate_conf_thresh,
                 classes=classes,
                 line_mode=line_mode, line_pos=line_pos,
+                fps_limit=fps_limit,
             )
             p.start()
             self.pipelines[source_id] = p

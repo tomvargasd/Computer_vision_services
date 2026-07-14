@@ -20,6 +20,7 @@ from typing import Optional, Dict, List, Tuple
 from ultralytics import YOLO
 
 from src.utils import get_device
+from src.config import BASE_DIR
 
 POSE_MODEL  = "yolo11n-pose.pt"
 CONF_THRESH = 0.35
@@ -30,8 +31,7 @@ MAX_FACE_CAPS = 3
 MAX_BODY_CAPS = 3
 CAP_THROTTLE_S = 3.0
 
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-CAPTURES_BASE = os.path.join(_PROJECT_ROOT, "static", "uploads", "captures")
+CAPTURES_BASE = os.path.join(BASE_DIR, "static", "uploads", "captures")
 
 # ── Reglas centralizadas ─────────────────────────────────────────────────────
 _RULES = {
@@ -668,6 +668,7 @@ class AccionesPipeline:
         conf_thresh: float = CONF_THRESH,
         half: bool = False,
         model_path: str = None,
+        fps_limit: float = 0.0,
     ):
         self.source_id   = source_id
         self.source_path = source_path
@@ -675,6 +676,7 @@ class AccionesPipeline:
         self.conf_thresh = conf_thresh
         self.half        = half
         self.model_path  = model_path or POSE_MODEL
+        self.fps_limit   = fps_limit
 
         self.model: Optional[YOLO] = None
 
@@ -739,6 +741,7 @@ class AccionesPipeline:
             annotated = self._process(frame)
             with self._lock:
                 self._frame = annotated
+            time.sleep(self.fps_limit)
 
         cap.release()
 
@@ -1171,10 +1174,11 @@ class AccionesManager:
         conf_thresh: float = CONF_THRESH,
         half: bool = False,
         model_path: str = None,
+        fps_limit: float = 0.0,
     ) -> None:
         self.stop_all()
         with self._lock:
-            p = AccionesPipeline(source_id, source_path, func_state.copy(), conf_thresh, half, model_path)
+            p = AccionesPipeline(source_id, source_path, func_state.copy(), conf_thresh, half, model_path, fps_limit)
             p.start()
             self.pipelines[source_id] = p
 

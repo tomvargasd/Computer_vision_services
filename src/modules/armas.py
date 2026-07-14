@@ -19,6 +19,7 @@ from typing import Optional, Dict, List
 from ultralytics import YOLO
 
 from src.utils import get_device
+from src.config import BASE_DIR
 
 # Palabras clave para identificar clase persona en cualquier modelo
 _PERSON_KEYWORDS = {"person", "persona", "people", "human", "pedestrian", "man", "woman", "without_weapon"}
@@ -38,11 +39,9 @@ CAP_THROTTLE_S  = 3.0             # segundos mínimos entre capturas del mismo I
 
 # Config de ByteTrack ajustada para armas (relativa al directorio de ejecución)
 import os as _os
-_TRACKER_CFG = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))), "bytetrack_armas.yaml")
+_TRACKER_CFG = _os.path.join(BASE_DIR, "bytetrack_armas.yaml")
 
-# Directorio base para capturas (relativo a la raíz del proyecto)
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-CAPTURES_BASE = os.path.join(_PROJECT_ROOT, "static", "uploads", "captures")
+CAPTURES_BASE = os.path.join(BASE_DIR, "static", "uploads", "captures")
 
 
 def _weapon_type(class_name: str) -> str:
@@ -78,6 +77,7 @@ class ArmasPipeline:
         conf_thresh: float = None,
         half: bool = False,
         model_path: str = None,
+        fps_limit: float = 0.0,
     ):
         self.source_id   = source_id
         self.source_path = source_path
@@ -86,6 +86,7 @@ class ArmasPipeline:
         self.half        = half
         is_default = (self.model_path == DEFAULT_MODEL)
         self.conf_thresh = conf_thresh if conf_thresh is not None else (CONF_THRESH if is_default else CONF_THRESH_CUSTOM)
+        self.fps_limit   = fps_limit
 
         self.model: Optional[YOLO]         = None   # cargado en hilo
         self._person_model: Optional[YOLO] = None   # secundario si el principal no tiene clase 0
@@ -192,6 +193,7 @@ class ArmasPipeline:
             annotated = self._process(frame)
             with self._lock:
                 self._frame = annotated
+            time.sleep(self.fps_limit)
 
         cap.release()
 
@@ -375,10 +377,11 @@ class ArmasManager:
         conf_thresh: float = None,
         half: bool = False,
         model_path: str = None,
+        fps_limit: float = 0.0,
     ) -> None:
         self.stop_all()
         with self._lock:
-            p = ArmasPipeline(source_id, source_path, func_state.copy(), conf_thresh, half, model_path)
+            p = ArmasPipeline(source_id, source_path, func_state.copy(), conf_thresh, half, model_path, fps_limit)
             p.start()
             self.pipelines[source_id] = p
 

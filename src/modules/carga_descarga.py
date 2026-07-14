@@ -23,7 +23,8 @@ class CargaDescargaPipeline:
     def __init__(self, source_id: int, source_path: str, func_state: dict,
                  conf_thresh: float = CONF_THRESH, half: bool = False,
                  model_path: str = None, classes: list = None,
-                 line_mode: str = "horizontal", line_pos: int = 50):
+                 line_mode: str = "horizontal", line_pos: int = 50,
+                 fps_limit: float = 0.0):
         self.source_id   = source_id
         self.source_path = source_path
         self.func_state  = func_state
@@ -33,6 +34,7 @@ class CargaDescargaPipeline:
         self.classes     = classes
         self.line_mode   = line_mode
         self.line_pos    = line_pos
+        self.fps_limit   = fps_limit
 
         self.model = None
         self._frame: Optional[np.ndarray] = None
@@ -116,6 +118,7 @@ class CargaDescargaPipeline:
             annotated = self._process(frame)
             with self._lock:
                 self._frame = annotated
+            time.sleep(self.fps_limit)
 
         cap.release()
 
@@ -291,12 +294,13 @@ class CargaDescargaManager:
     def start(self, source_id: int, source_path: str, func_state: dict,
               conf_thresh: float = CONF_THRESH, half: bool = False,
               model_path: str = None, classes: list = None,
-              line_mode: str = "horizontal", line_pos: int = 50) -> None:
+              line_mode: str = "horizontal", line_pos: int = 50,
+              fps_limit: float = 0.0) -> None:
         self.stop_all()
         with self._lock:
             p = CargaDescargaPipeline(source_id, source_path, func_state.copy(),
                                       conf_thresh, half, model_path, classes,
-                                      line_mode, line_pos)
+                                      line_mode, line_pos, fps_limit=fps_limit)
             p.start()
             self.pipelines[source_id] = p
 

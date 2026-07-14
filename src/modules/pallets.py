@@ -25,7 +25,8 @@ class PalletsPipeline:
                  model_path: str = None,
                  area_x1: int = 25, area_y1: int = 25,
                  area_x2: int = 75, area_y2: int = 75,
-                 classes: Optional[list] = None):
+                 classes: Optional[list] = None,
+                 fps_limit: float = 0.0):
         self.source_id   = source_id
         self.source_path = source_path
         self.func_state  = func_state
@@ -37,6 +38,7 @@ class PalletsPipeline:
         self.area_x2     = area_x2
         self.area_y2     = area_y2
         self.classes     = classes  # None = todas las clases
+        self.fps_limit   = fps_limit
 
         self.model = None
         self._frame: Optional[np.ndarray] = None
@@ -116,6 +118,7 @@ class PalletsPipeline:
             annotated = self._process(frame)
             with self._lock:
                 self._frame = annotated
+            time.sleep(self.fps_limit)
 
         cap.release()
 
@@ -279,13 +282,14 @@ class PalletsManager:
               model_path: str = None,
               area_x1: int = 25, area_y1: int = 25,
               area_x2: int = 75, area_y2: int = 75,
-              classes: Optional[list] = None) -> None:
+              classes: Optional[list] = None,
+              fps_limit: float = 0.0) -> None:
         self.stop_all()
         with self._lock:
             p = PalletsPipeline(source_id, source_path, func_state.copy(),
                                 conf_thresh, half, model_path,
                                 area_x1, area_y1, area_x2, area_y2,
-                                classes=classes)
+                                classes=classes, fps_limit=fps_limit)
             p.start()
             self.pipelines[source_id] = p
 
