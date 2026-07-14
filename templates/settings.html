@@ -76,6 +76,30 @@
       </div>
     </div>
 
+    <!-- Multi-detección -->
+    <div class="settings-section">
+      <div class="settings-section-header">
+        <svg class="settings-section-icon" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        <span class="settings-section-title">Multi-detección</span>
+      </div>
+      <div class="settings-section-body">
+        <div class="param-row" style="min-height:0">
+          <div class="param-info">
+            <span class="param-label">Reproducción simultánea</span>
+            <span class="param-desc">Permite ejecutar hasta 4 reproducciones simultáneas entre todos los módulos. Cuando está desactivado, solo un pipeline puede ejecutarse por módulo a la vez.</span>
+          </div>
+          <div class="param-control">
+            <label class="toggle">
+              <input type="checkbox" id="multi-detection-toggle"
+                     {% if settings.multi_detection == '1' %}checked{% endif %}>
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+        <div class="settings-toast" id="multi-toast">✓ Configuración actualizada</div>
+      </div>
+    </div>
+
   </div><!-- /panel-general -->
 
   <!-- ══ PANEL: Módulos ═══════════════════════════════ -->
@@ -662,6 +686,22 @@ async function saveCargaModels() {
     console.error("Error guardando modelos:", e);
   }
 }
+
+// ══ Multi-detección toggle ═══════════════════════════════════════
+document.getElementById("multi-detection-toggle").addEventListener("change", async function() {
+  try {
+    const res = await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ multi_detection: this.checked ? "1" : "0" }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    showToast("multi-toast");
+  } catch (e) {
+    console.error("Error guardando multi-detección:", e);
+    this.checked = !this.checked;
+  }
+});
 
 // Inicializar
 loadCargaModels();

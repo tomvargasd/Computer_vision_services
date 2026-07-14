@@ -10,6 +10,7 @@ from ultralytics import YOLO
 from datetime import datetime
 
 from src.utils import get_device
+from src.modules.base import multi_acquire, multi_release, is_multi_enabled
 
 MODEL_NAME  = "yolo11n.pt"
 CONF_THRESH = 0.35
@@ -240,7 +241,10 @@ class SmokeManager:
     def start(self, source_id: int, source_path: str, func_state: dict,
               conf_thresh: float = CONF_THRESH, half: bool = False,
               model_path: str = None, fps_limit: float = 0.0) -> None:
-        self.stop_all()
+        if not multi_acquire():
+            raise RuntimeError("Límite de 4 reproducciones simultáneas alcanzado")
+        if not is_multi_enabled():
+            self.stop_all()
         with self._lock:
             p = SmokePipeline(source_id, source_path, func_state.copy(),
                               conf_thresh, half, model_path,
@@ -253,6 +257,7 @@ class SmokeManager:
             p = self.pipelines.pop(source_id, None)
         if p:
             p.stop()
+            multi_release()
 
     def stop_all(self) -> None:
         with self._lock:

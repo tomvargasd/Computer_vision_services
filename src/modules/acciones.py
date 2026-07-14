@@ -20,6 +20,7 @@ from typing import Optional, Dict, List, Tuple
 from ultralytics import YOLO
 
 from src.utils import get_device
+from src.modules.base import multi_acquire, multi_release, is_multi_enabled
 from src.config import BASE_DIR
 
 POSE_MODEL  = "yolo11n-pose.pt"
@@ -1176,7 +1177,10 @@ class AccionesManager:
         model_path: str = None,
         fps_limit: float = 0.0,
     ) -> None:
-        self.stop_all()
+        if not multi_acquire():
+            raise RuntimeError("Límite de 4 reproducciones simultáneas alcanzado")
+        if not is_multi_enabled():
+            self.stop_all()
         with self._lock:
             p = AccionesPipeline(source_id, source_path, func_state.copy(), conf_thresh, half, model_path, fps_limit)
             p.start()
@@ -1187,6 +1191,7 @@ class AccionesManager:
             p = self.pipelines.pop(source_id, None)
         if p:
             p.stop()
+            multi_release()
 
     def stop_all(self) -> None:
         with self._lock:

@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor
 
 from src.utils import get_device
+from src.modules.base import multi_acquire, multi_release, is_multi_enabled
 
 MODEL_NAME  = "yolo11n.pt"
 CONF_THRESH = 0.35
@@ -687,7 +688,10 @@ class VehiculosManager:
               classes: Optional[list] = None,
               line_mode: str = "horizontal", line_pos: int = 50,
               fps_limit: float = 0.0) -> None:
-        self.stop_all()
+        if not multi_acquire():
+            raise RuntimeError("Límite de 4 reproducciones simultáneas alcanzado")
+        if not is_multi_enabled():
+            self.stop_all()
         with self._lock:
             p = VehiculosPipeline(
                 source_id, source_path, func_state.copy(),
@@ -706,6 +710,7 @@ class VehiculosManager:
             p = self.pipelines.pop(source_id, None)
         if p:
             p.stop()
+            multi_release()
 
     def stop_all(self) -> None:
         with self._lock:

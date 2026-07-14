@@ -105,6 +105,7 @@ FPS_DEFAULTS = [
 
 DEFAULT_SETTINGS = [
     ("system_name", "Computer Vision"), ("version", APP_VERSION), ("logo", ""),
+    ("multi_detection", "0"),
     *FPS_DEFAULTS,
     ("armas_model", ""), ("personas_model", ""), ("acciones_model", ""),
     ("troncos_model", ""), ("pallets_model", ""), ("cajas_model", ""),
