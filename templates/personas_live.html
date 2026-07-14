@@ -460,7 +460,7 @@
 
       <div class="lv-count-big">
         <div class="lv-count-num" id="cnt-cur">0</div>
-        <div class="lv-count-lbl">personas en escena</div>
+        <div class="lv-count-lbl">personas dentro</div>
       </div>
 
       <div class="lv-inout">
@@ -606,7 +606,7 @@ function startPoll() {
 
     // Conteo
     const curEl = document.getElementById("cnt-cur");
-    if (curEl) curEl.textContent = d.current_persons;
+    if (curEl) curEl.textContent = d.current_persons_net !== undefined ? d.current_persons_net : d.current_persons;
     const inEl  = document.getElementById("cnt-in");
     if (inEl)  inEl.textContent  = d.in_count;
     const outEl = document.getElementById("cnt-out");

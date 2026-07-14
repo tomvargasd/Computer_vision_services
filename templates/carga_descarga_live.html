@@ -233,6 +233,13 @@
             </label>
             <span>Vertical</span>
           </div>
+          <div class="lv-switch-row" style="margin-top:8px;padding-top:8px;border-top:1px solid #D8DCE3;">
+            <span style="font-weight:600;color:#182A55;">Invertir Carga/Descarga</span>
+            <label class="lv-switch">
+              <input type="checkbox" id="invert-toggle">
+              <span class="lv-slider"></span>
+            </label>
+          </div>
           <div class="lv-line-row">
             <span class="lv-area-label" id="line-pos-label">Pos</span>
             <input type="range" id="line-pos" min="5" max="95" step="1" value="{{ settings.get('carga_descarga_line_pos', '50') }}">
@@ -321,6 +328,16 @@ function startPoll() {
     document.getElementById("cnt-cur").textContent = d.current_objects || 0;
     document.getElementById("cnt-in").textContent  = d.in_count || 0;
     document.getElementById("cnt-out").textContent = d.out_count || 0;
+    // Sync invert toggle
+    const invToggle = document.getElementById("invert-toggle");
+    if (invToggle && invToggle.checked !== d.inverted) invToggle.checked = d.inverted;
+    // Swap label text when inverted
+    const inLbl = document.querySelector(".lv-inout-card.in .lv-inout-lbl");
+    const outLbl = document.querySelector(".lv-inout-card.out .lv-inout-lbl");
+    if (inLbl && outLbl) {
+      inLbl.textContent = d.inverted ? "Descarga (IN)" : "Carga (IN)";
+      outLbl.textContent = d.inverted ? "Carga (OUT)" : "Descarga (OUT)";
+    }
     document.getElementById("lv-ts").textContent =
       new Date().toLocaleTimeString("es-MX", { hour12: false });
     if (document.getElementById("tab-analytics").style.display !== "none") {
@@ -366,6 +383,15 @@ document.getElementById("line-mode-toggle").addEventListener("change", async () 
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ mode }),
+  });
+});
+
+document.getElementById("invert-toggle").addEventListener("change", async () => {
+  const inverted = document.getElementById("invert-toggle").checked;
+  await fetch(`/api/carga_descarga/sources/${SOURCE_ID}/invert`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ inverted }),
   });
 });
 

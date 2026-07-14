@@ -986,6 +986,14 @@ def carga_descarga_line_mode(source_id):
     return jsonify({"line_mode": mode})
 
 
+@app.route("/api/carga_descarga/sources/<int:source_id>/invert", methods=["POST"])
+def carga_descarga_invert(source_id):
+    data = request.get_json(silent=True) or {}
+    inverted = data.get("inverted", False)
+    CargaDescargaManager.get().set_inverted(source_id, inverted)
+    return jsonify({"inverted": inverted})
+
+
 @app.route("/api/carga_descarga/sources/<int:source_id>/line-pos", methods=["POST"])
 def carga_descarga_line_pos(source_id):
     data = request.get_json(silent=True) or {}

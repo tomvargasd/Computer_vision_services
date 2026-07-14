@@ -81,9 +81,13 @@ class PersonasPipeline:
 
         # ── Stats públicos (leídos por /api/personas/sources/<id>/stats) ────
         self.current_persons = 0
+        self.current_persons_net = 0
         self._active_ids: set = set()
         self._h = 0
         self._w = 0
+        self._dwell_max = 0.0
+        self._dwell_min = float('inf')
+        self._dwell_completed_count = 0
 
     # ── Control del pipeline ─────────────────────────────────────────────────
 
@@ -269,9 +273,15 @@ class PersonasPipeline:
         gone = set(self._prev_cy.keys()) - active_ids
         for tid in gone:
             self._prev_cy.pop(tid, None)
-            # _first_seen se conserva (historial completo de permanencia)
+            if tid in self._first_seen:
+                completed = now - self._first_seen[tid]
+                self._dwell_max = max(self._dwell_max, completed)
+                if completed < self._dwell_min:
+                    self._dwell_min = completed
+                self._dwell_completed_count += 1
 
         self.current_persons = len(active_ids)
+        self.current_persons_net = max(0, self.total_in - self.total_out)
         self._active_ids      = active_ids
 
         # ── Overlay del mapa de calor ─────────────────────────────────────────
@@ -301,7 +311,7 @@ class PersonasPipeline:
         # ── Contador de personas activas (siempre visible) ───────────────────
         cv2.putText(
             annotated,
-            f"Personas: {self.current_persons}",
+            f"Personas dentro: {self.current_persons_net}",
             (12, h - 14),
             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2, cv2.LINE_AA,
         )
@@ -324,19 +334,27 @@ class PersonasPipeline:
     def get_stats(self) -> dict:
         now    = time.time()
         active = self._active_ids
-        dwell  = sorted(
+        dwell_active = sorted(
             [{"id": tid, "seconds": int(now - t)}
              for tid, t in self._first_seen.items() if tid in active],
             key=lambda x: -x["seconds"],
         )
+        max_dwell = self._dwell_max
+        min_dwell = self._dwell_min if self._dwell_completed_count > 0 else None
+        if dwell_active:
+            if dwell_active[0]["seconds"] > max_dwell:
+                max_dwell = dwell_active[0]["seconds"]
+            if min_dwell is None or dwell_active[-1]["seconds"] < min_dwell:
+                min_dwell = dwell_active[-1]["seconds"]
         return {
-            "source_id":       self.source_id,
-            "current_persons": self.current_persons,
-            "in_count":        self.total_in,
-            "out_count":       self.total_out,
-            "max_dwell":       dwell[0]["seconds"]  if dwell else None,
-            "min_dwell":       dwell[-1]["seconds"] if dwell else None,
-            "dwell_times":     dwell[:20],
+            "source_id":          self.source_id,
+            "current_persons":    self.current_persons,
+            "current_persons_net": self.current_persons_net,
+            "in_count":           self.total_in,
+            "out_count":          self.total_out,
+            "max_dwell":          int(max_dwell) if max_dwell > 0 else None,
+            "min_dwell":          int(min_dwell) if min_dwell is not None and min_dwell != float('inf') else None,
+            "dwell_times":        dwell_active[:20],
         }
 
     def reset(self) -> None:
@@ -347,6 +365,9 @@ class PersonasPipeline:
         self._first_seen.clear()
         if self._heatmap_acc is not None:
             self._heatmap_acc[:] = 0
+        self._dwell_max = 0.0
+        self._dwell_min = float('inf')
+        self._dwell_completed_count = 0
 
 
 # ─────────────────────────────────────────────────────────────────────────────

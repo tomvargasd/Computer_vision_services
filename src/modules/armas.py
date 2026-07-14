@@ -107,6 +107,12 @@ class ArmasPipeline:
         self._cap_dir = os.path.join(CAPTURES_BASE, str(source_id))
         os.makedirs(self._cap_dir, exist_ok=True)
 
+        # ── Validación 3×5 frames ─────────────────────────────────────
+        self._round_buffer: List[bool] = []      # 5 frames del round actual
+        self._round_results: List[float] = []    # ratios de rounds completados (máx 3)
+        self._alert_active = False
+        self._alert_frames = 0
+
     # ── Control ──────────────────────────────────────────────────────────
 
     def start(self) -> None:
@@ -252,6 +258,30 @@ class ArmasPipeline:
 
             weapon_boxes.append((x1, y1, x2, y2, _weapon_type(cname), conf))
 
+        # ── Validación 3×5 frames ─────────────────────────────────────
+        if self.func_state.get("deteccion_arma", True):
+            has_weapon = len(weapon_boxes) + len(armed_persons) > 0
+            self._round_buffer.append(has_weapon)
+            if len(self._round_buffer) >= 5:
+                round_ratio = sum(self._round_buffer) / 5.0
+                self._round_results.append(round_ratio)
+                self._round_buffer = []
+                if len(self._round_results) >= 3:
+                    avg_ratio = sum(self._round_results) / 3.0
+                    if avg_ratio >= 0.3:
+                        self._alert_active = True
+                        self._alert_frames = 30
+                        # Capturar portadores visibles en este frame
+                        for (atid, apx1, apy1, apx2, apy2, _) in armed_persons:
+                            if self.func_state.get("captura_rostro"):
+                                self._try_capture(frame, atid, apx1, apy1, apx2, apy2)
+                    self._round_results = []
+
+        if self._alert_active:
+            self._alert_frames -= 1
+            if self._alert_frames <= 0:
+                self._alert_active = False
+
         # ── Dibujar + lógica ─────────────────────────────────────────────
         deteccion_on = self.func_state.get("deteccion_arma", True)
         self.weapon_current = len(weapon_boxes) + len(armed_persons)
@@ -284,6 +314,16 @@ class ArmasPipeline:
             (12, h - 14),
             cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2, cv2.LINE_AA,
         )
+
+        # ── Alerta de arma validada ──────────────────────────────────────
+        if self._alert_active:
+            cv2.rectangle(annotated, (0, 0), (w-1, h-1), (0, 0, 220), 6)
+            cv2.putText(
+                annotated, "ALERTA ARMA",
+                (w // 2 - 100, 50),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 220), 3, cv2.LINE_AA,
+            )
+
         return annotated
 
     def _try_capture(
@@ -340,6 +380,7 @@ class ArmasPipeline:
             "weapon_count":  self.weapon_current,
             "capture_count": self.capture_count,
             "captures": {str(tid): urls for tid, urls in self._captures.items()},
+            "alert_active":  self._alert_active,
         }
 
     def reset(self) -> None:
@@ -347,6 +388,10 @@ class ArmasPipeline:
         self.capture_count  = 0
         self._captures.clear()
         self._last_cap_ts.clear()
+        self._round_buffer = []
+        self._round_results = []
+        self._alert_active = False
+        self._alert_frames = 0
 
     def update_func_state(self, func_state: dict) -> None:
         self.func_state.update(func_state)

@@ -53,6 +53,7 @@ class CargaDescargaPipeline:
         self._cross_state = {}
         self._counted = set()
         self.model_id = "0"
+        self._inverted = False
 
     def start(self) -> None:
         self._stop.clear()
@@ -203,7 +204,10 @@ class CargaDescargaPipeline:
 
             if crossed:
                 self._counted.add(tid)
-                if direction == "in":
+                dir_actual = direction
+                if self._inverted:
+                    dir_actual = "out" if direction == "in" else "in"
+                if dir_actual == "in":
                     self.total_in += 1
                 else:
                     self.total_out += 1
@@ -213,7 +217,7 @@ class CargaDescargaPipeline:
                     insert_carga_descarga_detection(
                         source_id=self.source_id,
                         track_id=tid,
-                        direction=direction,
+                        direction=dir_actual,
                         model_id=self.model_id,
                     )
                 except Exception:
@@ -229,7 +233,9 @@ class CargaDescargaPipeline:
 
         cv2.line(annotated, draw_p1, draw_p2, PURPLE, 2)
         mode_label = "Horizontal" if self.line_mode == "horizontal" else "Vertical"
-        cv2.putText(annotated, f"Linea {mode_label}  IN {self.total_in}  OUT {self.total_out}",
+        in_lbl = "DESCARGA" if self._inverted else "CARGA"
+        out_lbl = "CARGA" if self._inverted else "DESCARGA"
+        cv2.putText(annotated, f"Linea {mode_label}  {in_lbl} {self.total_in}  {out_lbl} {self.total_out}",
                     (12, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.65, YELLOW, 2, cv2.LINE_AA)
         cv2.putText(annotated, f"Objetos: {self.current_objects}",
                     (12, h - 14), cv2.FONT_HERSHEY_SIMPLEX, 0.6, WHITE, 2, cv2.LINE_AA)
@@ -252,6 +258,7 @@ class CargaDescargaPipeline:
             "out_count":       self.total_out,
             "line_mode":       self.line_mode,
             "line_pos":        self.line_pos,
+            "inverted":        self._inverted,
         }
 
     def set_line_mode(self, mode: str) -> None:
@@ -260,6 +267,9 @@ class CargaDescargaPipeline:
 
     def set_line_pos(self, pct: int) -> None:
         self.line_pos = max(0, min(100, pct))
+
+    def set_inverted(self, inverted: bool) -> None:
+        self._inverted = inverted
 
     def reload_model(self, model_path: str, classes: list = None,
                      model_id: str = "0") -> None:
@@ -358,6 +368,12 @@ class CargaDescargaManager:
             p = self.pipelines.get(source_id)
         if p:
             p.set_line_pos(pct)
+
+    def set_inverted(self, source_id: int, inverted: bool) -> None:
+        with self._lock:
+            p = self.pipelines.get(source_id)
+        if p:
+            p.set_inverted(inverted)
 
     def reload_model(self, source_id: int, model_path: str,
                      classes: list = None, model_id: str = "0") -> None:
