@@ -99,9 +99,16 @@ class ArmasPipeline:
 
         # ── Stats ────────────────────────────────────────────────────────
         self.weapon_current = 0         # armas visibles en el frame actual
+        self.total_weapons = 0           # acumulado histórico (por track ID)
+        self.total_blanca  = 0
+        self.total_fuego   = 0
         self.capture_count = 0           # total capturas guardadas
         self._captures: Dict[int, List[str]] = {}  # {weapon_tid: ["url1", ...]}
         self._last_cap_ts: Dict[int, float]  = {}  # throttle por weapon_tid
+        # Sets para deduplicar por track ID
+        self._weapon_ids_seen: set = set()
+        self._blanca_ids_seen: set = set()
+        self._fuego_ids_seen: set = set()
 
         # Directorio de capturas para esta fuente
         self._cap_dir = os.path.join(CAPTURES_BASE, str(source_id))
@@ -111,7 +118,6 @@ class ArmasPipeline:
         self._round_buffer: List[bool] = []      # 5 frames del round actual
         self._round_results: List[float] = []    # ratios de rounds completados (máx 3)
         self._alert_active = False
-        self._alert_frames = 0
         self._alert_timestamp: Optional[float] = None
 
     # ── Control ──────────────────────────────────────────────────────────
@@ -228,7 +234,7 @@ class ArmasPipeline:
         names = self.model.names
 
         armed_persons: List[tuple] = []  # (tid, x1,y1,x2,y2, conf) — man_with_weapon rastreado
-        weapon_boxes: List[tuple]  = []  # (x1,y1,x2,y2, wtype, conf) — presencia, sin ID
+        weapon_boxes: List[tuple]  = []  # (x1,y1,x2,y2, wtype, conf, tid or None) — presencia
 
         for box in boxes:
             cls   = int(box.cls[0])
@@ -257,7 +263,35 @@ class ArmasPipeline:
             if is_default_model and cls not in COCO_WEAPON_CLS:
                 continue
 
-            weapon_boxes.append((x1, y1, x2, y2, _weapon_type(cname), conf))
+            wid = int(box.id[0]) if box.id is not None else None
+            weapon_boxes.append((x1, y1, x2, y2, _weapon_type(cname), conf, wid))
+
+        # ── Acumulado por track ID (deduplicado) ────────────────────────
+        for (wx1, wy1, wx2, wy2, wtype, wconf, wid) in weapon_boxes:
+            if wid is not None:
+                if wid not in self._weapon_ids_seen:
+                    self._weapon_ids_seen.add(wid)
+                    self.total_weapons += 1
+                    if wtype == "arma_blanca":
+                        if wid not in self._blanca_ids_seen:
+                            self._blanca_ids_seen.add(wid)
+                            self.total_blanca += 1
+                    elif wtype == "arma_fuego":
+                        if wid not in self._fuego_ids_seen:
+                            self._fuego_ids_seen.add(wid)
+                            self.total_fuego += 1
+            else:
+                # Sin track ID — contar como detección única (no deduplicable)
+                self.total_weapons += 1
+                if wtype == "arma_blanca":
+                    self.total_blanca += 1
+                elif wtype == "arma_fuego":
+                    self.total_fuego += 1
+        for (atid, apx1, apy1, apx2, apy2, _) in armed_persons:
+            if atid not in self._weapon_ids_seen:
+                self._weapon_ids_seen.add(atid)
+                self.total_weapons += 1
+                self.total_blanca += 1  # armed_persons se cuentan como blanca (portador)
 
         # ── Validación 3×5 frames ─────────────────────────────────────
         if self.func_state.get("deteccion_arma", True):
@@ -271,7 +305,6 @@ class ArmasPipeline:
                     avg_ratio = sum(self._round_results) / 3.0
                     if avg_ratio >= 0.3:
                         self._alert_active = True
-                        self._alert_frames = 30
                         self._alert_timestamp = time.time()
                         # Capturar portadores visibles en este frame
                         for (atid, apx1, apy1, apx2, apy2, _) in armed_persons:
@@ -279,19 +312,13 @@ class ArmasPipeline:
                                 self._try_capture(frame, atid, apx1, apy1, apx2, apy2)
                     self._round_results = []
 
-        if self._alert_active:
-            self._alert_frames -= 1
-            if self._alert_frames <= 0:
-                self._alert_active = False
-                self._alert_timestamp = None
-
         # ── Dibujar + lógica ─────────────────────────────────────────────
         deteccion_on = self.func_state.get("deteccion_arma", True)
         self.weapon_current = len(weapon_boxes) + len(armed_persons)
 
         if deteccion_on:
             # Armas sueltas — presencia sin ID
-            for (wx1, wy1, wx2, wy2, wtype, wconf) in weapon_boxes:
+            for (wx1, wy1, wx2, wy2, wtype, wconf, wid) in weapon_boxes:
                 color = (0, 255, 255) if wtype == "arma_fuego" else (0, 0, 220)
                 cv2.rectangle(annotated, (wx1, wy1), (wx2, wy2), color, 2)
                 type_label = "Arma de Fuego" if wtype == "arma_fuego" else "Arma Blanca"
@@ -313,7 +340,7 @@ class ArmasPipeline:
         # ── HUD ──────────────────────────────────────────────────────────
         cv2.putText(
             annotated,
-            f"Armas en zona: {self.weapon_current}   Capturas: {self.capture_count}",
+            f"Armas: {self.total_weapons}  En zona: {self.weapon_current}  Capturas: {self.capture_count}",
             (12, h - 14),
             cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2, cv2.LINE_AA,
         )
@@ -372,6 +399,9 @@ class ArmasPipeline:
         return {
             "source_id":       self.source_id,
             "weapon_count":    self.weapon_current,
+            "total_weapons":   self.total_weapons,
+            "total_blanca":    self.total_blanca,
+            "total_fuego":     self.total_fuego,
             "capture_count":   self.capture_count,
             "captures": {str(tid): urls for tid, urls in self._captures.items()},
             "alert_active":    self._alert_active,
@@ -380,13 +410,18 @@ class ArmasPipeline:
 
     def reset(self) -> None:
         self.weapon_current = 0
+        self.total_weapons  = 0
+        self.total_blanca   = 0
+        self.total_fuego    = 0
         self.capture_count  = 0
         self._captures.clear()
         self._last_cap_ts.clear()
+        self._weapon_ids_seen.clear()
+        self._blanca_ids_seen.clear()
+        self._fuego_ids_seen.clear()
         self._round_buffer = []
         self._round_results = []
         self._alert_active = False
-        self._alert_frames = 0
         self._alert_timestamp = None
 
     def update_func_state(self, func_state: dict) -> None:

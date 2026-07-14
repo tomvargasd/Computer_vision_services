@@ -239,6 +239,9 @@
         <div class="lv-count-num" id="cnt-armas">0</div>
         <div class="lv-count-lbl">armas únicas en escena</div>
       </div>
+      <div style="display:flex;gap:8px;margin-bottom:6px;font-size:0.7rem;color:#9D9FA2;justify-content:center;">
+        <span>Total detectadas: <strong id="cnt-total-armas" style="color:#182A55;">0</strong></span>
+      </div>
 
       <div class="lv-tipo-row">
         <div class="lv-tipo-card blanca">
@@ -417,13 +420,10 @@ async function fetchStats() {
 
 function updateStats(d) {
   document.getElementById("cnt-armas").textContent    = d.weapon_count ?? 0;
+  document.getElementById("cnt-total-armas").textContent = d.total_weapons ?? 0;
   document.getElementById("cnt-capturas").textContent = d.capture_count ?? 0;
-
-  // Tipo de armas (cuenta los IDs con al menos 1 captura como heurística;
-  // el servidor no envía desglose per-type directamente pero lo podemos omitir)
-  // Por ahora mostramos el total en ambas cartas (se puede refinar con backend)
-  // document.getElementById("cnt-blanca").textContent = ...
-  // document.getElementById("cnt-fuego").textContent  = ...
+  document.getElementById("cnt-blanca").textContent   = d.total_blanca ?? 0;
+  document.getElementById("cnt-fuego").textContent    = d.total_fuego ?? 0;
 
   // Alerta en panel lateral
   const alertaSec = document.getElementById("sec-alerta");
@@ -535,6 +535,7 @@ document.getElementById("btn-reset").addEventListener("click", async () => {
       Las capturas aparecerán aquí cuando se detecte un arma y se active la captura de rostro.
     </p>`;
   document.getElementById("cnt-armas").textContent    = "0";
+  document.getElementById("cnt-total-armas").textContent = "0";
   document.getElementById("cnt-capturas").textContent = "0";
   document.getElementById("cnt-blanca").textContent   = "0";
   document.getElementById("cnt-fuego").textContent    = "0";
