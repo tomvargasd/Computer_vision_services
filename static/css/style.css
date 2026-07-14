@@ -1501,6 +1501,21 @@ input:disabled + .slider { opacity: .4; cursor: not-allowed; }
   border-top: 1px solid var(--border);
 }
 
+.fps-input {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-family: var(--font);
+  outline: none;
+  width: 100px;
+  text-align: center;
+  transition: border-color .2s;
+}
+.fps-input:focus { border-color: var(--accent); }
+
 /* ══ SETTINGS TABS ════════════════════════════════════════════════════════ */
 .settings-tabs {
   display: flex;

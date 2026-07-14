@@ -333,6 +333,18 @@ def api_set_half(module_id):
     return jsonify({"half": val})
 
 
+@app.route("/api/<module_id>/settings/fps", methods=["POST"])
+def api_set_fps(module_id):
+    if module_id not in MODULES_META:
+        return jsonify({"error": "Módulo no encontrado"}), 404
+    data = request.get_json(silent=True) or {}
+    for src_type in ("video", "stream"):
+        if src_type in data:
+            val = str(float(data[src_type]))
+            set_setting(f"{module_id}_fps_limit_{src_type}", val)
+    return jsonify({"saved": True})
+
+
 @app.route("/api/pallets/settings/classes", methods=["POST"])
 def pallets_set_classes():
     data = request.get_json(silent=True) or {}
