@@ -41,3 +41,6 @@ Thumbs.db
 static/uploads/models/
 static/uploads/videos/
 static/uploads/captures/
+
+# Teach data (user-labeled action samples)
+src/modules/_teach_data.json

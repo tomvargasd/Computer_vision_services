@@ -29,6 +29,8 @@ MODULES_META = {
             "deteccion_violencia": {"label": "Alertas de violencia",         "description": "Detecta golpes, patadas y agresión física"},
             "deteccion_robo":      {"label": "Alertas de robo / amenaza",   "description": "Detecta brazo apuntando y posturas de amenaza"},
             "deteccion_sospechosa":{"label": "Actividad sospechosa",        "description": "Detecta agachado, rastreo y movimientos furtivos"},
+            "deteccion_celular":  {"label": "Uso de celular",            "description": "Detecta personas usando teléfono (llamando o texteando)"},
+            "deteccion_caida":    {"label": "Detección de caídas",       "description": "Detecta caídas parciales (tropiezo/arrodillado) y completas"},
         },
     },
     "troncos": {

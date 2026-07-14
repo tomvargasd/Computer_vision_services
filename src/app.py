@@ -1,6 +1,7 @@
 from flask import Flask, render_template, jsonify, request, Response, stream_with_context
 from flask_cors import CORS
 import os
+import uuid
 import time
 import json
 from werkzeug.utils import secure_filename
@@ -555,6 +556,46 @@ def acciones_reset(source_id):
 @app.route("/api/acciones/stream/<int:source_id>")
 def acciones_stream(source_id):
     return _stream_response("acciones", source_id)
+
+
+@app.route("/api/acciones/sources/<int:source_id>/teach/data")
+def acciones_teach_data(source_id):
+    mgr = AccionesManager.get()
+    data = mgr.get_teach_data(source_id)
+    if data is None:
+        return jsonify({"error": "Pipeline no activo"}), 404
+    return jsonify(data)
+
+
+@app.route("/api/acciones/sources/<int:source_id>/teach/save", methods=["POST"])
+def acciones_teach_save(source_id):
+    body = request.get_json()
+    if not body:
+        return jsonify({"error": "JSON requerido"}), 400
+    tid = body.get("person_id")
+    action = body.get("action")
+    if tid is None or action not in ("violencia", "robo", "sospechoso", "celular", "caida"):
+        return jsonify({"error": "person_id y action requeridos (violencia|robo|sospechoso|celular|caida)"}), 400
+    mgr = AccionesManager.get()
+    pipeline = mgr.pipelines.get(source_id) if hasattr(mgr, "pipelines") else None
+    if pipeline is None:
+        return jsonify({"error": "Pipeline no activo"}), 404
+    log = list(pipeline._person_log.get(tid, []))
+    sample = {
+        "id": str(uuid.uuid4()),
+        "action": action,
+        "source_id": source_id,
+        "person_id": tid,
+        "ts": time.time(),
+        "log": [dict(e) for e in log],
+        "captures": {
+            "face": list(pipeline._cap_face.get(tid, [])),
+            "body": list(pipeline._cap_body.get(tid, [])),
+        },
+    }
+    from src.modules.acciones import _save_teach_sample
+    _save_teach_sample(sample)
+    return jsonify({"ok": True, "sample_id": sample["id"]})
 
 
 # ─────────────────────────────────────────────
