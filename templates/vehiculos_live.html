@@ -187,10 +187,32 @@
       display: none; position: fixed; inset: 0;
       background: rgba(0,0,0,0.85); z-index: 1000;
       align-items: center; justify-content: center;
+      flex-direction: column; gap: 16px;
     }
     .lb-overlay.open { display: flex; }
-    .lb-overlay img { max-width: 90vw; max-height: 90vh; border-radius: 8px; border: 1px solid #D8DCE3; }
+    .lb-overlay img { max-width: 90vw; max-height: 80vh; border-radius: 8px; border: 1px solid #D8DCE3; }
     .lb-close { position: absolute; top: 20px; right: 24px; font-size: 2rem; color: #fff; cursor: pointer; line-height: 1; }
+    .lb-plate-label {
+      display: none;
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      border-radius: 8px;
+      padding: 8px 20px;
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #F59E0B;
+      letter-spacing: .06em;
+      text-align: center;
+    }
+    .lb-plate-label.has-plate { display: block; }
+    .lb-vehicle-id {
+      display: none;
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.5);
+      font-weight: 500;
+    }
+    .lb-vehicle-id.has-id { display: block; }
 
     .lv-info-row {
       display: flex; align-items: center; justify-content: space-between;
@@ -360,7 +382,9 @@
 <!-- Lightbox -->
 <div class="lb-overlay" id="lb-overlay">
   <span class="lb-close" id="lb-close">×</span>
+  <span class="lb-vehicle-id" id="lb-vid"></span>
   <img id="lb-img" src="" alt="Captura">
+  <div class="lb-plate-label" id="lb-plate"></div>
 </div>
 
 <script>
@@ -459,7 +483,8 @@ function renderRegistros(regs) {
     const plateHtml = r.plate_text
       ? `<div class="reg-plate">${r.plate_text}</div>`
       : "";
-    return `<div class="reg-item" onclick="openLightbox('${src}')">
+    const plateEsc = (r.plate_text || "").replace(/'/g, "\\'");
+    return `<div class="reg-item" onclick="openLightbox('${src}', '${plateEsc}', '${r.track_id}')">
       <img class="reg-thumb" src="${src}" alt="Vehículo ${r.track_id}" loading="lazy">
       <div class="reg-info">
         <div class="reg-id">Vehículo #${r.track_id}</div>
@@ -479,7 +504,8 @@ function renderPlacas(placas) {
   }
   container.innerHTML = placas.slice().reverse().map(p => {
     const src = `/static/uploads/captures/vehiculos/${p.image}`;
-    return `<div class="plate-item" onclick="openLightbox('${src}')">
+    const plateEsc = (p.plate || "").replace(/'/g, "\\'");
+    return `<div class="plate-item" onclick="openLightbox('${src}', '${plateEsc}', '${p.track_id}')">
       <img class="plate-thumb" src="${src}" alt="Placa" loading="lazy">
       <span class="plate-text">${p.plate}</span>
       <span class="plate-time">${p.timestamp}</span>
@@ -490,9 +516,25 @@ function renderPlacas(placas) {
 // ── Lightbox ──────────────────────────────────────────────────────────────
 const lbOverlay = document.getElementById("lb-overlay");
 const lbImg     = document.getElementById("lb-img");
+const lbPlate   = document.getElementById("lb-plate");
+const lbVid     = document.getElementById("lb-vid");
 
-function openLightbox(url) {
+function openLightbox(url, plateText, vehicleId) {
   lbImg.src = url;
+  if (plateText) {
+    lbPlate.textContent = plateText;
+    lbPlate.classList.add("has-plate");
+  } else {
+    lbPlate.textContent = "";
+    lbPlate.classList.remove("has-plate");
+  }
+  if (vehicleId) {
+    lbVid.textContent = "Vehículo #" + vehicleId;
+    lbVid.classList.add("has-id");
+  } else {
+    lbVid.textContent = "";
+    lbVid.classList.remove("has-id");
+  }
   lbOverlay.classList.add("open");
 }
 document.getElementById("lb-close").addEventListener("click", () => lbOverlay.classList.remove("open"));
