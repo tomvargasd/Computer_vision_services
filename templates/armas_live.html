@@ -252,7 +252,24 @@
       </div>
     </div>
 
-    <!-- ── 2. Capturas de Rostros ────────────────────────── -->
+    <!-- ── 2. Alertas ────────────────────────────────────── -->
+    <div class="lv-section" id="sec-alerta" style="display:none;">
+      <div class="lv-section-title">
+        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span style="color:#EF4444;">ALERTA ARMA DETECTADA</span>
+      </div>
+      <div style="background:#FEF2F2;border:2px solid #EF4444;border-radius:10px;padding:14px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+          <span style="font-size:1.8rem;">⚠️</span>
+          <div>
+            <div style="font-size:0.85rem;font-weight:700;color:#EF4444;">Arma validada en escena</div>
+            <div style="font-size:0.68rem;color:#9D9FA2;" id="alerta-ts">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 3. Capturas de Rostros ────────────────────────── -->
     <div class="lv-section" id="sec-capturas">
       <div class="lv-section-title">
         <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
@@ -274,7 +291,7 @@
       </div>
     </div>
 
-    <!-- ── 3. Funciones activas ──────────────────────────── -->
+    <!-- ── 4. Funciones activas ──────────────────────────── -->
     <div class="lv-section" id="sec-funciones">
       <div class="lv-section-title">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -407,6 +424,21 @@ function updateStats(d) {
   // Por ahora mostramos el total en ambas cartas (se puede refinar con backend)
   // document.getElementById("cnt-blanca").textContent = ...
   // document.getElementById("cnt-fuego").textContent  = ...
+
+  // Alerta en panel lateral
+  const alertaSec = document.getElementById("sec-alerta");
+  if (alertaSec) {
+    if (d.alert_active) {
+      alertaSec.style.display = "";
+      const tsEl = document.getElementById("alerta-ts");
+      if (tsEl && d.alert_timestamp) {
+        const dts = new Date(d.alert_timestamp * 1000);
+        tsEl.textContent = dts.toLocaleTimeString("es-MX", {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+      }
+    } else {
+      alertaSec.style.display = "none";
+    }
+  }
 
   // Galería de capturas
   renderCaptures(d.captures || {});

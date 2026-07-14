@@ -112,6 +112,7 @@ class ArmasPipeline:
         self._round_results: List[float] = []    # ratios de rounds completados (máx 3)
         self._alert_active = False
         self._alert_frames = 0
+        self._alert_timestamp: Optional[float] = None
 
     # ── Control ──────────────────────────────────────────────────────────
 
@@ -271,6 +272,7 @@ class ArmasPipeline:
                     if avg_ratio >= 0.3:
                         self._alert_active = True
                         self._alert_frames = 30
+                        self._alert_timestamp = time.time()
                         # Capturar portadores visibles en este frame
                         for (atid, apx1, apy1, apx2, apy2, _) in armed_persons:
                             if self.func_state.get("captura_rostro"):
@@ -281,6 +283,7 @@ class ArmasPipeline:
             self._alert_frames -= 1
             if self._alert_frames <= 0:
                 self._alert_active = False
+                self._alert_timestamp = None
 
         # ── Dibujar + lógica ─────────────────────────────────────────────
         deteccion_on = self.func_state.get("deteccion_arma", True)
@@ -314,15 +317,6 @@ class ArmasPipeline:
             (12, h - 14),
             cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2, cv2.LINE_AA,
         )
-
-        # ── Alerta de arma validada ──────────────────────────────────────
-        if self._alert_active:
-            cv2.rectangle(annotated, (0, 0), (w-1, h-1), (0, 0, 220), 6)
-            cv2.putText(
-                annotated, "ALERTA ARMA",
-                (w // 2 - 100, 50),
-                cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 220), 3, cv2.LINE_AA,
-            )
 
         return annotated
 
@@ -376,11 +370,12 @@ class ArmasPipeline:
 
     def get_stats(self) -> dict:
         return {
-            "source_id":     self.source_id,
-            "weapon_count":  self.weapon_current,
-            "capture_count": self.capture_count,
+            "source_id":       self.source_id,
+            "weapon_count":    self.weapon_current,
+            "capture_count":   self.capture_count,
             "captures": {str(tid): urls for tid, urls in self._captures.items()},
-            "alert_active":  self._alert_active,
+            "alert_active":    self._alert_active,
+            "alert_timestamp": self._alert_timestamp,
         }
 
     def reset(self) -> None:
@@ -392,6 +387,7 @@ class ArmasPipeline:
         self._round_results = []
         self._alert_active = False
         self._alert_frames = 0
+        self._alert_timestamp = None
 
     def update_func_state(self, func_state: dict) -> None:
         self.func_state.update(func_state)
