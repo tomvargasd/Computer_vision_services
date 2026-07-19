@@ -28,6 +28,7 @@ from src.modules.carga_descarga import CargaDescargaManager
 from src.modules.epp import EppManager
 from src.modules.smoke import SmokeManager
 from src.modules.vehiculos import VehiculosManager
+from src.modules.tanques_gas import TanquesGasManager
 
 
 def _normalize_path(path, src_type):
@@ -140,6 +141,7 @@ def live_view(module_id, source_id):
         "epp": "epp_live.html",
         "smoke": "smoke_live.html",
         "vehiculos": "vehiculos_live.html",
+        "tanques_gas": "tanques_gas_live.html",
     }
     tmpl = tmpl_map.get(module_id)
     if not tmpl:
@@ -170,6 +172,7 @@ def api_toggle_module(module_id):
             "epp": EppManager,
             "smoke": SmokeManager,
             "vehiculos": VehiculosManager,
+            "tanques_gas": TanquesGasManager,
         }
         mgr = stop_map.get(module_id)
         if mgr:
@@ -414,6 +417,7 @@ _MANAGERS = {
     "epp": EppManager,
     "smoke": SmokeManager,
     "vehiculos": VehiculosManager,
+    "tanques_gas": TanquesGasManager,
 }
 
 
@@ -1255,6 +1259,208 @@ def vehiculos_upload_plate_model():
 @app.route("/api/vehiculos/stream/<int:source_id>")
 def vehiculos_stream(source_id):
     return _stream_response("vehiculos", source_id)
+
+
+# ─────────────────────────────────────────────
+# API Tanques de Gas
+# ─────────────────────────────────────────────
+
+@app.route("/api/tanques_gas/sources/<int:source_id>/start", methods=["POST"])
+def tanques_gas_start(source_id):
+    sources = get_sources("tanques_gas")
+    src = next((s for s in sources if s["id"] == source_id), None)
+    if not src:
+        return jsonify({"error": "Fuente no encontrada"}), 404
+    s = get_settings()
+    fps_limit = _get_fps_limit("tanques_gas", src["type"], s)
+    try:
+        TanquesGasManager.get().start(source_id, src["path"],
+            _func_state_for("tanques_gas"),
+            float(s.get("tanques_gas_conf", "0.35")),
+            s.get("tanques_gas_half", "0") == "1",
+            s.get("tanques_gas_model") or None,
+            s.get("tanques_gas_pose_model") or None,
+            s.get("tanques_gas_smoke_model") or None,
+            s.get("tanques_gas_line_mode", "horizontal"),
+            int(s.get("tanques_gas_line_pos", "50")),
+            fps_limit=fps_limit)
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 429
+    return jsonify({"started": source_id})
+
+
+@app.route("/api/tanques_gas/sources/<int:source_id>/stop", methods=["POST"])
+def tanques_gas_stop(source_id):
+    TanquesGasManager.get().stop(source_id)
+    return jsonify({"stopped": source_id})
+
+
+@app.route("/api/tanques_gas/sources/<int:source_id>/stats")
+def tanques_gas_stats(source_id):
+    stats = TanquesGasManager.get().get_stats(source_id)
+    if stats is None:
+        return jsonify({"error": "Pipeline no activo"}), 404
+    return jsonify(stats)
+
+
+@app.route("/api/tanques_gas/sources/<int:source_id>/reset", methods=["POST"])
+def tanques_gas_reset(source_id):
+    TanquesGasManager.get().reset(source_id)
+    return jsonify({"reset": source_id})
+
+
+@app.route("/api/tanques_gas/sources/<int:source_id>/line-mode", methods=["POST"])
+def tanques_gas_line_mode(source_id):
+    data = request.get_json(silent=True) or {}
+    mode = data.get("mode", "horizontal")
+    if mode not in ("horizontal", "vertical", "rectangle", "custom_line", "custom_rect"):
+        return jsonify({"error": "Modo inválido"}), 400
+    set_setting("tanques_gas_line_mode", mode)
+    TanquesGasManager.get().set_line_mode(source_id, mode)
+    return jsonify({"line_mode": mode})
+
+
+@app.route("/api/tanques_gas/sources/<int:source_id>/line-pos", methods=["POST"])
+def tanques_gas_line_pos(source_id):
+    data = request.get_json(silent=True) or {}
+    pct = max(0, min(100, int(data.get("pct", 50))))
+    set_setting("tanques_gas_line_pos", str(pct))
+    TanquesGasManager.get().set_line_pos(source_id, pct)
+    return jsonify({"line_pos": pct})
+
+
+@app.route("/api/tanques_gas/sources/<int:source_id>/custom-line", methods=["POST"])
+def tanques_gas_custom_line(source_id):
+    data = request.get_json(silent=True) or {}
+    p1x = float(data.get("p1x", 0.25))
+    p1y = float(data.get("p1y", 0.25))
+    p2x = float(data.get("p2x", 0.75))
+    p2y = float(data.get("p2y", 0.75))
+    TanquesGasManager.get().set_custom_line(source_id, p1x, p1y, p2x, p2y)
+    return jsonify({"p1x": p1x, "p1y": p1y, "p2x": p2x, "p2y": p2y})
+
+
+@app.route("/api/tanques_gas/sources/<int:source_id>/custom-rect", methods=["POST"])
+def tanques_gas_custom_rect(source_id):
+    data = request.get_json(silent=True) or {}
+    points = data.get("points", [])
+    if len(points) != 4:
+        return jsonify({"error": "Se requieren exactamente 4 puntos"}), 400
+    TanquesGasManager.get().set_custom_rect(source_id, points)
+    return jsonify({"points": points})
+
+
+@app.route("/api/tanques_gas/sources/<int:source_id>/rect-area", methods=["POST"])
+def tanques_gas_rect_area(source_id):
+    data = request.get_json(silent=True) or {}
+    x1 = int(data.get("x1", 20)); y1 = int(data.get("y1", 20))
+    x2 = int(data.get("x2", 80)); y2 = int(data.get("y2", 80))
+    TanquesGasManager.get().set_rect_area(source_id, x1, y1, x2, y2)
+    return jsonify({"x1": x1, "y1": y1, "x2": x2, "y2": y2})
+
+
+# ── Restricted Areas ──
+
+@app.route("/api/tanques_gas/sources/<int:source_id>/restricted-areas", methods=["GET", "POST"])
+def tanques_gas_restricted_areas(source_id):
+    if request.method == "GET":
+        with TanquesGasManager.get()._lock:
+            p = TanquesGasManager.get().pipelines.get(source_id)
+        if p:
+            return jsonify(p.restricted_areas)
+        return jsonify([])
+    data = request.get_json(silent=True) or {}
+    points = data.get("points", [])
+    restrict_type = data.get("restrict_type", "ambos")
+    TanquesGasManager.get().add_restricted_area(source_id, points, restrict_type)
+    with TanquesGasManager.get()._lock:
+        p = TanquesGasManager.get().pipelines.get(source_id)
+    return jsonify(p.restricted_areas if p else [])
+
+
+@app.route("/api/tanques_gas/sources/<int:source_id>/restricted-areas/<area_id>", methods=["DELETE"])
+def tanques_gas_remove_restricted_area(source_id, area_id):
+    from urllib.parse import unquote
+    area_id = unquote(area_id)
+    TanquesGasManager.get().remove_restricted_area(source_id, area_id)
+    return jsonify({"removed": area_id})
+
+
+# ── Teach ──
+
+@app.route("/api/tanques_gas/sources/<int:source_id>/teach/start", methods=["POST"])
+def tanques_gas_teach_start(source_id):
+    TanquesGasManager.get().start_teach(source_id)
+    return jsonify({"teach_mode": True})
+
+
+@app.route("/api/tanques_gas/sources/<int:source_id>/teach/cancel", methods=["POST"])
+def tanques_gas_teach_cancel(source_id):
+    TanquesGasManager.get().cancel_teach(source_id)
+    return jsonify({"teach_mode": False})
+
+
+@app.route("/api/tanques_gas/sources/<int:source_id>/teach/capture")
+def tanques_gas_teach_capture(source_id):
+    data = TanquesGasManager.get().get_teach_capture(source_id)
+    if data is None:
+        return jsonify(None)
+    return jsonify(data)
+
+
+@app.route("/api/tanques_gas/sources/<int:source_id>/teach/save", methods=["POST"])
+def tanques_gas_teach_save(source_id):
+    data = request.get_json(silent=True) or {}
+    action = data.get("action", "").strip()
+    if not action:
+        return jsonify({"error": "Acción requerida"}), 400
+    ok = TanquesGasManager.get().save_teach_action(source_id, action)
+    return jsonify({"ok": ok})
+
+
+@app.route("/api/tanques_gas/sources/<int:source_id>/teach/samples")
+def tanques_gas_teach_samples(source_id):
+    from src.modules.tanques_gas import _TEACH_SAMPLES
+    return jsonify({"samples": _TEACH_SAMPLES})
+
+
+@app.route("/api/tanques_gas/sources/<int:source_id>/actions-info")
+def tanques_gas_actions_info(source_id):
+    info = TanquesGasManager.get().get_actions_info(source_id)
+    return jsonify(info)
+
+
+@app.route("/api/tanques_gas/upload-pose-model", methods=["POST"])
+def tanques_gas_upload_pose_model():
+    if "model" not in request.files:
+        return jsonify({"error": "No se envió archivo"}), 400
+    f = request.files["model"]
+    if not f.filename.endswith(".pt"):
+        return jsonify({"error": "Solo archivos .pt"}), 400
+    fname = secure_filename(f.filename)
+    f.save(os.path.join(MODELS_FOLDER, fname))
+    rel = os.path.join("static", "uploads", "models", fname)
+    set_setting("tanques_gas_pose_model", rel)
+    return jsonify({"model": fname})
+
+
+@app.route("/api/tanques_gas/upload-smoke-model", methods=["POST"])
+def tanques_gas_upload_smoke_model():
+    if "model" not in request.files:
+        return jsonify({"error": "No se envió archivo"}), 400
+    f = request.files["model"]
+    if not f.filename.endswith(".pt"):
+        return jsonify({"error": "Solo archivos .pt"}), 400
+    fname = secure_filename(f.filename)
+    f.save(os.path.join(MODELS_FOLDER, fname))
+    rel = os.path.join("static", "uploads", "models", fname)
+    set_setting("tanques_gas_smoke_model", rel)
+    return jsonify({"model": fname})
+
+
+@app.route("/api/tanques_gas/stream/<int:source_id>")
+def tanques_gas_stream(source_id):
+    return _stream_response("tanques_gas", source_id)
 
 
 # ─────────────────────────────────────────────

@@ -30,6 +30,13 @@
 
     <div class="nav-section-label">Módulos</div>
 
+    <a href="{{ url_for('module_view', module_id='tanques_gas') }}"
+       class="nav-item {% if request.endpoint == 'module_view' and module_id == 'tanques_gas' %}active{% endif %}">
+      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0-10 10c0 4.42 2.65 8.17 6.35 9.95-.03-.17-.05-.34-.05-.5 0-2.76 2.24-5 5-5s5 2.24 5 5c0 .16-.02.33-.05.5C19.35 20.17 22 16.42 22 12A10 10 0 0 0 12 2z"/><circle cx="12" cy="12" r="3"/><path d="M12 6v2M12 16v2M6 12h2M16 12h2"/></svg>
+      <span>Tanques de Gas</span>
+      <span class="status-dot {% if modules['tanques_gas']['enabled'] %}on{% endif %}"></span>
+    </a>
+
     <a href="{{ url_for('module_view', module_id='reglamento') }}"
        class="nav-item {% if request.endpoint == 'module_view' and module_id == 'reglamento' %}active{% endif %}">
       <svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 11 12 14 15 9"/></svg>

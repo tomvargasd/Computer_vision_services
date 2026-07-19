@@ -107,13 +107,13 @@
 
     <!-- Sub-tabs de módulos -->
     <div class="settings-subtabs">
-      {% for mid in ('personas', 'armas', 'acciones', 'troncos', 'pallets', 'cajas', 'reglamento', 'carga_descarga', 'epp', 'smoke', 'vehiculos') %}      <button class="settings-subtab {% if loop.first %}active{% endif %}" data-module="{{ mid }}">
+      {% for mid in ('tanques_gas', 'personas', 'armas', 'acciones', 'troncos', 'pallets', 'cajas', 'reglamento', 'carga_descarga', 'epp', 'smoke', 'vehiculos') %}      <button class="settings-subtab {% if loop.first %}active{% endif %}" data-module="{{ mid }}">
         {{ modules[mid].label }}
       </button>
       {% endfor %}
     </div>
 
-        {% for mid in ('personas', 'armas', 'acciones', 'troncos', 'pallets', 'cajas', 'reglamento', 'carga_descarga', 'epp', 'smoke', 'vehiculos') %}    {% set model_key = mid + '_model' %}
+        {% for mid in ('tanques_gas', 'personas', 'armas', 'acciones', 'troncos', 'pallets', 'cajas', 'reglamento', 'carga_descarga', 'epp', 'smoke', 'vehiculos') %}    {% set model_key = mid + '_model' %}
     {% set conf_key = mid + '_conf' %}
     {% set half_key = mid + '_half' %}
     {% set conf_val = ((settings.get(conf_key) or '0.35') | float * 100) | int %}
@@ -156,6 +156,79 @@
           </div>
         </div>
       </div>
+
+      {% if mid == 'tanques_gas' %}
+      <!-- Modelo de Acciones (Pose) -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <svg class="settings-section-icon" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <span class="settings-section-title">Modelo de Acciones (Pose)</span>
+        </div>
+        <div class="settings-section-body">
+          <div class="model-info-row">
+            <div class="model-current">
+              <span class="model-current-lbl">Modelo activo:</span>
+              <span class="model-current-val" id="pose-model-name-tanques_gas">
+                {% if settings.get('tanques_gas_pose_model') %}
+                  {{ settings.get('tanques_gas_pose_model').split('/')[-1] }}
+                {% else %}
+                  Modelo por defecto (yolo11n-pose.pt)
+                {% endif %}
+              </span>
+            </div>
+            <button class="btn-model-remove" id="btn-pose-model-remove-tanques_gas"
+                    style="{% if not settings.get('tanques_gas_pose_model') %}display:none{% endif %}"
+                    title="Eliminar modelo personalizado">
+              <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+              Quitar modelo
+            </button>
+          </div>
+          <input type="file" id="pose-model-file-tanques_gas" accept=".pt" style="display:none"/>
+          <label for="pose-model-file-tanques_gas" class="upload-area upload-area-model" id="upload-pose-model-area-tanques_gas">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <span id="pose-model-upload-label-tanques_gas">Subir modelo .pt para detección de acciones</span>
+          </label>
+          <div class="upload-progress" id="pose-model-upload-progress-tanques_gas" hidden>
+            <div class="upload-progress-bar" id="pose-model-upload-bar-tanques_gas"></div>
+          </div>
+        </div>
+      </div>
+      <!-- Modelo de Humo/Fuego -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <svg class="settings-section-icon" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <span class="settings-section-title">Modelo de Humo/Fuego</span>
+        </div>
+        <div class="settings-section-body">
+          <div class="model-info-row">
+            <div class="model-current">
+              <span class="model-current-lbl">Modelo activo:</span>
+              <span class="model-current-val" id="smoke-model-name-tanques_gas">
+                {% if settings.get('tanques_gas_smoke_model') %}
+                  {{ settings.get('tanques_gas_smoke_model').split('/')[-1] }}
+                {% else %}
+                  Modelo por defecto (yolo11n.pt)
+                {% endif %}
+              </span>
+            </div>
+            <button class="btn-model-remove" id="btn-smoke-model-remove-tanques_gas"
+                    style="{% if not settings.get('tanques_gas_smoke_model') %}display:none{% endif %}"
+                    title="Eliminar modelo personalizado">
+              <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+              Quitar modelo
+            </button>
+          </div>
+          <input type="file" id="smoke-model-file-tanques_gas" accept=".pt" style="display:none"/>
+          <label for="smoke-model-file-tanques_gas" class="upload-area upload-area-model" id="upload-smoke-model-area-tanques_gas">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <span id="smoke-model-upload-label-tanques_gas">Subir modelo .pt para detección de humo/fuego</span>
+          </label>
+          <div class="upload-progress" id="smoke-model-upload-progress-tanques_gas" hidden>
+            <div class="upload-progress-bar" id="smoke-model-upload-bar-tanques_gas"></div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
 
       {% if mid == 'vehiculos' %}
       <!-- Modelo de Placas -->
@@ -398,7 +471,7 @@ function showToast(id) {
 }
 
 // ══ Model upload per module ═══════════════════════════════════════
-const ALL_MIDS = ['personas', 'armas', 'acciones', 'troncos', 'pallets', 'cajas', 'reglamento', 'carga_descarga', 'epp', 'smoke', 'vehiculos'];
+const ALL_MIDS = ['tanques_gas', 'personas', 'armas', 'acciones', 'troncos', 'pallets', 'cajas', 'reglamento', 'carga_descarga', 'epp', 'smoke', 'vehiculos'];
 
 ALL_MIDS.forEach(mid => {
   const modelArea   = document.getElementById("upload-model-area-" + mid);
@@ -542,6 +615,138 @@ document.querySelectorAll(".fps-input").forEach(input => {
     }, 400);
   });
 });
+
+// ══ Pose model upload (tanques_gas) ══════════════════════════════
+const poseArea   = document.getElementById("upload-pose-model-area-tanques_gas");
+const poseFile   = document.getElementById("pose-model-file-tanques_gas");
+const poseLabel  = document.getElementById("pose-model-upload-label-tanques_gas");
+const poseProg   = document.getElementById("pose-model-upload-progress-tanques_gas");
+const poseBar    = document.getElementById("pose-model-upload-bar-tanques_gas");
+const poseName   = document.getElementById("pose-model-name-tanques_gas");
+const poseRemove = document.getElementById("btn-pose-model-remove-tanques_gas");
+
+if (poseArea) {
+  poseArea.addEventListener("dragover",  e => { e.preventDefault(); e.stopPropagation(); poseArea.classList.add("drag-over"); });
+  poseArea.addEventListener("dragleave", e => { e.stopPropagation(); poseArea.classList.remove("drag-over"); });
+  poseArea.addEventListener("drop", e => {
+    e.preventDefault(); e.stopPropagation();
+    poseArea.classList.remove("drag-over");
+    const file = e.dataTransfer.files[0];
+    if (file) uploadPoseModel(file);
+  });
+  poseFile.addEventListener("change", () => { if (poseFile.files[0]) uploadPoseModel(poseFile.files[0]); });
+}
+
+function uploadPoseModel(file) {
+  if (!file.name.endsWith(".pt")) { alert("Solo se permiten archivos .pt"); return; }
+  poseLabel.textContent = `Subiendo: ${file.name}…`;
+  poseProg.hidden = false;
+  poseBar.style.width = "0%";
+  const fd = new FormData();
+  fd.append("model", file);
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", "/api/tanques_gas/upload-pose-model");
+  xhr.upload.onprogress = e => {
+    if (e.lengthComputable) poseBar.style.width = Math.round(e.loaded / e.total * 100) + "%";
+  };
+  xhr.onload = () => {
+    if (xhr.status === 200) {
+      const d = JSON.parse(xhr.responseText);
+      poseBar.style.width = "100%";
+      poseLabel.textContent = "Haz clic para cambiar el modelo";
+      if (poseName) poseName.textContent = d.model;
+      if (poseRemove) poseRemove.style.display = "";
+    } else {
+      poseLabel.textContent = "Error al subir el modelo";
+      poseProg.hidden = true;
+    }
+  };
+  xhr.onerror = () => { poseLabel.textContent = "Error de red"; };
+  xhr.send(fd);
+}
+
+if (poseRemove) {
+  poseRemove.addEventListener("click", async () => {
+    if (!confirm("¿Eliminar el modelo de pose y usar el modelo por defecto?")) return;
+    const r = await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tanques_gas_pose_model: "" }),
+    });
+    if (r.ok) {
+      if (poseName) poseName.textContent = "Modelo por defecto (yolo11n-pose.pt)";
+      if (poseLabel) poseLabel.textContent = "Subir modelo .pt para detección de acciones";
+      if (poseProg) poseProg.hidden = true;
+      poseRemove.style.display = "none";
+    }
+  });
+}
+
+// ══ Smoke model upload (tanques_gas) ══════════════════════════════
+const smokeArea   = document.getElementById("upload-smoke-model-area-tanques_gas");
+const smokeFile   = document.getElementById("smoke-model-file-tanques_gas");
+const smokeLabel  = document.getElementById("smoke-model-upload-label-tanques_gas");
+const smokeProg   = document.getElementById("smoke-model-upload-progress-tanques_gas");
+const smokeBar    = document.getElementById("smoke-model-upload-bar-tanques_gas");
+const smokeName   = document.getElementById("smoke-model-name-tanques_gas");
+const smokeRemove = document.getElementById("btn-smoke-model-remove-tanques_gas");
+
+if (smokeArea) {
+  smokeArea.addEventListener("dragover",  e => { e.preventDefault(); e.stopPropagation(); smokeArea.classList.add("drag-over"); });
+  smokeArea.addEventListener("dragleave", e => { e.stopPropagation(); smokeArea.classList.remove("drag-over"); });
+  smokeArea.addEventListener("drop", e => {
+    e.preventDefault(); e.stopPropagation();
+    smokeArea.classList.remove("drag-over");
+    const file = e.dataTransfer.files[0];
+    if (file) uploadSmokeModel(file);
+  });
+  smokeFile.addEventListener("change", () => { if (smokeFile.files[0]) uploadSmokeModel(smokeFile.files[0]); });
+}
+
+function uploadSmokeModel(file) {
+  if (!file.name.endsWith(".pt")) { alert("Solo se permiten archivos .pt"); return; }
+  smokeLabel.textContent = `Subiendo: ${file.name}…`;
+  smokeProg.hidden = false;
+  smokeBar.style.width = "0%";
+  const fd = new FormData();
+  fd.append("model", file);
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", "/api/tanques_gas/upload-smoke-model");
+  xhr.upload.onprogress = e => {
+    if (e.lengthComputable) smokeBar.style.width = Math.round(e.loaded / e.total * 100) + "%";
+  };
+  xhr.onload = () => {
+    if (xhr.status === 200) {
+      const d = JSON.parse(xhr.responseText);
+      smokeBar.style.width = "100%";
+      smokeLabel.textContent = "Haz clic para cambiar el modelo";
+      if (smokeName) smokeName.textContent = d.model;
+      if (smokeRemove) smokeRemove.style.display = "";
+    } else {
+      smokeLabel.textContent = "Error al subir el modelo";
+      smokeProg.hidden = true;
+    }
+  };
+  xhr.onerror = () => { smokeLabel.textContent = "Error de red"; };
+  xhr.send(fd);
+}
+
+if (smokeRemove) {
+  smokeRemove.addEventListener("click", async () => {
+    if (!confirm("¿Eliminar el modelo de humo/fuego y usar el modelo por defecto?")) return;
+    const r = await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tanques_gas_smoke_model: "" }),
+    });
+    if (r.ok) {
+      if (smokeName) smokeName.textContent = "Modelo por defecto (yolo11n.pt)";
+      if (smokeLabel) smokeLabel.textContent = "Subir modelo .pt para detección de humo/fuego";
+      if (smokeProg) smokeProg.hidden = true;
+      smokeRemove.style.display = "none";
+    }
+  });
+}
 
 // ══ Plate model upload (vehiculos) ═══════════════════════════════
 const plateArea   = document.getElementById("upload-plate-model-area-vehiculos");

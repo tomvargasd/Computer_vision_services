@@ -88,12 +88,22 @@ MODULES_META = {
             "deteccion_placas": {"label": "Detección de placas",    "description": "Reconoce placas en vehículos detectados"},
         },
     },
+    "tanques_gas": {
+        "label": "Tanques de Gas",
+        "functions": {
+            "conteo":              {"label": "Conteo de tanques",               "description": "Cuenta tanques que cruzan línea o ingresan a área"},
+            "deteccion_acciones":  {"label": "Detección de acciones",           "description": "Detección de acciones con sistema de enseñanza"},
+            "deteccion_humo":      {"label": "Detección de humo/fuego",         "description": "Detecta presencia de humo o fuego en escena"},
+            "areas_restringidas":  {"label": "Áreas restringidas",              "description": "Define áreas prohibidas para personas o tanques"},
+        },
+    },
 }
 
 
 _FPS_MODULES = [
     "personas", "armas", "acciones", "troncos", "pallets",
     "cajas", "reglamento", "carga_descarga", "epp", "smoke", "vehiculos",
+    "tanques_gas",
 ]
 FPS_DEFAULTS = [
     (f"{m}_fps_limit_video", "0.02")
@@ -142,6 +152,13 @@ DEFAULT_SETTINGS = [
     ("vehiculos_plate_conf", "0.35"),
     ("vehiculos_line_mode", "horizontal"),
     ("vehiculos_line_pos", "50"),
+    ("tanques_gas_model", ""),
+    ("tanques_gas_conf", "0.35"),
+    ("tanques_gas_half", "0"),
+    ("tanques_gas_pose_model", ""),
+    ("tanques_gas_smoke_model", ""),
+    ("tanques_gas_line_mode", "horizontal"),
+    ("tanques_gas_line_pos", "50"),
 ]
 
 
