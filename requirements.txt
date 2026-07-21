@@ -1,5 +1,6 @@
 flask==3.1.0
 flask-cors==5.0.0
+Flask-Compress==1.17
 ultralytics>=8.4.0
 opencv-python-headless>=4.8.0
 pytesseract>=0.3.10

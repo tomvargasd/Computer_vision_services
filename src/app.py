@@ -1,5 +1,6 @@
 from flask import Flask, render_template, jsonify, request, Response, stream_with_context
 from flask_cors import CORS
+from flask_compress import Compress
 import os
 import uuid
 import time
@@ -52,6 +53,7 @@ def _get_fps_limit(module_id, src_type, settings):
 app = Flask(__name__, template_folder=os.path.join(BASE_DIR, "templates"),
             static_folder=os.path.join(BASE_DIR, "static"))
 CORS(app)
+Compress(app)
 
 app.secret_key = os.urandom(32)
 app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
@@ -845,6 +847,11 @@ def reglamento_start(source_id):
     s = get_settings()
     fps_limit = _get_fps_limit("reglamento", src["type"], s)
     try:
+        raw_rect = s.get("reglamento_custom_rect", "[]")
+        try:
+            custom_rect = json.loads(raw_rect) if raw_rect else []
+        except (json.JSONDecodeError, TypeError):
+            custom_rect = []
         ReglamentoManager.get().start(source_id, src["path"],
             _func_state_for("reglamento"),
             float(s.get("reglamento_conf", "0.45")),
@@ -855,6 +862,13 @@ def reglamento_start(source_id):
             int(s.get("reglamento_area_y1", "30")),
             int(s.get("reglamento_area_x2", "70")),
             int(s.get("reglamento_area_y2", "70")),
+            line_mode=s.get("reglamento_line_mode", "rectangle"),
+            line_pos=int(s.get("reglamento_line_pos", "50")),
+            inverted=s.get("reglamento_inverted", "0") == "1",
+            jpeg_q=int(s.get("reglamento_jpeg_q", "72")),
+            max_dim=int(s.get("reglamento_max_dim", "0")),
+            frame_step=int(s.get("reglamento_frame_step", "1")),
+            custom_rect=custom_rect if custom_rect else None,
             fps_limit=fps_limit)
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 429
@@ -892,6 +906,46 @@ def reglamento_area(source_id):
     return jsonify({"x1": x1, "y1": y1, "x2": x2, "y2": y2})
 
 
+@app.route("/api/reglamento/sources/<int:source_id>/line-mode", methods=["POST"])
+def reglamento_line_mode(source_id):
+    data = request.get_json(silent=True) or {}
+    mode = data.get("mode", "rectangle")
+    if mode not in ("horizontal", "vertical", "rectangle", "custom_rect"):
+        return jsonify({"error": "Modo inválido"}), 400
+    set_setting("reglamento_line_mode", mode)
+    ReglamentoManager.get().set_line_mode(source_id, mode)
+    return jsonify({"line_mode": mode})
+
+
+@app.route("/api/reglamento/sources/<int:source_id>/line-pos", methods=["POST"])
+def reglamento_line_pos(source_id):
+    data = request.get_json(silent=True) or {}
+    pct = max(0, min(100, int(data.get("pct", 50))))
+    set_setting("reglamento_line_pos", str(pct))
+    ReglamentoManager.get().set_line_pos(source_id, pct)
+    return jsonify({"line_pos": pct})
+
+
+@app.route("/api/reglamento/sources/<int:source_id>/custom-rect", methods=["POST"])
+def reglamento_custom_rect(source_id):
+    data = request.get_json(silent=True) or {}
+    points = data.get("points", [])
+    if len(points) < 3:
+        return jsonify({"error": "Se requieren al menos 3 puntos"}), 400
+    set_setting("reglamento_custom_rect", json.dumps(points))
+    ReglamentoManager.get().set_custom_rect(source_id, points)
+    return jsonify({"points": points})
+
+
+@app.route("/api/reglamento/sources/<int:source_id>/invert", methods=["POST"])
+def reglamento_invert(source_id):
+    data = request.get_json(silent=True) or {}
+    inverted = data.get("inverted", False)
+    set_setting("reglamento_inverted", "1" if inverted else "0")
+    ReglamentoManager.get().set_inverted(source_id, inverted)
+    return jsonify({"inverted": inverted})
+
+
 @app.route("/api/reglamento/sources/<int:source_id>/min-time", methods=["POST"])
 def reglamento_min_time(source_id):
     data = request.get_json(silent=True) or {}
@@ -919,6 +973,42 @@ def reglamento_evidencias(source_id):
 @app.route("/api/reglamento/stream/<int:source_id>")
 def reglamento_stream(source_id):
     return _stream_response("reglamento", source_id)
+
+
+@app.route("/api/reglamento/settings/jpeg-q", methods=["POST"])
+def reglamento_jpeg_q():
+    data = request.get_json(silent=True) or {}
+    q = max(10, min(100, int(data.get("jpeg_q", 72))))
+    set_setting("reglamento_jpeg_q", str(q))
+    mgr = ReglamentoManager.get()
+    with mgr._lock:
+        for sid in mgr.pipelines:
+            mgr.pipelines[sid].set_jpeg_q(q)
+    return jsonify({"jpeg_q": q})
+
+
+@app.route("/api/reglamento/settings/max-dim", methods=["POST"])
+def reglamento_max_dim():
+    data = request.get_json(silent=True) or {}
+    d = max(0, min(4096, int(data.get("max_dim", 0))))
+    set_setting("reglamento_max_dim", str(d))
+    mgr = ReglamentoManager.get()
+    with mgr._lock:
+        for sid in mgr.pipelines:
+            mgr.pipelines[sid].set_max_dim(d)
+    return jsonify({"max_dim": d})
+
+
+@app.route("/api/reglamento/settings/frame-step", methods=["POST"])
+def reglamento_frame_step():
+    data = request.get_json(silent=True) or {}
+    s = max(1, min(10, int(data.get("frame_step", 1))))
+    set_setting("reglamento_frame_step", str(s))
+    mgr = ReglamentoManager.get()
+    with mgr._lock:
+        for sid in mgr.pipelines:
+            mgr.pipelines[sid].set_frame_step(s)
+    return jsonify({"frame_step": s})
 
 
 # ─────────────────────────────────────────────
