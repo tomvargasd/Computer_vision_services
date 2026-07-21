@@ -847,11 +847,6 @@ def reglamento_start(source_id):
     s = get_settings()
     fps_limit = _get_fps_limit("reglamento", src["type"], s)
     try:
-        raw_rect = s.get("reglamento_custom_rect", "[]")
-        try:
-            custom_rect = json.loads(raw_rect) if raw_rect else []
-        except (json.JSONDecodeError, TypeError):
-            custom_rect = []
         ReglamentoManager.get().start(source_id, src["path"],
             _func_state_for("reglamento"),
             float(s.get("reglamento_conf", "0.45")),
@@ -862,13 +857,9 @@ def reglamento_start(source_id):
             int(s.get("reglamento_area_y1", "30")),
             int(s.get("reglamento_area_x2", "70")),
             int(s.get("reglamento_area_y2", "70")),
-            line_mode=s.get("reglamento_line_mode", "rectangle"),
-            line_pos=int(s.get("reglamento_line_pos", "50")),
-            inverted=s.get("reglamento_inverted", "0") == "1",
             jpeg_q=int(s.get("reglamento_jpeg_q", "72")),
             max_dim=int(s.get("reglamento_max_dim", "0")),
             frame_step=int(s.get("reglamento_frame_step", "1")),
-            custom_rect=custom_rect if custom_rect else None,
             fps_limit=fps_limit)
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 429
@@ -904,46 +895,6 @@ def reglamento_area(source_id):
     set_setting("reglamento_area_x2", str(x2)); set_setting("reglamento_area_y2", str(y2))
     ReglamentoManager.get().set_area(source_id, x1, y1, x2, y2)
     return jsonify({"x1": x1, "y1": y1, "x2": x2, "y2": y2})
-
-
-@app.route("/api/reglamento/sources/<int:source_id>/line-mode", methods=["POST"])
-def reglamento_line_mode(source_id):
-    data = request.get_json(silent=True) or {}
-    mode = data.get("mode", "rectangle")
-    if mode not in ("horizontal", "vertical", "rectangle", "custom_rect"):
-        return jsonify({"error": "Modo inválido"}), 400
-    set_setting("reglamento_line_mode", mode)
-    ReglamentoManager.get().set_line_mode(source_id, mode)
-    return jsonify({"line_mode": mode})
-
-
-@app.route("/api/reglamento/sources/<int:source_id>/line-pos", methods=["POST"])
-def reglamento_line_pos(source_id):
-    data = request.get_json(silent=True) or {}
-    pct = max(0, min(100, int(data.get("pct", 50))))
-    set_setting("reglamento_line_pos", str(pct))
-    ReglamentoManager.get().set_line_pos(source_id, pct)
-    return jsonify({"line_pos": pct})
-
-
-@app.route("/api/reglamento/sources/<int:source_id>/custom-rect", methods=["POST"])
-def reglamento_custom_rect(source_id):
-    data = request.get_json(silent=True) or {}
-    points = data.get("points", [])
-    if len(points) < 3:
-        return jsonify({"error": "Se requieren al menos 3 puntos"}), 400
-    set_setting("reglamento_custom_rect", json.dumps(points))
-    ReglamentoManager.get().set_custom_rect(source_id, points)
-    return jsonify({"points": points})
-
-
-@app.route("/api/reglamento/sources/<int:source_id>/invert", methods=["POST"])
-def reglamento_invert(source_id):
-    data = request.get_json(silent=True) or {}
-    inverted = data.get("inverted", False)
-    set_setting("reglamento_inverted", "1" if inverted else "0")
-    ReglamentoManager.get().set_inverted(source_id, inverted)
-    return jsonify({"inverted": inverted})
 
 
 @app.route("/api/reglamento/sources/<int:source_id>/min-time", methods=["POST"])

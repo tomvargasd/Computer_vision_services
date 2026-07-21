@@ -6,7 +6,7 @@ import time
 import threading
 from datetime import datetime
 import numpy as np
-from typing import Optional, Dict, List, Tuple
+from typing import Optional, Dict
 from ultralytics import YOLO
 
 from src.config import BASE_DIR
@@ -24,7 +24,6 @@ WHITE  = (255, 255, 255)
 GREEN  = (0, 255, 0)
 RED    = (0, 0, 255)
 CYAN   = (255, 255, 0)
-ORANGE = (0, 165, 255)
 
 SHORT_WINDOW_SIZE = 15
 LONG_WINDOW_SIZE  = 30
@@ -42,30 +41,14 @@ CAPTURES_DIR = os.path.join(
 )
 
 
-def _point_in_polygon(pt: Tuple[float, float], polygon: List[Tuple[float, float]]) -> bool:
-    x, y = pt
-    n = len(polygon)
-    inside = False
-    j = n - 1
-    for i in range(n):
-        xi, yi = polygon[i]
-        xj, yj = polygon[j]
-        if ((yi > y) != (yj > y)) and (x < (xj - xi) * (y - yi) / (yj - yi) + xi):
-            inside = not inside
-        j = i
-    return inside
-
-
 class AreaPipeline:
     def __init__(self, source_id: int, source_path: str, func_state: dict,
                  conf_thresh: float = CONF_THRESH, half: bool = False,
                  model_path: str = None, min_time: int = 10,
                  area_x1: int = 30, area_y1: int = 30,
                  area_x2: int = 70, area_y2: int = 70,
-                 line_mode: str = "rectangle", line_pos: int = 50,
-                 inverted: bool = False, jpeg_q: int = JPEG_Q,
-                 max_dim: int = 0, frame_step: int = 1,
-                 custom_rect: Optional[List[Tuple[float, float]]] = None,
+                 jpeg_q: int = JPEG_Q, max_dim: int = 0,
+                 frame_step: int = 1,
                  fps_limit: float = 0.0):
         self.source_id   = source_id
         self.source_path = source_path
@@ -78,13 +61,9 @@ class AreaPipeline:
         self.area_y1     = area_y1
         self.area_x2     = area_x2
         self.area_y2     = area_y2
-        self.line_mode   = line_mode
-        self.line_pos    = line_pos
-        self.inverted    = inverted
         self.jpeg_q      = jpeg_q
         self.max_dim     = max_dim
         self.frame_step  = max(1, frame_step)
-        self._rect_points = custom_rect or [(0.2, 0.2), (0.8, 0.2), (0.8, 0.8), (0.2, 0.8)]
         self.fps_limit   = fps_limit
 
         self.model = None
@@ -97,11 +76,6 @@ class AreaPipeline:
         self.total_sin_botas      = 0
         self.total_cumplimientos  = 0
         self.total_incumplimientos = 0
-
-        self.total_in        = 0
-        self.total_out       = 0
-        self.current_in_area = 0
-
         self._h = 0
         self._w = 0
 
@@ -116,13 +90,6 @@ class AreaPipeline:
         self._counted             = set()
         self._alerts_sent         = set()
         self._exited              = set()
-
-        self._track_area_state: Dict[int, dict] = {}
-        self._prev_pos: Dict[int, Tuple[float, float]] = {}
-        self._counted_tracks: set = set()
-        self._person_first_seen: Dict[int, float] = {}
-        self._pipeline_start_time: Optional[float] = None
-        self._warmup_seconds = 2.0
 
         self._frame_count = 0
 
@@ -315,22 +282,13 @@ class AreaPipeline:
 
     def _process(self, frame: np.ndarray) -> np.ndarray:
         h, w = self._h, self._w
-        is_area_mode = self.line_mode in ("rectangle", "custom_rect")
 
-        if is_area_mode:
-            if self.line_mode == "rectangle":
-                rx1 = int(w * self.area_x1 / 100)
-                ry1 = int(h * self.area_y1 / 100)
-                rx2 = int(w * self.area_x2 / 100)
-                ry2 = int(h * self.area_y2 / 100)
-                area_coords = [(rx1, ry1), (rx2, ry1), (rx2, ry2), (rx1, ry2)]
-                poly_pts = area_coords
-                area_ok = True
-            else:
-                poly_pts = [(int(w * px), int(h * py)) for px, py in self._rect_points]
-                area_ok = len(poly_pts) >= 3
-        else:
-            line_pos = int((h if self.line_mode == "horizontal" else w) * self.line_pos / 100)
+        rx1 = int(w * self.area_x1 / 100)
+        ry1 = int(h * self.area_y1 / 100)
+        rx2 = int(w * self.area_x2 / 100)
+        ry2 = int(h * self.area_y2 / 100)
+        area_mid_y = (ry1 + ry2) // 2
+        area_coords = [(rx1, ry1), (rx2, ry1), (rx2, ry2), (rx1, ry2)]
 
         results = self.model.track(
             frame, persist=True, conf=self.conf_thresh,
@@ -342,7 +300,6 @@ class AreaPipeline:
         r = results[0]
         boxes = r.boxes if r.boxes is not None else []
         current_tids = set()
-        now = time.monotonic()
 
         persons = []
         boots   = []
@@ -359,252 +316,134 @@ class AreaPipeline:
             elif cls == 1:
                 boots.append(entry)
 
-        if self._pipeline_start_time is None:
-            self._pipeline_start_time = now
-
         for p in persons:
             px1, py1, px2, py2 = p['bbox']
             tid = p['track_id']
-            cx = (px1 + px2) // 2
-            cy = (py1 + py2) // 2
-            person_bottom = py2
             current_tids.add(tid)
 
-            if tid not in self._person_first_seen:
-                self._person_first_seen[tid] = now
-            time_since_first_seen = now - self._person_first_seen[tid]
-            is_warmup = (now - self._pipeline_start_time) < self._warmup_seconds
+            boots_in_p, boots_in_a, boots_near = self._find_boots_for_person(
+                px1, py1, px2, py2, boots, area_coords,
+            )
 
-            if is_area_mode and area_ok:
-                if self.line_mode == "rectangle":
-                    inside = rx1 <= cx <= rx2 and ry1 <= cy <= ry2
+            person_bottom = py2
+            is_inside_area = (rx1 <= (px1 + px2) / 2 <= rx2 and
+                              person_bottom >= area_mid_y)
+
+            now = time.monotonic()
+
+            if is_inside_area:
+                if tid not in self._entry_time:
+                    self._entry_time[tid] = now
+                elapsed = now - self._entry_time[tid]
+                self._seconds_in_area[tid] = elapsed
+
+                if (tid in self._person_boot_status and
+                    tid in self._seconds_in_area and
+                    self._seconds_in_area[tid] >= REVERIFY_SECONDS and
+                    tid not in self._reverify_done and
+                    self._person_boot_status[tid] == 'sin_botas'):
+
+                    prev = self._person_boot_status[tid]
+                    self._status_before_rev[tid] = prev
+                    can = self._classify_person(tid, boots_in_a, boots_near,
+                                                 [px1, py1, px2, py2],
+                                                 persons, area_coords)
+                    if can:
+                        avg_f, _, _ = self._calc_dual_avg(tid)
+                        if avg_f >= REVERIFY_THRESHOLD:
+                            self._person_boot_status[tid] = 'con_botas'
+                    self._reverify_done[tid] = True
+
+                if (tid not in self._person_boot_status and
+                    tid not in self._exited):
+                    can = self._classify_person(tid, boots_in_a, boots_near,
+                                                 [px1, py1, px2, py2],
+                                                 persons, area_coords)
+                    if can:
+                        avg_f, _, _ = self._calc_dual_avg(tid)
+                        if avg_f >= CLASSIFY_THRESHOLD:
+                            self._person_boot_status[tid] = 'con_botas'
+                        else:
+                            self._person_boot_status[tid] = 'sin_botas'
+
+            exit_through_bottom = person_bottom >= ry2
+
+            if exit_through_bottom and tid in self._entry_time and tid not in self._counted:
+                elapsed = self._seconds_in_area.get(tid, 0)
+                boot_st = self._person_boot_status.get(tid, 'sin_determinar')
+
+                compliance = 'incumplio'
+                if boot_st == 'con_botas' and elapsed >= self.min_time:
+                    compliance = 'cumplio'
+
+                if compliance == 'cumplio':
+                    self.total_cumplimientos += 1
                 else:
-                    inside = _point_in_polygon((cx, cy), poly_pts)
-
-                if tid not in self._track_area_state:
-                    self._track_area_state[tid] = {"counted_in": False}
-                st = self._track_area_state[tid]
-
-                if inside and not st["counted_in"]:
-                    is_legacy = (
-                        is_warmup and
-                        time_since_first_seen < self._warmup_seconds and
-                        tid not in self._prev_pos
-                    )
-                    if not is_legacy:
-                        self.total_in += 1
-                    st["counted_in"] = True
-                elif not inside and st["counted_in"]:
-                    self.total_out += 1
-                    st["counted_in"] = False
-
-                was_in_area = tid in self._entry_time
-
-                if inside:
-                    if not was_in_area:
-                        self._entry_time[tid] = now
-                    elapsed = now - self._entry_time[tid]
-                    self._seconds_in_area[tid] = elapsed
-
-                    if self.line_mode == "rectangle":
-                        boot_area_coords = area_coords
-                    else:
-                        xs = [p[0] for p in poly_pts]
-                        ys = [p[1] for p in poly_pts]
-                        bmin_x, bmax_x = min(xs), max(xs)
-                        bmin_y, bmax_y = min(ys), max(ys)
-                        boot_area_coords = [(bmin_x, bmin_y), (bmax_x, bmin_y), (bmax_x, bmax_y), (bmin_x, bmax_y)]
-
-                    boots_in_p, boots_in_a, boots_near = self._find_boots_for_person(
-                        px1, py1, px2, py2, boots, boot_area_coords,
-                    )
-
-                    if (tid in self._person_boot_status and
-                        tid in self._seconds_in_area and
-                        self._seconds_in_area[tid] >= REVERIFY_SECONDS and
-                        tid not in self._reverify_done and
-                        self._person_boot_status[tid] == 'sin_botas'):
-
-                        prev = self._person_boot_status[tid]
-                        self._status_before_rev[tid] = prev
-                        can = self._classify_person(tid, boots_in_a, boots_near,
-                                                     [px1, py1, px2, py2],
-                                                     persons, area_coords)
-                        if can:
-                            avg_f, _, _ = self._calc_dual_avg(tid)
-                            if avg_f >= REVERIFY_THRESHOLD:
-                                self._person_boot_status[tid] = 'con_botas'
-                        self._reverify_done[tid] = True
-
-                    if (tid not in self._person_boot_status and
-                        tid not in self._exited):
-                        can = self._classify_person(tid, boots_in_a, boots_near,
-                                                     [px1, py1, px2, py2],
-                                                     persons, area_coords)
-                        if can:
-                            avg_f, _, _ = self._calc_dual_avg(tid)
-                            if avg_f >= CLASSIFY_THRESHOLD:
-                                self._person_boot_status[tid] = 'con_botas'
-                            else:
-                                self._person_boot_status[tid] = 'sin_botas'
-
-                if was_in_area and not inside and tid not in self._counted:
-                    elapsed = self._seconds_in_area.get(tid, 0)
-                    boot_st = self._person_boot_status.get(tid, 'sin_determinar')
-
-                    compliance = 'incumplio'
-                    if boot_st == 'con_botas' and elapsed >= self.min_time:
-                        compliance = 'cumplio'
-
-                    if compliance == 'cumplio':
-                        self.total_cumplimientos += 1
-                    else:
-                        self.total_incumplimientos += 1
-                        self._save_evidence(annotated, tid, boot_st, elapsed)
-
-                    if boot_st == 'con_botas':
-                        self.total_con_botas += 1
-                    elif boot_st == 'sin_botas':
-                        self.total_sin_botas += 1
-
-                    self._counted.add(tid)
-                    self._exited.add(tid)
-
-                    from src.database import insert_reglamento_detection
-                    try:
-                        insert_reglamento_detection(
-                            source_id=self.source_id,
-                            track_id=tid,
-                            boot_status=boot_st,
-                            time_compliance=compliance,
-                            seconds_in_area=elapsed,
-                        )
-                    except Exception:
-                        pass
-
-                if not inside and tid in self._entry_time:
-                    self._entry_time.pop(tid, None)
-                    self._seconds_in_area.pop(tid, None)
-
-                boot_st = self._person_boot_status.get(tid, None)
-                seconds = self._seconds_in_area.get(tid, 0)
+                    self.total_incumplimientos += 1
+                    self._save_evidence(annotated, tid, boot_st, elapsed)
 
                 if boot_st == 'con_botas':
-                    color = GREEN
-                    label = f"ID[{tid}] CON BOTAS {seconds:.1f}s"
+                    self.total_con_botas += 1
                 elif boot_st == 'sin_botas':
-                    color = RED
-                    label = f"ID[{tid}] SIN BOTAS {seconds:.1f}s"
-                elif boot_st is None and tid in self._entry_time:
-                    color = CYAN
-                    label = f"ID[{tid}] LOADING {seconds:.1f}s"
-                else:
-                    color = CYAN
-                    label = f"ID[{tid}]"
+                    self.total_sin_botas += 1
 
-                cv2.rectangle(annotated, (px1, py1), (px2, py2), color, 2)
-                ty = py1 - 10 if py1 > 24 else py2 + 20
-                cv2.putText(annotated, label, (px1, ty),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.50, color, 2, cv2.LINE_AA)
+                self._counted.add(tid)
+                self._exited.add(tid)
 
+                from src.database import insert_reglamento_detection
+                try:
+                    insert_reglamento_detection(
+                        source_id=self.source_id,
+                        track_id=tid,
+                        boot_status=boot_st,
+                        time_compliance=compliance,
+                        seconds_in_area=elapsed,
+                    )
+                except Exception:
+                    pass
+
+            boot_st = self._person_boot_status.get(tid, None)
+            seconds = self._seconds_in_area.get(tid, 0)
+
+            if boot_st == 'con_botas':
+                color = GREEN
+                label = f"ID[{tid}] CON BOTAS {seconds:.1f}s"
+            elif boot_st == 'sin_botas':
+                color = RED
+                label = f"ID[{tid}] SIN BOTAS {seconds:.1f}s"
+            elif boot_st is None and tid in self._entry_time:
+                color = CYAN
+                label = f"ID[{tid}] LOADING {seconds:.1f}s"
             else:
-                prev = self._prev_pos.get(tid)
-                if prev is not None and tid not in self._counted_tracks:
-                    if self.line_mode == "horizontal":
-                        if prev[1] < line_pos <= cy:
-                            self.total_in += 1
-                            self._counted_tracks.add(tid)
-                        elif prev[1] > line_pos >= cy:
-                            self.total_out += 1
-                            self._counted_tracks.add(tid)
-                    else:
-                        if prev[0] < line_pos <= cx:
-                            self.total_in += 1
-                            self._counted_tracks.add(tid)
-                        elif prev[0] > line_pos >= cx:
-                            self.total_out += 1
-                            self._counted_tracks.add(tid)
-
-                cv2.rectangle(annotated, (px1, py1), (px2, py2), YELLOW, 2)
+                color = CYAN
                 label = f"ID[{tid}]"
-                ty = py1 - 8 if py1 > 20 else py2 + 18
-                cv2.putText(annotated, label, (px1, ty),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.52, YELLOW, 2, cv2.LINE_AA)
 
-            self._prev_pos[tid] = (cx, cy)
+            cv2.rectangle(annotated, (px1, py1), (px2, py2), color, 2)
+            ty = py1 - 10 if py1 > 24 else py2 + 20
+            cv2.putText(annotated, label, (px1, ty),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.50, color, 2, cv2.LINE_AA)
 
-        gone_ids = set(self._prev_pos.keys()) - current_tids
-        for tid in gone_ids:
-            self._prev_pos.pop(tid, None)
-            self._person_first_seen.pop(tid, None)
-        gone_c = set(self._counted_tracks) - current_tids
-        for tid in gone_c:
-            self._counted_tracks.discard(tid)
-        gone_a = set(self._track_area_state.keys()) - current_tids
-        for tid in gone_a:
-            st = self._track_area_state[tid]
-            if st["counted_in"]:
-                self.total_out += 1
-            del self._track_area_state[tid]
-
-        active_in_area = sum(1 for s in self._track_area_state.values() if s.get("counted_in"))
-        self.current_in_area = active_in_area
-        display_in = self.total_out if self.inverted else self.total_in
-        display_out = self.total_in if self.inverted else self.total_out
-
-        if is_area_mode and area_ok:
-            if self.line_mode == "rectangle":
-                cv2.rectangle(annotated, (rx1, ry1), (rx2, ry2), PURPLE, 2)
-                cv2.putText(annotated, "Area de analisis", (rx1 + 4, max(ry1 - 6, 14)),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.45, PURPLE, 1, cv2.LINE_AA)
-            else:
-                pts_arr = np.array(poly_pts)
-                cv2.polylines(annotated, [pts_arr], True, PURPLE, 2)
-                for i, pt in enumerate(poly_pts):
-                    cv2.circle(annotated, pt, 5, GREEN, -1)
-                    cv2.putText(annotated, str(i+1), (pt[0]+8, pt[1]+8),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, WHITE, 1, cv2.LINE_AA)
-                if poly_pts:
-                    cx = int(sum(p[0] for p in poly_pts) / len(poly_pts))
-                    cy_t = int(sum(p[1] for p in poly_pts) / len(poly_pts))
-                    cv2.putText(annotated, "Area personalizada", (cx - 50, max(cy_t - 10, 14)),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.4, PURPLE, 1, cv2.LINE_AA)
-        else:
-            if self.line_mode == "horizontal":
-                cv2.line(annotated, (0, line_pos), (w, line_pos), PURPLE, 2)
-                cv2.putText(annotated, "Linea de conteo", (4, max(line_pos - 8, 14)),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.45, PURPLE, 1, cv2.LINE_AA)
-            else:
-                cv2.line(annotated, (line_pos, 0), (line_pos, h), PURPLE, 2)
-                cv2.putText(annotated, "Linea de conteo", (max(line_pos + 4, 4), 20),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.45, PURPLE, 1, cv2.LINE_AA)
+        cv2.rectangle(annotated, (rx1, ry1), (rx2, ry2), PURPLE, 2)
+        mid_x = (rx1 + rx2) // 2
+        cv2.line(annotated, (rx1, area_mid_y), (rx2, area_mid_y), PURPLE, 1,
+                 cv2.LINE_AA)
+        cv2.putText(annotated, "Area de analisis", (rx1 + 4, max(ry1 - 6, 14)),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, PURPLE, 1, cv2.LINE_AA)
 
         ox = 12
         oy = 30
         lh = 20
-
-        if is_area_mode:
-            items = [
-                (f"ENTRADAS: {display_in}", GREEN),
-                (f"SALIDAS: {display_out}", RED),
-                (f"CON BOTAS: {self.total_con_botas}", GREEN),
-                (f"SIN BOTAS: {self.total_sin_botas}", RED),
-                (f"CUMPLIMIENTO: {self.total_cumplimientos}", GREEN),
-                (f"INCUMPLIMIENTO: {self.total_incumplimientos}", RED),
-                (f"EN AREA: {self.current_in_area}", CYAN),
-            ]
-        else:
-            items = [
-                (f"ENTRADAS: {display_in}", GREEN),
-                (f"SALIDAS: {display_out}", RED),
-            ]
-
-        n_items = len(items)
         overlay = annotated.copy()
         cv2.rectangle(overlay, (ox - 6, oy - 22),
-                      (ox + 240, oy + n_items * lh + 4), (0, 0, 0), -1)
+                      (ox + 240, oy + 4 * lh + 4), (0, 0, 0), -1)
         cv2.addWeighted(overlay, 0.55, annotated, 0.45, 0, annotated)
 
+        items = [
+            (f"CON BOTAS: {self.total_con_botas}", GREEN),
+            (f"SIN BOTAS: {self.total_sin_botas}", RED),
+            (f"CUMPLIMIENTO: {self.total_cumplimientos}", GREEN),
+            (f"INCUMPLIMIENTO: {self.total_incumplimientos}", RED),
+        ]
         for i, (txt, clr) in enumerate(items):
             cv2.putText(annotated, txt, (ox, oy + i * lh),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.50, clr, 1, cv2.LINE_AA)
@@ -620,8 +459,6 @@ class AreaPipeline:
         return buf.tobytes() if ok else None
 
     def get_stats(self) -> dict:
-        display_in = self.total_out if self.inverted else self.total_in
-        display_out = self.total_in if self.inverted else self.total_out
         return {
             "source_id":          self.source_id,
             "con_botas":          self.total_con_botas,
@@ -633,14 +470,6 @@ class AreaPipeline:
             "area_y1":            self.area_y1,
             "area_x2":            self.area_x2,
             "area_y2":            self.area_y2,
-            "total_in":           self.total_in,
-            "total_out":          self.total_out,
-            "current_in_area":    self.current_in_area,
-            "display_in":         display_in,
-            "display_out":        display_out,
-            "inverted":           self.inverted,
-            "line_mode":          self.line_mode,
-            "line_pos":           self.line_pos,
         }
 
     def set_area(self, x1: int, y1: int, x2: int, y2: int) -> None:
@@ -656,16 +485,6 @@ class AreaPipeline:
     def set_min_time(self, t: int) -> None:
         self.min_time = max(1, t)
 
-    def set_line_mode(self, mode: str) -> None:
-        if mode in ("horizontal", "vertical", "rectangle", "custom_rect"):
-            self.line_mode = mode
-
-    def set_line_pos(self, pct: int) -> None:
-        self.line_pos = max(0, min(100, pct))
-
-    def set_inverted(self, inv: bool) -> None:
-        self.inverted = inv
-
     def set_jpeg_q(self, q: int) -> None:
         self.jpeg_q = max(10, min(100, q))
 
@@ -675,18 +494,11 @@ class AreaPipeline:
     def set_frame_step(self, s: int) -> None:
         self.frame_step = max(1, s)
 
-    def set_custom_rect(self, points: List[Tuple[float, float]]) -> None:
-        if len(points) >= 3:
-            self._rect_points = points[:4]
-
     def reset(self) -> None:
         self.total_con_botas      = 0
         self.total_sin_botas      = 0
         self.total_cumplimientos  = 0
         self.total_incumplimientos = 0
-        self.total_in             = 0
-        self.total_out            = 0
-        self.current_in_area      = 0
         self._person_boot_status.clear()
         self._person_frames.clear()
         self._obs_short.clear()
@@ -698,11 +510,6 @@ class AreaPipeline:
         self._counted.clear()
         self._alerts_sent.clear()
         self._exited.clear()
-        self._track_area_state.clear()
-        self._prev_pos.clear()
-        self._counted_tracks.clear()
-        self._person_first_seen.clear()
-        self._pipeline_start_time = None
         self.evidencias.clear()
 
 
@@ -726,10 +533,8 @@ class ReglamentoManager:
               model_path: str = None, min_time: int = 10,
               area_x1: int = 30, area_y1: int = 30,
               area_x2: int = 70, area_y2: int = 70,
-              line_mode: str = "rectangle", line_pos: int = 50,
-              inverted: bool = False, jpeg_q: int = JPEG_Q,
-              max_dim: int = 0, frame_step: int = 1,
-              custom_rect: Optional[List[Tuple[float, float]]] = None,
+              jpeg_q: int = JPEG_Q, max_dim: int = 0,
+              frame_step: int = 1,
               fps_limit: float = 0.0) -> None:
         if not multi_acquire():
             raise RuntimeError("Límite de 4 reproducciones simultáneas alcanzado")
@@ -739,10 +544,8 @@ class ReglamentoManager:
             p = AreaPipeline(source_id, source_path, func_state.copy(),
                                    conf_thresh, half, model_path, min_time,
                                    area_x1, area_y1, area_x2, area_y2,
-                                   line_mode=line_mode, line_pos=line_pos,
-                                   inverted=inverted, jpeg_q=jpeg_q,
-                                   max_dim=max_dim, frame_step=frame_step,
-                                   custom_rect=custom_rect,
+                                   jpeg_q=jpeg_q, max_dim=max_dim,
+                                   frame_step=frame_step,
                                    fps_limit=fps_limit)
             p.start()
             self.pipelines[source_id] = p
@@ -799,24 +602,6 @@ class ReglamentoManager:
         if p:
             p.set_min_time(t)
 
-    def set_line_mode(self, source_id: int, mode: str) -> None:
-        with self._lock:
-            p = self.pipelines.get(source_id)
-        if p:
-            p.set_line_mode(mode)
-
-    def set_line_pos(self, source_id: int, pct: int) -> None:
-        with self._lock:
-            p = self.pipelines.get(source_id)
-        if p:
-            p.set_line_pos(pct)
-
-    def set_inverted(self, source_id: int, inv: bool) -> None:
-        with self._lock:
-            p = self.pipelines.get(source_id)
-        if p:
-            p.set_inverted(inv)
-
     def set_jpeg_q(self, source_id: int, q: int) -> None:
         with self._lock:
             p = self.pipelines.get(source_id)
@@ -834,12 +619,6 @@ class ReglamentoManager:
             p = self.pipelines.get(source_id)
         if p:
             p.set_frame_step(s)
-
-    def set_custom_rect(self, source_id: int, points: List[Tuple[float, float]]) -> None:
-        with self._lock:
-            p = self.pipelines.get(source_id)
-        if p:
-            p.set_custom_rect(points)
 
     def reset(self, source_id: int) -> None:
         with self._lock:
