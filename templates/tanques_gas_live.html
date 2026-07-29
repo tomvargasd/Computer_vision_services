@@ -258,18 +258,14 @@
           <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           Conteo - Tanques de Gas
         </div>
-        <div class="lv-count-big">
-          <div class="lv-count-num" id="cnt-cur">0</div>
-          <div class="lv-count-lbl">objetos en escena</div>
-        </div>
         <div class="lv-inout">
           <div class="lv-inout-card in">
             <div class="lv-inout-val" id="cnt-in">0</div>
-            <div class="lv-inout-lbl">Entradas</div>
+            <div class="lv-inout-lbl">Entrada</div>
           </div>
           <div class="lv-inout-card out">
             <div class="lv-inout-val" id="cnt-out">0</div>
-            <div class="lv-inout-lbl">Salidas</div>
+            <div class="lv-inout-lbl">Salida</div>
           </div>
         </div>
 
@@ -496,14 +492,12 @@ function startPoll() {
     const r = await fetch(`/api/tanques_gas/sources/${SOURCE_ID}/stats`);
     if (!r.ok) return;
     const d = await r.json();
-    document.getElementById("cnt-cur").textContent = d.current_objects || 0;
-    document.getElementById("cnt-in").textContent  = d.in_count || 0;
-    document.getElementById("cnt-out").textContent = d.out_count || 0;
+    document.getElementById("cnt-in").textContent  = d.entrada || 0;
+    document.getElementById("cnt-out").textContent = d.salida || 0;
     document.getElementById("lv-ts").textContent =
       new Date().toLocaleTimeString("es-MX", { hour12: false });
 
     // Actions tab
-    document.getElementById("cnt-persons").textContent = d.current_persons || 0;
     const actionLog = d.action_log || [];
     const logEl = document.getElementById("action-log");
     if (actionLog.length > 0) {
@@ -700,7 +694,7 @@ document.getElementById("btn-teach").addEventListener("click", async () => {
     return;
   }
   btn.classList.add("active");
-  btn.textContent = "⏳ Capturando...";
+  btn.textContent = "Capturando...";
   await fetch(`/api/tanques_gas/sources/${SOURCE_ID}/teach/start`, { method: "POST" });
   // Wait for capture (poll will trigger modal)
 });
@@ -852,7 +846,7 @@ async function removeArea(id) {
 // ── Reset & Stop ──
 document.getElementById("btn-reset").addEventListener("click", async () => {
   await fetch(`/api/tanques_gas/sources/${SOURCE_ID}/reset`, { method: "POST" });
-  ["cnt-cur","cnt-in","cnt-out"].forEach(id => {
+  ["cnt-in","cnt-out"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.textContent = "0";
   });

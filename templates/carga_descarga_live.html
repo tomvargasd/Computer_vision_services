@@ -206,23 +206,19 @@
           <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3 8 12 13 21 8"/></svg>
           Carga y Descarga
         </div>
-        <div class="lv-count-big">
-          <div class="lv-count-num" id="cnt-cur">0</div>
-          <div class="lv-count-lbl">objetos en escena</div>
-        </div>
         <div class="lv-inout">
           <div class="lv-inout-card in">
             <div class="lv-inout-val" id="cnt-in">0</div>
-            <div class="lv-inout-lbl">Carga (IN)</div>
+            <div class="lv-inout-lbl">Entrada</div>
           </div>
           <div class="lv-inout-card out">
             <div class="lv-inout-val" id="cnt-out">0</div>
-            <div class="lv-inout-lbl">Descarga (OUT)</div>
+            <div class="lv-inout-lbl">Salida</div>
           </div>
         </div>
         <div class="lv-line-config">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-            <span style="font-size:0.78rem;font-weight:600;color:#182A55;">Invertir Carga/Descarga</span>
+            <span style="font-size:0.78rem;font-weight:600;color:#182A55;">Invertir Entrada/Salida</span>
             <label class="toggle" style="margin:0;">
               <input type="checkbox" id="invert-toggle">
               <span class="slider"></span>
@@ -327,9 +323,8 @@ function startPoll() {
     const r = await fetch(`/api/carga_descarga/sources/${SOURCE_ID}/stats`);
     if (!r.ok) return;
     const d = await r.json();
-    document.getElementById("cnt-cur").textContent = d.current_objects || 0;
-    document.getElementById("cnt-in").textContent  = d.in_count || 0;
-    document.getElementById("cnt-out").textContent = d.out_count || 0;
+    document.getElementById("cnt-in").textContent  = d.entrada || 0;
+    document.getElementById("cnt-out").textContent = d.salida || 0;
     // Sync invert toggle
     const invToggle = document.getElementById("invert-toggle");
     if (invToggle && invToggle.checked !== d.inverted) invToggle.checked = d.inverted;
@@ -337,8 +332,8 @@ function startPoll() {
     const inLbl = document.querySelector(".lv-inout-card.in .lv-inout-lbl");
     const outLbl = document.querySelector(".lv-inout-card.out .lv-inout-lbl");
     if (inLbl && outLbl) {
-      inLbl.textContent = d.inverted ? "Descarga (IN)" : "Carga (IN)";
-      outLbl.textContent = d.inverted ? "Carga (OUT)" : "Descarga (OUT)";
+      inLbl.textContent = d.inverted ? "Salida" : "Entrada";
+      outLbl.textContent = d.inverted ? "Entrada" : "Salida";
     }
     document.getElementById("lv-ts").textContent =
       new Date().toLocaleTimeString("es-MX", { hour12: false });
@@ -494,7 +489,7 @@ document.getElementById("analytics-days").addEventListener("change", fetchAnalyt
 
 document.getElementById("btn-reset").addEventListener("click", async () => {
   await fetch(`/api/carga_descarga/sources/${SOURCE_ID}/reset`, { method: "POST" });
-  ["cnt-cur","cnt-in","cnt-out"].forEach(id => {
+  ["cnt-in","cnt-out"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.textContent = "0";
   });

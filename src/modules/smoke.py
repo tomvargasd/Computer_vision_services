@@ -9,8 +9,13 @@ from typing import Optional, Dict
 from ultralytics import YOLO
 from datetime import datetime
 
+import torch
 from src.utils import get_device
-from src.modules.base import multi_acquire, multi_release, is_multi_enabled
+from src.modules.base import multi_acquire, multi_release, is_multi_enabled, BasePersistPipeline
+import logging
+from src.database import insert_module_event, save_module_counters, reset_module_counters
+
+logger = logging.getLogger("vision.smoke")
 
 MODEL_NAME  = "yolo11n.pt"
 CONF_THRESH = 0.35
@@ -30,7 +35,7 @@ CAPTURES_DIR = os.path.join(
 )
 
 
-class SmokePipeline:
+class SmokePipeline(BasePersistPipeline):
     def __init__(self, source_id: int, source_path: str, func_state: dict,
                  conf_thresh: float = CONF_THRESH, half: bool = False,
                  model_path: str = None,
@@ -44,6 +49,7 @@ class SmokePipeline:
         self.model_path  = model_path or MODEL_NAME
         self.target_classes = target_classes or SMOKE_CLASSES
         self.fps_limit   = fps_limit
+        self._init_persistence("smoke", source_id)
 
         self.model: Optional[YOLO] = None
         self._frame: Optional[np.ndarray] = None
@@ -61,6 +67,11 @@ class SmokePipeline:
         os.makedirs(CAPTURES_DIR, exist_ok=True)
 
     def start(self) -> None:
+        saved = self._load_counters()
+        if saved:
+            self.smoke_detected = saved.get("smoke_detected", False)
+            self.first_detection_time = saved.get("first_detection", saved.get("first_detection_time", None))
+            self.alert_triggered = self.smoke_detected
         self._stop.clear()
         self._thread = threading.Thread(
             target=self._run, daemon=True,
@@ -73,6 +84,12 @@ class SmokePipeline:
         if self._thread:
             self._thread.join(timeout=5)
         self._thread = None
+        save_module_counters(self._module_id, self._source_id, {
+            "smoke_detected": self.smoke_detected,
+            "first_detection": self.first_detection_time or "",
+        })
+        del self.model
+        torch.cuda.empty_cache()
 
     def is_alive(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
@@ -90,44 +107,61 @@ class SmokePipeline:
         return frame
 
     def _run(self) -> None:
-        self.model = YOLO(self.model_path)
-        self.model.to(get_device())
-
         try:
-            src = int(self.source_path)
-        except (ValueError, TypeError):
-            src = self.source_path
+            self.model = YOLO(self.model_path)
+            self.model.to(get_device())
 
-        cap = cv2.VideoCapture(src)
-        if not cap.isOpened():
-            err = self._make_error_frame(f"No se puede abrir: {self.source_path}")
-            with self._lock:
-                self._frame = err
-            while not self._stop.is_set():
-                time.sleep(0.5)
-            return
+            try:
+                src = int(self.source_path)
+            except (ValueError, TypeError):
+                src = self.source_path
 
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            cap = cv2.VideoCapture(src)
+            if not cap.isOpened():
+                err = self._make_error_frame(f"No se puede abrir: {self.source_path}")
+                with self._lock:
+                    self._frame = err
+                while not self._stop.is_set():
+                    time.sleep(0.5)
+                return
 
-        first_frame = True
-        while not self._stop.is_set() and cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                if isinstance(src, str) and "://" not in src:
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                    continue
-                break
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
-            if first_frame:
-                self._h, self._w = frame.shape[:2]
-                first_frame = False
+            first_frame = True
+            while not self._stop.is_set() and cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    if isinstance(src, str) and "://" not in src:
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                        continue
+                    break
 
-            annotated = self._process(frame)
-            with self._lock:
-                self._frame = annotated
-            time.sleep(self.fps_limit)
+                if first_frame:
+                    self._h, self._w = frame.shape[:2]
+                    first_frame = False
 
-        cap.release()
+                annotated = self._process(frame)
+                with self._lock:
+                    self._frame = annotated
+                if self.smoke_detected:
+                    self._persist_counters({
+                        "smoke_detected": self.smoke_detected,
+                        "first_detection_time": self.first_detection_time or "",
+                    })
+                time.sleep(self.fps_limit)
+
+            save_module_counters(self._module_id, self._source_id, {
+                "smoke_detected": self.smoke_detected,
+                "first_detection": self.first_detection_time or "",
+            })
+            cap.release()
+        except Exception:
+            logger.exception("Fatal error in %s %s pipeline", self._module_id, self._source_id)
+            save_module_counters(self._module_id, self._source_id, {
+                "smoke_detected": self.smoke_detected,
+                "first_detection": self.first_detection_time or "",
+            })
+            self._stop.set()
 
     def _process(self, frame: np.ndarray) -> np.ndarray:
         h, w = self._h, self._w
@@ -162,7 +196,10 @@ class SmokePipeline:
                 self.alert_triggered = True
                 if not self._evidence_saved:
                     self._evidence_saved = True
-                    self._save_evidence(annotated)
+                    cap_path = self._save_evidence(annotated)
+                    insert_module_event("smoke", self.source_id,
+                                        "smoke_detected", "Humo/fuego detectado",
+                                        capture_path=cap_path)
 
         overlay = annotated.copy()
         lines = []
@@ -191,11 +228,12 @@ class SmokePipeline:
 
         return overlay
 
-    def _save_evidence(self, frame: np.ndarray) -> None:
+    def _save_evidence(self, frame: np.ndarray) -> str:
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         fname = f"smoke_{self.source_id}_{ts}.jpg"
         path = os.path.join(CAPTURES_DIR, fname)
         cv2.imwrite(path, frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_Q])
+        return f"/static/uploads/captures/smoke/{fname}"
 
     def get_frame_jpeg(self) -> Optional[bytes]:
         with self._lock:
@@ -218,6 +256,7 @@ class SmokePipeline:
         self.alert_triggered   = False
         self.first_detection_time = None
         self._evidence_saved   = False
+        reset_module_counters(self._module_id, self._source_id)
 
     def set_classes(self, classes: list) -> None:
         self.target_classes = classes
@@ -272,6 +311,7 @@ class SmokeManager:
             return False
         if not p.is_alive():
             with self._lock:
+                p.multi_release()
                 self.pipelines.pop(source_id, None)
             return False
         return True

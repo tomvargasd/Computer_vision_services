@@ -12,9 +12,14 @@ from typing import Optional, Dict, List, Tuple
 from ultralytics import YOLO
 from datetime import datetime
 
+import torch
 from src.utils import get_device
-from src.modules.base import multi_acquire, multi_release, is_multi_enabled
+from src.modules.base import multi_acquire, multi_release, is_multi_enabled, BasePersistPipeline
 from src.config import BASE_DIR
+import logging
+from src.database import insert_module_event, save_module_counters, reset_module_counters
+
+logger = logging.getLogger("vision.tanques_gas")
 
 MODEL_NAME  = "yolo11n.pt"
 POSE_MODEL  = "yolo11n-pose.pt"
@@ -95,7 +100,7 @@ def _point_in_polygon(pt, polygon) -> bool:
     return inside
 
 
-class TanquesGasPipeline:
+class TanquesGasPipeline(BasePersistPipeline):
     def __init__(self, source_id: int, source_path: str, func_state: dict,
                  conf_thresh: float = CONF_THRESH, half: bool = False,
                  model_path: str = None, pose_model_path: str = None,
@@ -114,6 +119,7 @@ class TanquesGasPipeline:
         self.line_mode   = line_mode
         self.line_pos    = line_pos
         self.fps_limit   = fps_limit
+        self._init_persistence("tanques_gas", source_id)
 
         self.model: Optional[YOLO] = None
         self.pose_model: Optional[YOLO] = None
@@ -129,7 +135,6 @@ class TanquesGasPipeline:
         # ── Conteo ──
         self.total_in   = 0
         self.total_out  = 0
-        self.current_objects = 0
         self._prev_pos = {}
         self._cross_state = {}
         self._counted_tracks = set()
@@ -140,7 +145,7 @@ class TanquesGasPipeline:
         self._custom_editing = False
 
         # ── Acciones / Teach ──
-        self.current_persons = 0
+        self._person_log: Dict[int, deque] = {}
         self._person_log: Dict[int, deque] = {}
         self._prev_person_data: list = []
         self._next_tid = 1
@@ -168,6 +173,14 @@ class TanquesGasPipeline:
         self.restricted_areas: List[dict] = []
 
     def start(self) -> None:
+        saved = self._load_counters()
+        if saved:
+            self.total_in = saved.get("entrada", saved.get("total_in", 0))
+            self.total_out = saved.get("salida", saved.get("total_out", 0))
+            self.smoke_detected = saved.get("smoke_detected", False)
+            self.first_detection_time = saved.get("first_detection", saved.get("first_detection_time", None))
+            if self.smoke_detected:
+                self.alert_triggered = True
         self._stop.clear()
         self._thread = threading.Thread(
             target=self._run, daemon=True,
@@ -180,6 +193,19 @@ class TanquesGasPipeline:
         if self._thread:
             self._thread.join(timeout=5)
         self._thread = None
+        save_module_counters(self._module_id, self._source_id, {
+            "entrada": self.total_in,
+            "salida": self.total_out,
+            "smoke_detected": self.smoke_detected,
+            "first_detection": self.first_detection_time or "",
+            "action_count": dict(self._action_count),
+        })
+        if hasattr(self, 'pose_model') and self.pose_model is not None:
+            del self.pose_model
+        if hasattr(self, 'smoke_model') and self.smoke_model is not None:
+            del self.smoke_model
+        del self.model
+        torch.cuda.empty_cache()
 
     def is_alive(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
@@ -197,58 +223,82 @@ class TanquesGasPipeline:
         return frame
 
     def _run(self) -> None:
-        self.model = YOLO(self.model_path)
-        self.model.to(get_device())
-
-        if self.func_state.get("deteccion_acciones"):
-            try:
-                self.pose_model = YOLO(self.pose_model_path)
-                self.pose_model.to(get_device())
-            except Exception:
-                self.pose_model = None
-
-        if self.func_state.get("deteccion_humo"):
-            try:
-                self.smoke_model = YOLO(self.smoke_model_path)
-                self.smoke_model.to(get_device())
-            except Exception:
-                self.smoke_model = None
-
         try:
-            src = int(self.source_path)
-        except (ValueError, TypeError):
-            src = self.source_path
+            self.model = YOLO(self.model_path)
+            self.model.to(get_device())
 
-        cap = cv2.VideoCapture(src)
-        if not cap.isOpened():
-            err = self._make_error_frame(f"No se puede abrir: {self.source_path}")
-            with self._lock:
-                self._frame = err
-            while not self._stop.is_set():
-                time.sleep(0.5)
-            return
+            if self.func_state.get("deteccion_acciones"):
+                try:
+                    self.pose_model = YOLO(self.pose_model_path)
+                    self.pose_model.to(get_device())
+                except Exception:
+                    self.pose_model = None
 
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            if self.func_state.get("deteccion_humo"):
+                try:
+                    self.smoke_model = YOLO(self.smoke_model_path)
+                    self.smoke_model.to(get_device())
+                except Exception:
+                    self.smoke_model = None
 
-        first_frame = True
-        while not self._stop.is_set() and cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                if isinstance(src, str) and "://" not in src:
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                    continue
-                break
+            try:
+                src = int(self.source_path)
+            except (ValueError, TypeError):
+                src = self.source_path
 
-            if first_frame:
-                self._h, self._w = frame.shape[:2]
-                first_frame = False
+            cap = cv2.VideoCapture(src)
+            if not cap.isOpened():
+                err = self._make_error_frame(f"No se puede abrir: {self.source_path}")
+                with self._lock:
+                    self._frame = err
+                while not self._stop.is_set():
+                    time.sleep(0.5)
+                return
 
-            annotated = self._process(frame)
-            with self._lock:
-                self._frame = annotated
-            time.sleep(self.fps_limit)
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
-        cap.release()
+            first_frame = True
+            while not self._stop.is_set() and cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    if isinstance(src, str) and "://" not in src:
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                        continue
+                    break
+
+                if first_frame:
+                    self._h, self._w = frame.shape[:2]
+                    first_frame = False
+
+                annotated = self._process(frame)
+                with self._lock:
+                    self._frame = annotated
+                self._persist_counters({
+                    "total_in": self.total_in,
+                    "total_out": self.total_out,
+                    "smoke_detected": self.smoke_detected,
+                    "first_detection_time": self.first_detection_time or "",
+                })
+                time.sleep(self.fps_limit)
+
+            save_module_counters(self._module_id, self._source_id, {
+                "entrada": self.total_in,
+                "salida": self.total_out,
+                "smoke_detected": self.smoke_detected,
+                "first_detection": self.first_detection_time or "",
+                "action_count": dict(self._action_count),
+            })
+            cap.release()
+        except Exception:
+            logger.exception("Fatal error in %s %s pipeline", self._module_id, self._source_id)
+            save_module_counters(self._module_id, self._source_id, {
+                "entrada": self.total_in,
+                "salida": self.total_out,
+                "smoke_detected": self.smoke_detected,
+                "first_detection": self.first_detection_time or "",
+                "action_count": dict(self._action_count),
+            })
+            self._stop.set()
 
     def _process(self, frame: np.ndarray) -> np.ndarray:
         h, w = self._h, self._w
@@ -285,8 +335,6 @@ class TanquesGasPipeline:
             annotated = self._process_smoke(annotated)
 
         # ── HUD ──
-        cv2.putText(annotated, f"Objetos: {self.current_objects}",
-                    (12, h - 14), cv2.FONT_HERSHEY_SIMPLEX, 0.6, WHITE, 2, cv2.LINE_AA)
         if self._teach_mode:
             cv2.putText(annotated, "MODO ENSEÑAR - Haga clic en una persona", (12, 60),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, MAGENTA, 2, cv2.LINE_AA)
@@ -338,10 +386,14 @@ class TanquesGasPipeline:
                 if tid not in self._counted_tracks and inside:
                     self.total_in += 1
                     self._counted_tracks.add(tid)
+                    insert_module_event("tanques_gas", self.source_id,
+                                        "entry", f"Tanque ID {tid}")
                 # Check exit
                 if tid in self._counted_tracks and not inside:
                     if self._cross_state.get(tid) == "inside":
                         self.total_out += 1
+                        insert_module_event("tanques_gas", self.source_id,
+                                            "exit", f"Tanque ID {tid}")
                     self._cross_state[tid] = "outside"
 
                 if inside:
@@ -379,8 +431,12 @@ class TanquesGasPipeline:
                     self._counted_tracks.add(tid)
                     if direction == "in":
                         self.total_in += 1
+                        insert_module_event("tanques_gas", self.source_id,
+                                            "entry", f"Tanque ID {tid}")
                     else:
                         self.total_out += 1
+                        insert_module_event("tanques_gas", self.source_id,
+                                            "exit", f"Tanque ID {tid}")
 
             # ── Custom line counting ──
             elif self.line_mode == "custom_line":
@@ -405,27 +461,31 @@ class TanquesGasPipeline:
                     self._counted_tracks.add(tid)
                     if s2 > 0:
                         self.total_in += 1
+                        insert_module_event("tanques_gas", self.source_id,
+                                            "entry", f"Tanque ID {tid}")
                     else:
                         self.total_out += 1
+                        insert_module_event("tanques_gas", self.source_id,
+                                            "exit", f"Tanque ID {tid}")
 
         # Draw counting overlays
         if self.line_mode == "horizontal":
             cv2.line(frame, draw_p1, draw_p2, PURPLE, 2)
-            cv2.putText(frame, f"Linea Horizontal  IN {self.total_in}  OUT {self.total_out}",
+            cv2.putText(frame, f"Linea Horizontal  Entrada {self.total_in}  Salida {self.total_out}",
                         (12, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.6, YELLOW, 2, cv2.LINE_AA)
         elif self.line_mode == "vertical":
             cv2.line(frame, draw_p1, draw_p2, PURPLE, 2)
-            cv2.putText(frame, f"Linea Vertical  IN {self.total_in}  OUT {self.total_out}",
+            cv2.putText(frame, f"Linea Vertical  Entrada {self.total_in}  Salida {self.total_out}",
                         (12, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.6, YELLOW, 2, cv2.LINE_AA)
         elif self.line_mode == "rectangle":
             cv2.rectangle(frame, (x1, y1), (x2, y2), PURPLE, 2)
-            cv2.putText(frame, f"Area  IN {self.total_in}  OUT {self.total_out}",
+            cv2.putText(frame, f"Area  Entrada {self.total_in}  Salida {self.total_out}",
                         (12, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.6, YELLOW, 2, cv2.LINE_AA)
         elif self.line_mode == "custom_line":
             cv2.line(frame, draw_p1, draw_p2, PURPLE, 2)
             cv2.circle(frame, draw_p1, 6, GREEN, -1)
             cv2.circle(frame, draw_p2, 6, GREEN, -1)
-            cv2.putText(frame, f"Custom Line  IN {self.total_in}  OUT {self.total_out}",
+            cv2.putText(frame, f"Custom Line  Entrada {self.total_in}  Salida {self.total_out}",
                         (12, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.6, YELLOW, 2, cv2.LINE_AA)
         elif self.line_mode == "custom_rect":
             pts = []
@@ -437,7 +497,7 @@ class TanquesGasPipeline:
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, WHITE, 2, cv2.LINE_AA)
             if len(pts) == 4:
                 cv2.polylines(frame, [np.array(pts)], True, PURPLE, 2)
-            cv2.putText(frame, f"Custom Rect  IN {self.total_in}  OUT {self.total_out}",
+            cv2.putText(frame, f"Custom Rect  Entrada {self.total_in}  Salida {self.total_out}",
                         (12, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.6, YELLOW, 2, cv2.LINE_AA)
 
         # Cleanup stale tracks
@@ -452,7 +512,6 @@ class TanquesGasPipeline:
                 self._counted_tracks.discard(tid)
                 self._cross_state.pop(tid, None)
 
-        self.current_objects = len(active_ids)
         return frame
 
     def _process_restricted_areas(self, frame: np.ndarray, boxes) -> np.ndarray:
@@ -619,6 +678,8 @@ class TanquesGasPipeline:
                 if now - last_time >= _ACTION_COOLDOWN:
                     cooldowns[detected_action] = now
                     self._action_count[detected_action] = self._action_count.get(detected_action, 0) + 1
+                    insert_module_event("tanques_gas", self.source_id,
+                                        detected_action, f"Accion ID {tid}: {detected_action}")
                     per_p = self._per_person_action_count.setdefault(detected_action, {})
                     per_p[tid] = per_p.get(tid, 0) + 1
                     self._action_detected_log.append({
@@ -630,7 +691,6 @@ class TanquesGasPipeline:
                         self._action_detected_log = self._action_detected_log[-200:]
 
         self._prev_person_data = new_pdata
-        self.current_persons = len(kps_all)
 
         active_tids = {p["tid"] for p in new_pdata}
         for tid in list(self._person_log):
@@ -705,7 +765,10 @@ class TanquesGasPipeline:
                 self.alert_triggered = True
                 if not self._evidence_saved:
                     self._evidence_saved = True
-                    self._save_evidence(frame)
+                    cap_path = self._save_evidence(frame)
+                    insert_module_event("tanques_gas", self.source_id,
+                                        "smoke_detected", "Humo/fuego detectado en tanques",
+                                        capture_path=cap_path)
 
         if self.smoke_detected:
             cv2.putText(frame, "!!! HUMO / FUEGO DETECTADO !!!",
@@ -716,11 +779,12 @@ class TanquesGasPipeline:
 
         return frame
 
-    def _save_evidence(self, frame: np.ndarray) -> None:
+    def _save_evidence(self, frame: np.ndarray) -> str:
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         fname = f"smoke_tanques_{self.source_id}_{ts}.jpg"
         path = os.path.join(CAPTURES_DIR, fname)
         cv2.imwrite(path, frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_Q])
+        return f"/static/uploads/captures/tanques_gas/{fname}"
 
     # ── Public API ──
 
@@ -736,15 +800,13 @@ class TanquesGasPipeline:
         action_log_recent = [e for e in self._action_detected_log if time.time() - e["ts"] <= 10]
         return {
             "source_id": self.source_id,
-            "current_objects": self.current_objects,
-            "in_count": self.total_in,
-            "out_count": self.total_out,
+            "entrada": self.total_in,
+            "salida": self.total_out,
             "line_mode": self.line_mode,
             "line_pos": self.line_pos,
             "smoke_detected": self.smoke_detected,
             "alert_triggered": self.alert_triggered,
             "first_detection": self.first_detection_time,
-            "current_persons": self.current_persons,
             "action_count": dict(self._action_count),
             "action_log": action_log_recent,
             "teach_mode": self._teach_mode,
@@ -867,6 +929,8 @@ class TanquesGasPipeline:
     def set_pose_model(self, path: str) -> None:
         self.pose_model_path = path
         try:
+            if hasattr(self, 'pose_model') and self.pose_model is not None:
+                del self.pose_model
             self.pose_model = YOLO(path)
             self.pose_model.to(get_device())
         except Exception:
@@ -875,6 +939,8 @@ class TanquesGasPipeline:
     def set_smoke_model(self, path: str) -> None:
         self.smoke_model_path = path
         try:
+            if hasattr(self, 'smoke_model') and self.smoke_model is not None:
+                del self.smoke_model
             self.smoke_model = YOLO(path)
             self.smoke_model.to(get_device())
         except Exception:
@@ -895,6 +961,7 @@ class TanquesGasPipeline:
         self._per_person_action_count.clear()
         self._action_detected_log.clear()
         self._person_cooldown.clear()
+        reset_module_counters(self._module_id, self._source_id)
 
 
 class TanquesGasManager:
@@ -950,6 +1017,7 @@ class TanquesGasManager:
             return False
         if not p.is_alive():
             with self._lock:
+                p.multi_release()
                 self.pipelines.pop(source_id, None)
             return False
         return True

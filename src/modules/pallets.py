@@ -7,8 +7,13 @@ import numpy as np
 from typing import Optional, Dict
 from ultralytics import YOLO
 
+import torch
 from src.utils import get_device
-from src.modules.base import multi_acquire, multi_release, is_multi_enabled
+from src.modules.base import multi_acquire, multi_release, is_multi_enabled, BasePersistPipeline
+import logging
+from src.database import insert_module_event, save_module_counters, reset_module_counters
+
+logger = logging.getLogger("vision.pallets")
 
 MODEL_NAME  = "yolo11n.pt"
 CONF_THRESH = 0.35
@@ -20,7 +25,7 @@ YELLOW = (0, 255, 255)
 WHITE  = (255, 255, 255)
 
 
-class PalletsPipeline:
+class PalletsPipeline(BasePersistPipeline):
     def __init__(self, source_id: int, source_path: str, func_state: dict,
                  conf_thresh: float = CONF_THRESH, half: bool = False,
                  model_path: str = None,
@@ -38,8 +43,9 @@ class PalletsPipeline:
         self.area_y1     = area_y1
         self.area_x2     = area_x2
         self.area_y2     = area_y2
-        self.classes     = classes  # None = todas las clases
+        self.classes     = classes
         self.fps_limit   = fps_limit
+        self._init_persistence("pallets", source_id)
 
         self.model = None
         self._frame: Optional[np.ndarray] = None
@@ -48,13 +54,14 @@ class PalletsPipeline:
         self._thread: Optional[threading.Thread] = None
 
         self.total_in       = 0
-        self.total_out      = 0
-        self._track_state   = {}  # tid -> {enter_ts, exit_ts, absent_ts, counted_in}
-        self.current_objects = 0
+        self._track_state   = {}
         self._h = 0
         self._w = 0
 
     def start(self) -> None:
+        saved = self._load_counters()
+        if saved:
+            self.total_in = saved.get("total_count", saved.get("total_in", 0))
         self._stop.clear()
         self._thread = threading.Thread(
             target=self._run, daemon=True,
@@ -67,6 +74,9 @@ class PalletsPipeline:
         if self._thread:
             self._thread.join(timeout=5)
         self._thread = None
+        save_module_counters(self._module_id, self._source_id, {"total_count": self.total_in})
+        del self.model
+        torch.cuda.empty_cache()
 
     def is_alive(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
@@ -84,44 +94,51 @@ class PalletsPipeline:
         return frame
 
     def _run(self) -> None:
-        self.model = YOLO(self.model_path)
-        self.model.to(get_device())
-
         try:
-            src = int(self.source_path)
-        except (ValueError, TypeError):
-            src = self.source_path
+            self.model = YOLO(self.model_path)
+            self.model.to(get_device())
 
-        cap = cv2.VideoCapture(src)
-        if not cap.isOpened():
-            err = self._make_error_frame(f"No se puede abrir: {self.source_path}")
-            with self._lock:
-                self._frame = err
-            while not self._stop.is_set():
-                time.sleep(0.5)
-            return
+            try:
+                src = int(self.source_path)
+            except (ValueError, TypeError):
+                src = self.source_path
 
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            cap = cv2.VideoCapture(src)
+            if not cap.isOpened():
+                err = self._make_error_frame(f"No se puede abrir: {self.source_path}")
+                with self._lock:
+                    self._frame = err
+                while not self._stop.is_set():
+                    time.sleep(0.5)
+                return
 
-        first_frame = True
-        while not self._stop.is_set() and cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                if isinstance(src, str) and "://" not in src:
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                    continue
-                break
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
-            if first_frame:
-                self._h, self._w = frame.shape[:2]
-                first_frame = False
+            first_frame = True
+            while not self._stop.is_set() and cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    if isinstance(src, str) and "://" not in src:
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                        continue
+                    break
 
-            annotated = self._process(frame)
-            with self._lock:
-                self._frame = annotated
-            time.sleep(self.fps_limit)
+                if first_frame:
+                    self._h, self._w = frame.shape[:2]
+                    first_frame = False
 
-        cap.release()
+                annotated = self._process(frame)
+                with self._lock:
+                    self._frame = annotated
+                self._persist_counters({"total_in": self.total_in})
+                time.sleep(self.fps_limit)
+
+            save_module_counters(self._module_id, self._source_id, {"total_count": self.total_in})
+            cap.release()
+        except Exception:
+            logger.exception("Fatal error in %s %s pipeline", self._module_id, self._source_id)
+            save_module_counters(self._module_id, self._source_id, {"total_count": self.total_in})
+            self._stop.set()
 
     def _process(self, frame: np.ndarray) -> np.ndarray:
         h, w = self._h, self._w
@@ -142,12 +159,11 @@ class PalletsPipeline:
         annotated  = frame.copy()
         r          = results[0]
         boxes      = r.boxes if r.boxes is not None else []
-        active_ids = set()
         now        = time.monotonic()
-        COUNTED_CLASS = 0  # Solo clase 0 (Pallet) cuenta como IN/OUT
-        MIN_DWELL     = 5.0   # segundos dentro del área antes de contar IN
-        MIN_EXIT      = 2.0   # segundos fuera antes de contar OUT
-        MAX_ABSENT    = 3.0   # segundos sin ver el track para descartarlo
+        COUNTED_CLASS = 0
+        MIN_DWELL     = 5.0
+        MIN_EXIT      = 2.0
+        MAX_ABSENT    = 3.0
 
         seen_class0: set = set()
 
@@ -160,7 +176,6 @@ class PalletsPipeline:
             x1, y1, x2, y2 = map(int, box.xyxy[0])
             cx = (x1 + x2) // 2
             cy = (y1 + y2) // 2
-            active_ids.add(tid)
 
             cv2.rectangle(annotated, (x1, y1), (x2, y2), YELLOW, 2)
             label = f"ID[{tid}] - conf. {int(conf * 100)}%"
@@ -181,50 +196,43 @@ class PalletsPipeline:
                     "counted_in": False,
                 }
             st = self._track_state[tid]
-            st["absent_ts"] = None  # visible this frame
+            st["absent_ts"] = None
 
             inside = rx1 <= cx <= rx2 and ry1 <= cy <= ry2
 
             if inside:
                 if st["enter_ts"] is None:
-                    st["enter_ts"] = now  # start dwell timer
+                    st["enter_ts"] = now
                 st["exit_ts"] = None
 
                 if not st["counted_in"] and (now - st["enter_ts"]) >= MIN_DWELL:
                     self.total_in += 1
                     st["counted_in"] = True
+                    insert_module_event("pallets", self.source_id,
+                                        "counting", f"Tarima ID {tid}")
             else:
                 st["enter_ts"] = None
-
                 if st["counted_in"]:
                     if st["exit_ts"] is None:
                         st["exit_ts"] = now
                     elif (now - st["exit_ts"]) >= MIN_EXIT:
-                        self.total_out += 1
                         st["counted_in"] = False
                         st["exit_ts"] = None
 
-        # Tracks no vistos este frame
         for tid in list(self._track_state):
             if tid not in seen_class0:
                 st = self._track_state[tid]
                 if st["absent_ts"] is None:
                     st["absent_ts"] = now
                 elif (now - st["absent_ts"]) >= MAX_ABSENT:
-                    if st["counted_in"]:
-                        self.total_out += 1
                     del self._track_state[tid]
-
-        self.current_objects = len(active_ids)
 
         cv2.rectangle(annotated, (rx1, ry1), (rx2, ry2), PURPLE, 2)
         cv2.putText(annotated, "Area de conteo", (rx1 + 4, max(ry1 - 6, 14)),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.45, PURPLE, 1, cv2.LINE_AA)
 
-        cv2.putText(annotated, f"IN {self.total_in}   OUT {self.total_out}",
+        cv2.putText(annotated, f"Total: {self.total_in}",
                     (12, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.8, YELLOW, 2, cv2.LINE_AA)
-        cv2.putText(annotated, f"Objetos: {self.current_objects}",
-                    (12, h - 14), cv2.FONT_HERSHEY_SIMPLEX, 0.6, WHITE, 2, cv2.LINE_AA)
 
         return annotated
 
@@ -239,9 +247,7 @@ class PalletsPipeline:
     def get_stats(self) -> dict:
         return {
             "source_id":       self.source_id,
-            "current_objects": self.current_objects,
-            "in_count":        self.total_in,
-            "out_count":       self.total_out,
+            "total_count":     self.total_in,
         }
 
     def set_area(self, x1: int, y1: int, x2: int, y2: int) -> None:
@@ -259,8 +265,8 @@ class PalletsPipeline:
 
     def reset(self) -> None:
         self.total_in  = 0
-        self.total_out = 0
         self._track_state.clear()
+        reset_module_counters(self._module_id, self._source_id)
 
 
 class PalletsManager:
@@ -317,6 +323,7 @@ class PalletsManager:
             return False
         if not p.is_alive():
             with self._lock:
+                p.multi_release()
                 self.pipelines.pop(source_id, None)
             return False
         return True

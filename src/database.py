@@ -220,7 +220,48 @@ def init_db():
                 model_id         TEXT,
                 created_at       TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
             );
+
+            -- CVVision v3.0: persistencia de contadores por fuente
+            CREATE TABLE IF NOT EXISTS module_counters (
+                module_id   TEXT    NOT NULL,
+                source_id   INTEGER NOT NULL,
+                counter_key TEXT    NOT NULL,
+                int_value   INTEGER NOT NULL DEFAULT 0,
+                float_value REAL    DEFAULT NULL,
+                str_value   TEXT    DEFAULT NULL,
+                updated_at  TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
+                PRIMARY KEY (module_id, source_id, counter_key)
+            );
+
+            -- CVVision v3.0: eventos / alertas históricas por fuente
+            CREATE TABLE IF NOT EXISTS module_events (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                module_id    TEXT    NOT NULL,
+                source_id    INTEGER NOT NULL,
+                event_type   TEXT    NOT NULL,
+                label        TEXT    DEFAULT '',
+                description  TEXT    DEFAULT '',
+                event_data   TEXT    NOT NULL DEFAULT '{}',
+                capture_path TEXT    DEFAULT NULL,
+                extra_paths  TEXT    DEFAULT NULL,
+                created_at   TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_counters_lookup ON module_counters(module_id, source_id);
+            CREATE INDEX IF NOT EXISTS idx_events_module  ON module_events(module_id, source_id);
+            CREATE INDEX IF NOT EXISTS idx_events_time    ON module_events(created_at);
+            CREATE INDEX IF NOT EXISTS idx_events_type    ON module_events(module_id, event_type);
         """)
+
+        # Migraciones v3.0 (no destructivas)
+        try:
+            conn.execute("ALTER TABLE sources ADD COLUMN config TEXT NOT NULL DEFAULT '{}'")
+        except Exception:
+            pass
+        try:
+            conn.execute("ALTER TABLE reglamento_detections ADD COLUMN missing_items TEXT DEFAULT NULL")
+        except Exception:
+            pass
 
         for k, v in DEFAULT_SETTINGS:
             conn.execute("INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)", (k, v))
@@ -341,6 +382,12 @@ def update_source(source_id, name=None, path=None):
     return dict(row) if row else None
 
 
+def get_source(source_id: int) -> dict | None:
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM sources WHERE id=?", (source_id,)).fetchone()
+    return dict(row) if row else None
+
+
 def delete_source(source_id):
     with get_conn() as conn:
         row = conn.execute("SELECT path FROM sources WHERE id=?", (source_id,)).fetchone()
@@ -444,3 +491,163 @@ def get_carga_descarga_analytics(source_id, days=7):
             (source_id, f'-{days} days'),
         ).fetchall()
     return {"summary": [dict(r) for r in rows], "daily": [dict(r) for r in daily]}
+
+
+# ── Module Counters (Persistencia v3.0) ────────────────────────────────────
+
+def save_module_counters(module_id: str, source_id: int, counters: dict) -> None:
+    with get_conn() as conn:
+        for key, value in counters.items():
+            if isinstance(value, bool):
+                iv = 1 if value else 0
+                fv = None
+                sv = None
+            elif isinstance(value, int):
+                iv = value
+                fv = None
+                sv = None
+            elif isinstance(value, float):
+                iv = 0
+                fv = value
+                sv = None
+            else:
+                iv = 0
+                fv = None
+                sv = str(value)
+            conn.execute("""
+                INSERT INTO module_counters(module_id, source_id, counter_key, int_value, float_value, str_value)
+                VALUES (?,?,?,?,?,?)
+                ON CONFLICT(module_id, source_id, counter_key)
+                DO UPDATE SET int_value=excluded.int_value, float_value=excluded.float_value,
+                              str_value=excluded.str_value, updated_at=datetime('now','localtime')
+            """, (module_id, source_id, key, iv, fv, sv))
+        conn.commit()
+
+
+def load_module_counters(module_id: str, source_id: int) -> dict:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT counter_key, int_value, float_value, str_value FROM module_counters WHERE module_id=? AND source_id=?",
+            (module_id, source_id),
+        ).fetchall()
+    result = {}
+    for r in rows:
+        k = r["counter_key"]
+        if r["float_value"] is not None:
+            result[k] = r["float_value"]
+        elif r["str_value"] is not None:
+            result[k] = r["str_value"]
+        else:
+            result[k] = r["int_value"]
+    return result
+
+
+def reset_module_counters(module_id: str, source_id: int) -> None:
+    with get_conn() as conn:
+        conn.execute("DELETE FROM module_counters WHERE module_id=? AND source_id=?", (module_id, source_id))
+        conn.commit()
+
+
+# ── Module Events (Alertas históricas v3.0) ────────────────────────────────
+
+def insert_module_event(module_id: str, source_id: int, event_type: str,
+                        label: str = '', description: str = '',
+                        event_data: dict = None, capture_path: str = None,
+                        extra_paths: list = None) -> int:
+    with get_conn() as conn:
+        cur = conn.execute(
+            """INSERT INTO module_events(module_id, source_id, event_type, label, description, event_data, capture_path, extra_paths)
+               VALUES (?,?,?,?,?,?,?,?)""",
+            (module_id, source_id, event_type, label, description,
+             json.dumps(event_data or {}), capture_path,
+             json.dumps(extra_paths) if extra_paths else None),
+        )
+        conn.commit()
+    return cur.lastrowid
+
+
+def get_module_events(module_id: str, source_id: int = None,
+                      event_type: str = None, days: int = 7,
+                      limit: int = 100) -> list:
+    with get_conn() as conn:
+        sql = "SELECT * FROM module_events WHERE module_id=?"
+        params = [module_id]
+        if source_id is not None:
+            sql += " AND source_id=?"
+            params.append(source_id)
+        if event_type:
+            sql += " AND event_type=?"
+            params.append(event_type)
+        sql += " AND created_at >= datetime('now', ?)"
+        params.append(f'-{days} days')
+        sql += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+        rows = conn.execute(sql, params).fetchall()
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["event_data"] = json.loads(d.get("event_data", "{}"))
+        d["extra_paths"] = json.loads(d["extra_paths"]) if d.get("extra_paths") else []
+        result.append(d)
+    return result
+
+
+def get_module_analytics(module_id: str, source_id: int = None, days: int = 7) -> dict:
+    with get_conn() as conn:
+        params = [module_id, f'-{days} days']
+        src_filter = " AND source_id=?" if source_id is not None else ""
+        if source_id is not None:
+            params.insert(1, source_id)
+
+        event_counts = conn.execute(
+            f"SELECT event_type, COUNT(*) as count FROM module_events WHERE module_id=?{src_filter} AND created_at >= datetime('now', ?) GROUP BY event_type",
+            params,
+        ).fetchall()
+
+        daily = conn.execute(
+            f"SELECT DATE(created_at) as day, event_type, COUNT(*) as count FROM module_events WHERE module_id=?{src_filter} AND created_at >= datetime('now', ?) GROUP BY DATE(created_at), event_type ORDER BY day ASC",
+            params,
+        ).fetchall()
+
+        last_events = conn.execute(
+            f"SELECT id, event_type, label, created_at, capture_path FROM module_events WHERE module_id=?{src_filter} AND created_at >= datetime('now', ?) ORDER BY created_at DESC LIMIT 50",
+            params,
+        ).fetchall()
+
+    return {
+        "event_counts": {r["event_type"]: r["count"] for r in event_counts},
+        "daily": [dict(r) for r in daily],
+        "last_events": [dict(r) for r in last_events],
+    }
+
+
+# ── Source Config (Configuración por fuente v3.0) ──────────────────────────
+
+def save_source_config(source_id: int, key: str, value: str) -> None:
+    with get_conn() as conn:
+        row = conn.execute("SELECT config FROM sources WHERE id=?", (source_id,)).fetchone()
+        if row is None:
+            return
+        config = json.loads(row["config"])
+        config[key] = value
+        conn.execute("UPDATE sources SET config=? WHERE id=?", (json.dumps(config), source_id))
+        conn.commit()
+
+
+def get_source_config(source_id: int) -> dict:
+    with get_conn() as conn:
+        row = conn.execute("SELECT config FROM sources WHERE id=?", (source_id,)).fetchone()
+    if row is None:
+        return {}
+    return json.loads(row["config"])
+
+
+def get_source_config_value(source_id: int, key: str, default=None):
+    config = get_source_config(source_id)
+    return config.get(key, default)
+
+
+def delete_source_config(source_id: int) -> None:
+    with get_conn() as conn:
+        conn.execute("UPDATE sources SET config='{}' WHERE id=?", (source_id,))
+        conn.commit()

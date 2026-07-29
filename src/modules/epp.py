@@ -10,9 +10,14 @@ from typing import Optional, Dict, List, Set
 from collections import defaultdict
 from ultralytics import YOLO
 
+import torch
 from src.config import BASE_DIR
 from src.utils import get_device
-from src.modules.base import multi_acquire, multi_release, is_multi_enabled
+from src.modules.base import multi_acquire, multi_release, is_multi_enabled, BasePersistPipeline
+import logging
+from src.database import insert_module_event, save_module_counters, reset_module_counters
+
+logger = logging.getLogger("vision.epp")
 
 MODEL_NAME  = "yolo11n.pt"
 CONF_THRESH = 0.35
@@ -43,7 +48,7 @@ CONFIRM_CHECKS  = 3
 CAPTURES_DIR = os.path.join(BASE_DIR, "static", "uploads", "captures", "epp")
 
 
-class EppPipeline:
+class EppPipeline(BasePersistPipeline):
     def __init__(self, source_id: int, source_path: str, func_state: dict,
                  conf_thresh: float = CONF_THRESH, half: bool = False,
                  model_path: str = None, fps_limit: float = 0.0):
@@ -54,6 +59,7 @@ class EppPipeline:
         self.half        = half
         self.model_path  = model_path or MODEL_NAME
         self.fps_limit   = fps_limit
+        self._init_persistence("epp", source_id)
 
         self.model: Optional[YOLO] = None
         self._frame: Optional[np.ndarray] = None
@@ -85,6 +91,10 @@ class EppPipeline:
         os.makedirs(CAPTURES_DIR, exist_ok=True)
 
     def start(self) -> None:
+        saved = self._load_counters()
+        if saved:
+            self.total_protected = saved.get("protected", saved.get("total_protected", 0))
+            self.total_unprotected = saved.get("unprotected", saved.get("total_unprotected", 0))
         self._stop.clear()
         self._thread = threading.Thread(
             target=self._run, daemon=True,
@@ -97,6 +107,14 @@ class EppPipeline:
         if self._thread:
             self._thread.join(timeout=5)
         self._thread = None
+        save_module_counters(self._module_id, self._source_id, {
+            "protected": self.total_protected,
+            "unprotected": self.total_unprotected,
+            "total_detections": self.total_protected + self.total_unprotected,
+            "active_persons": len(self._person_status),
+        })
+        del self.model
+        torch.cuda.empty_cache()
 
     def is_alive(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
@@ -169,44 +187,64 @@ class EppPipeline:
             self._evidencias = self._evidencias[:50]
 
     def _run(self) -> None:
-        self.model = YOLO(self.model_path)
-        self.model.to(get_device())
-
         try:
-            src = int(self.source_path)
-        except (ValueError, TypeError):
-            src = self.source_path
+            self.model = YOLO(self.model_path)
+            self.model.to(get_device())
 
-        cap = cv2.VideoCapture(src)
-        if not cap.isOpened():
-            err = self._make_error_frame(f"No se puede abrir: {self.source_path}")
-            with self._lock:
-                self._frame = err
-            while not self._stop.is_set():
-                time.sleep(0.5)
-            return
+            try:
+                src = int(self.source_path)
+            except (ValueError, TypeError):
+                src = self.source_path
 
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            cap = cv2.VideoCapture(src)
+            if not cap.isOpened():
+                err = self._make_error_frame(f"No se puede abrir: {self.source_path}")
+                with self._lock:
+                    self._frame = err
+                while not self._stop.is_set():
+                    time.sleep(0.5)
+                return
 
-        first_frame = True
-        while not self._stop.is_set() and cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                if isinstance(src, str) and "://" not in src:
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                    continue
-                break
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
-            if first_frame:
-                self._h, self._w = frame.shape[:2]
-                first_frame = False
+            first_frame = True
+            while not self._stop.is_set() and cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    if isinstance(src, str) and "://" not in src:
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                        continue
+                    break
 
-            annotated = self._process(frame)
-            with self._lock:
-                self._frame = annotated
-            time.sleep(self.fps_limit)
+                if first_frame:
+                    self._h, self._w = frame.shape[:2]
+                    first_frame = False
 
-        cap.release()
+                annotated = self._process(frame)
+                with self._lock:
+                    self._frame = annotated
+                self._persist_counters({
+                    "total_protected": self.total_protected,
+                    "total_unprotected": self.total_unprotected,
+                })
+                time.sleep(self.fps_limit)
+
+            save_module_counters(self._module_id, self._source_id, {
+                "protected": self.total_protected,
+                "unprotected": self.total_unprotected,
+                "total_detections": self.total_protected + self.total_unprotected,
+                "active_persons": len(self._person_status),
+            })
+            cap.release()
+        except Exception:
+            logger.exception("Fatal error in %s %s pipeline", self._module_id, self._source_id)
+            save_module_counters(self._module_id, self._source_id, {
+                "protected": self.total_protected,
+                "unprotected": self.total_unprotected,
+                "total_detections": self.total_protected + self.total_unprotected,
+                "active_persons": len(self._person_status),
+            })
+            self._stop.set()
 
     def _process(self, frame: np.ndarray) -> np.ndarray:
         h, w = self._h, self._w
@@ -281,6 +319,8 @@ class EppPipeline:
                             self._person_finalized[tid] = True
                             self._protected_tids.add(tid)
                             self.total_protected += 1
+                            insert_module_event("epp", self.source_id,
+                                                "protected", f"ID {tid} protegido")
                             for epp_cls in EPP_CLASS_IDS:
                                 if self._person_epp[tid].get(epp_cls) and any(self._person_epp[tid][epp_cls]):
                                     epp_name = EPP_CLASS_MAP[epp_cls]
@@ -292,6 +332,9 @@ class EppPipeline:
                             if tid not in self._alerts_sent:
                                 self._alerts_sent.add(tid)
                                 self._save_evidence(annotated, tid, "sin_epp")
+                                insert_module_event("epp", self.source_id,
+                                                    "unprotected", f"ID {tid} sin EPP",
+                                                    capture_path=self._evidencias[0].get("capture_path") if self._evidencias else None)
                     else:
                         self._person_window_frames[tid] = 0
                         self._person_window_start[tid] = time.monotonic()
@@ -353,6 +396,7 @@ class EppPipeline:
         epp_ranking = sorted(self._epp_counts.items(), key=lambda x: -x[1])
         return {
             "source_id":         self.source_id,
+            "total_detections":  self.total_protected + self.total_unprotected,
             "protected":         self.total_protected,
             "unprotected":       self.total_unprotected,
             "epp_ranking":       epp_ranking,
@@ -385,6 +429,7 @@ class EppPipeline:
         self._alerts_sent.clear()
         self._epp_counts.clear()
         self._evidencias.clear()
+        reset_module_counters(self._module_id, self._source_id)
 
 
 class EppManager:
@@ -435,6 +480,7 @@ class EppManager:
             return False
         if not p.is_alive():
             with self._lock:
+                p.multi_release()
                 self.pipelines.pop(source_id, None)
             return False
         return True

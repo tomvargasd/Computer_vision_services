@@ -9,9 +9,14 @@ import numpy as np
 from typing import Optional, Dict
 from ultralytics import YOLO
 
+import torch
 from src.config import BASE_DIR
 from src.utils import get_device
-from src.modules.base import multi_acquire, multi_release, is_multi_enabled
+from src.modules.base import multi_acquire, multi_release, is_multi_enabled, BasePersistPipeline
+import logging
+from src.database import insert_module_event, save_module_counters, reset_module_counters
+
+logger = logging.getLogger("vision.reglamento")
 
 MODEL_NAME  = "yolo11n.pt"
 CONF_THRESH = 0.45
@@ -41,7 +46,7 @@ CAPTURES_DIR = os.path.join(
 )
 
 
-class AreaPipeline:
+class AreaPipeline(BasePersistPipeline):
     def __init__(self, source_id: int, source_path: str, func_state: dict,
                  conf_thresh: float = CONF_THRESH, half: bool = False,
                  model_path: str = None, min_time: int = 10,
@@ -65,6 +70,7 @@ class AreaPipeline:
         self.max_dim     = max_dim
         self.frame_step  = max(1, frame_step)
         self.fps_limit   = fps_limit
+        self._init_persistence("reglamento", source_id)
 
         self.model = None
         self._frame: Optional[np.ndarray] = None
@@ -98,6 +104,12 @@ class AreaPipeline:
         os.makedirs(CAPTURES_DIR, exist_ok=True)
 
     def start(self) -> None:
+        saved = self._load_counters()
+        if saved:
+            self.total_con_botas = saved.get("con_botas", saved.get("total_con_botas", 0))
+            self.total_sin_botas = saved.get("sin_botas", saved.get("total_sin_botas", 0))
+            self.total_cumplimientos = saved.get("cumplimientos", saved.get("total_cumplimientos", 0))
+            self.total_incumplimientos = saved.get("incumplimientos", saved.get("total_incumplimientos", 0))
         self._stop.clear()
         self._thread = threading.Thread(
             target=self._run, daemon=True,
@@ -110,6 +122,14 @@ class AreaPipeline:
         if self._thread:
             self._thread.join(timeout=5)
         self._thread = None
+        save_module_counters(self._module_id, self._source_id, {
+            "con_botas": self.total_con_botas,
+            "sin_botas": self.total_sin_botas,
+            "cumplimientos": self.total_cumplimientos,
+            "incumplimientos": self.total_incumplimientos,
+        })
+        del self.model
+        torch.cuda.empty_cache()
 
     def is_alive(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
@@ -226,59 +246,81 @@ class AreaPipeline:
         return fpath
 
     def _run(self) -> None:
-        self.model = YOLO(self.model_path)
-        self.model.to(get_device())
-
         try:
-            src = int(self.source_path)
-        except (ValueError, TypeError):
-            src = self.source_path
+            self.model = YOLO(self.model_path)
+            self.model.to(get_device())
 
-        cap = cv2.VideoCapture(src)
-        if not cap.isOpened():
-            err = self._make_error_frame(f"No se puede abrir: {self.source_path}")
-            with self._lock:
-                self._frame = err
-            while not self._stop.is_set():
-                time.sleep(0.5)
-            return
+            try:
+                src = int(self.source_path)
+            except (ValueError, TypeError):
+                src = self.source_path
 
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-
-        first_frame = True
-        self._frame_count = 0
-        while not self._stop.is_set() and cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                if isinstance(src, str) and "://" not in src:
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                    continue
-                break
-
-            if first_frame:
-                self._h, self._w = frame.shape[:2]
-                if self.max_dim > 0:
-                    scale = min(self.max_dim / self._w, self.max_dim / self._h, 1.0)
-                    if scale < 1.0:
-                        new_w = int(self._w * scale)
-                        new_h = int(self._h * scale)
-                        frame = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
-                        self._w, self._h = new_w, new_h
-                first_frame = False
-
-            self._frame_count += 1
-            if self._frame_count % self.frame_step != 0:
+            cap = cv2.VideoCapture(src)
+            if not cap.isOpened():
+                err = self._make_error_frame(f"No se puede abrir: {self.source_path}")
                 with self._lock:
-                    pass
-                time.sleep(0.001)
-                continue
+                    self._frame = err
+                while not self._stop.is_set():
+                    time.sleep(0.5)
+                return
 
-            annotated = self._process(frame)
-            with self._lock:
-                self._frame = annotated
-            time.sleep(self.fps_limit)
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
-        cap.release()
+            first_frame = True
+            self._frame_count = 0
+            while not self._stop.is_set() and cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    if isinstance(src, str) and "://" not in src:
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                        continue
+                    break
+
+                if first_frame:
+                    self._h, self._w = frame.shape[:2]
+                    if self.max_dim > 0:
+                        scale = min(self.max_dim / self._w, self.max_dim / self._h, 1.0)
+                        if scale < 1.0:
+                            new_w = int(self._w * scale)
+                            new_h = int(self._h * scale)
+                            frame = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
+                            self._w, self._h = new_w, new_h
+                    first_frame = False
+
+                self._frame_count += 1
+                if self._frame_count % self.frame_step != 0:
+                    with self._lock:
+                        pass
+                    time.sleep(0.001)
+                    continue
+
+                annotated = self._process(frame)
+                with self._lock:
+                    self._frame = annotated
+                self._persist_counters({
+                    "total_con_botas": self.total_con_botas,
+                    "total_sin_botas": self.total_sin_botas,
+                    "total_cumplimientos": self.total_cumplimientos,
+                    "total_incumplimientos": self.total_incumplimientos,
+                })
+                time.sleep(self.fps_limit)
+
+            save_module_counters(self._module_id, self._source_id, {
+                "con_botas": self.total_con_botas,
+                "sin_botas": self.total_sin_botas,
+                "cumplimientos": self.total_cumplimientos,
+                "incumplimientos": self.total_incumplimientos,
+            })
+            cap.release()
+        except Exception:
+            logger.exception("Fatal error in %s %s pipeline", self._module_id, self._source_id)
+            save_module_counters(self._module_id, self._source_id, {
+                "con_botas": self.total_con_botas,
+                "sin_botas": self.total_sin_botas,
+                "cumplimientos": self.total_cumplimientos,
+                "incumplimientos": self.total_incumplimientos,
+            })
+            self._stop.set()
 
     def _process(self, frame: np.ndarray) -> np.ndarray:
         h, w = self._h, self._w
@@ -378,9 +420,14 @@ class AreaPipeline:
 
                 if compliance == 'cumplio':
                     self.total_cumplimientos += 1
+                    insert_module_event("reglamento", self.source_id,
+                                        "cumplio", f"ID {tid} cumplio reglamento")
                 else:
                     self.total_incumplimientos += 1
-                    self._save_evidence(annotated, tid, boot_st, elapsed)
+                    path = self._save_evidence(annotated, tid, boot_st, elapsed)
+                    insert_module_event("reglamento", self.source_id,
+                                        "incumplio", f"ID {tid} incumplio reglamento",
+                                        capture_path=f"/static/uploads/captures/reglamento/{os.path.basename(path)}")
 
                 if boot_st == 'con_botas':
                     self.total_con_botas += 1
@@ -461,6 +508,8 @@ class AreaPipeline:
     def get_stats(self) -> dict:
         return {
             "source_id":          self.source_id,
+            "total_detections":   self.total_con_botas + self.total_sin_botas,
+            "missing_items":      self.total_sin_botas,
             "con_botas":          self.total_con_botas,
             "sin_botas":          self.total_sin_botas,
             "cumplimientos":      self.total_cumplimientos,
@@ -511,6 +560,7 @@ class AreaPipeline:
         self._alerts_sent.clear()
         self._exited.clear()
         self.evidencias.clear()
+        reset_module_counters(self._module_id, self._source_id)
 
 
 class ReglamentoManager:
@@ -570,6 +620,7 @@ class ReglamentoManager:
             return False
         if not p.is_alive():
             with self._lock:
+                p.multi_release()
                 self.pipelines.pop(source_id, None)
             return False
         return True

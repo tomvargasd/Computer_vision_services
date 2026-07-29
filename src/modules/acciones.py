@@ -19,9 +19,14 @@ from typing import Optional, Dict, List, Tuple
 
 from ultralytics import YOLO
 
+import torch
 from src.utils import get_device
-from src.modules.base import multi_acquire, multi_release, is_multi_enabled
+from src.modules.base import multi_acquire, multi_release, is_multi_enabled, BasePersistPipeline
 from src.config import BASE_DIR
+import logging
+from src.database import insert_module_event, save_module_counters, reset_module_counters
+
+logger = logging.getLogger("vision.acciones")
 
 POSE_MODEL  = "yolo11n-pose.pt"
 CONF_THRESH = 0.35
@@ -658,7 +663,7 @@ def analyze_pose(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-class AccionesPipeline:
+class AccionesPipeline(BasePersistPipeline):
     """Pipeline de pose/esqueleto para una fuente de video."""
 
     def __init__(
@@ -678,6 +683,7 @@ class AccionesPipeline:
         self.half        = half
         self.model_path  = model_path or POSE_MODEL
         self.fps_limit   = fps_limit
+        self._init_persistence("acciones", source_id)
 
         self.model: Optional[YOLO] = None
 
@@ -686,7 +692,6 @@ class AccionesPipeline:
         self._stop   = threading.Event()
         self._thread: Optional[threading.Thread] = None
 
-        self.current_persons: int = 0
         self.current_alerts: dict = {k: 0 for k in _ALERT_KEYS}
         self.total_alerts:   dict = {k: 0 for k in _ALERT_KEYS}
         self._prev_person_data: list = []
@@ -706,6 +711,10 @@ class AccionesPipeline:
     # ── Control ──────────────────────────────────────────────────────────
 
     def start(self) -> None:
+        saved = self._load_counters()
+        if saved:
+            for k in _ALERT_KEYS:
+                self.total_alerts[k] = saved.get(k, 0)
         self._stop.clear()
         self._thread = threading.Thread(
             target=self._run, daemon=True, name=f"acciones-pipe-{self.source_id}"
@@ -717,6 +726,9 @@ class AccionesPipeline:
         if self._thread:
             self._thread.join(timeout=5)
         self._thread = None
+        save_module_counters(self._module_id, self._source_id, dict(self.total_alerts))
+        del self.model
+        torch.cuda.empty_cache()
 
     def is_alive(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
@@ -724,27 +736,34 @@ class AccionesPipeline:
     # ── Hilo principal ────────────────────────────────────────────────────
 
     def _run(self) -> None:
-        self.model = YOLO(self.model_path)
-        self.model.to(get_device())
-        print(f"[AccionesPipeline] Modelo pose cargado: {self.model_path}")
+        try:
+            self.model = YOLO(self.model_path)
+            self.model.to(get_device())
+            print(f"[AccionesPipeline] Modelo pose cargado: {self.model_path}")
 
-        src = self.source_path
-        cap = cv2.VideoCapture(int(src) if src.isdigit() else src)
+            src = self.source_path
+            cap = cv2.VideoCapture(int(src) if src.isdigit() else src)
 
-        while not self._stop.is_set():
-            ret, frame = cap.read()
-            if not ret:
-                if isinstance(src, str) and "://" not in src:
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                    continue
-                break
+            while not self._stop.is_set():
+                ret, frame = cap.read()
+                if not ret:
+                    if isinstance(src, str) and "://" not in src:
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                        continue
+                    break
 
-            annotated = self._process(frame)
-            with self._lock:
-                self._frame = annotated
-            time.sleep(self.fps_limit)
+                annotated = self._process(frame)
+                with self._lock:
+                    self._frame = annotated
+                self._persist_counters(dict(self.total_alerts))
+                time.sleep(self.fps_limit)
 
-        cap.release()
+            save_module_counters(self._module_id, self._source_id, dict(self.total_alerts))
+            cap.release()
+        except Exception:
+            logger.exception("Fatal error in %s %s pipeline", self._module_id, self._source_id)
+            save_module_counters(self._module_id, self._source_id, dict(self.total_alerts))
+            self._stop.set()
 
     # ── Capturas ─────────────────────────────────────────────────────────
 
@@ -950,6 +969,8 @@ class AccionesPipeline:
                     new_pdata[-1]["alert_active"][_K_VIOLENCIA] = True
                     if not prev_alert[_K_VIOLENCIA]:
                         self.total_alerts[_K_VIOLENCIA] += 1
+                        insert_module_event("acciones", self.source_id,
+                                            "violencia", f"Violencia ID {tid}")
                     cap_trigger = True
 
                 if robo_on and smooth[_K_ROBO] >= _RULES[_K_ROBO]["threshold"]:
@@ -957,6 +978,8 @@ class AccionesPipeline:
                     new_pdata[-1]["alert_active"][_K_ROBO] = True
                     if not prev_alert[_K_ROBO]:
                         self.total_alerts[_K_ROBO] += 1
+                        insert_module_event("acciones", self.source_id,
+                                            "robo", f"Robo/amenaza ID {tid}")
                     cap_trigger = True
 
                 if sospechoso_on and smooth[_K_SOSPECHOSO] >= _RULES[_K_SOSPECHOSO]["threshold"]:
@@ -964,12 +987,16 @@ class AccionesPipeline:
                     new_pdata[-1]["alert_active"][_K_SOSPECHOSO] = True
                     if not prev_alert[_K_SOSPECHOSO]:
                         self.total_alerts[_K_SOSPECHOSO] += 1
+                        insert_module_event("acciones", self.source_id,
+                                            "sospechoso", f"Sospechoso ID {tid}")
 
                 if celular_on and smooth[_K_CELULAR] >= _RULES[_K_CELULAR]["threshold"]:
                     active.append(("USO CELULAR",  _CLR_PH, smooth[_K_CELULAR]))
                     new_pdata[-1]["alert_active"][_K_CELULAR] = True
                     if not prev_alert[_K_CELULAR]:
                         self.total_alerts[_K_CELULAR] += 1
+                        insert_module_event("acciones", self.source_id,
+                                            "celular", f"Celular ID {tid}")
                     cap_trigger = True
 
                 if caida_on and smooth[_K_CAIDA] >= _RULES[_K_CAIDA]["threshold"]:
@@ -984,6 +1011,8 @@ class AccionesPipeline:
                     new_pdata[-1]["alert_active"][_K_CAIDA] = True
                     if not prev_alert[_K_CAIDA]:
                         self.total_alerts[_K_CAIDA] += 1
+                        insert_module_event("acciones", self.source_id,
+                                            "caida", f"Caida ID {tid}")
                     fall_trigger = True
 
                 # ── Bounding box
@@ -1052,7 +1081,6 @@ class AccionesPipeline:
                     cv2.circle(annotated, (int(xk), int(yk)), 3, _KP_COLOR, -1, cv2.LINE_AA)
 
         self._prev_person_data = new_pdata
-        self.current_persons   = persons
 
         # ── Podar logs de TIDs que ya no están en escena ──
         active_tids = {p["tid"] for p in new_pdata}
@@ -1124,11 +1152,25 @@ class AccionesPipeline:
         }
         return {
             "source_id":       self.source_id,
-            "current_persons": self.current_persons,
-            "alerts":          dict(self.total_alerts),
+            "violencia":       self.total_alerts.get(_K_VIOLENCIA, 0),
+            "robo":            self.total_alerts.get(_K_ROBO, 0),
+            "sospechoso":      self.total_alerts.get(_K_SOSPECHOSO, 0),
+            "celular":         self.total_alerts.get(_K_CELULAR, 0),
+            "caida":           self.total_alerts.get(_K_CAIDA, 0),
             "capture_count":   self.capture_count,
             "captures":        captures,
         }
+
+    def reset(self) -> None:
+        for k in _ALERT_KEYS:
+            self.total_alerts[k] = 0
+        self.capture_count = 0
+        self._cap_face.clear()
+        self._cap_body.clear()
+        self._last_cap_ts.clear()
+        self._person_log.clear()
+        self._ref_cap_taken.clear()
+        reset_module_counters(self._module_id, self._source_id)
 
     def get_teach_data(self) -> dict:
         now = time.time()
@@ -1206,6 +1248,7 @@ class AccionesManager:
             return False
         if not p.is_alive():
             with self._lock:
+                p.multi_release()
                 self.pipelines.pop(source_id, None)
             return False
         return True
@@ -1219,6 +1262,12 @@ class AccionesManager:
         with self._lock:
             p = self.pipelines.get(source_id)
         return p.get_stats() if p else None
+
+    def reset(self, source_id: int) -> None:
+        with self._lock:
+            p = self.pipelines.get(source_id)
+        if p:
+            p.reset()
 
     def get_teach_data(self, source_id: int) -> Optional[dict]:
         with self._lock:

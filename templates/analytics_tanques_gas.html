@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Analytics · Tanques de Gas{% endblock %}
+{% block page_title %}Analytics · {{ module.label }}{% endblock %}
+{% block content %}
+<div class="analytics-dashboard">
+  <div class="analytics-kpi-row">
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Entradas</span><span class="analytics-kpi-value" id="kpi-entradas">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg> Salidas</span><span class="analytics-kpi-value" id="kpi-salidas">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Intrusiones</span><span class="analytics-kpi-value" id="kpi-intrusiones">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Hoy</span><span class="analytics-kpi-value" id="kpi-today">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M12 2L9.5 6.5 12 10 9.5 13.5 12 17l-2.5 3.5"/><path d="M12 2l2.5 4.5L12 10l2.5 3.5L12 17l2.5 3.5"/></svg> Humo/Fuego</span><span class="analytics-kpi-value" id="kpi-humo">—</span></div>
+  </div>
+
+  <div class="analytics-chart-row">
+    <div class="analytics-chart-card">
+      <h4>Timeline multicapa</h4>
+      <canvas id="chart-timeline"></canvas>
+    </div>
+    <div class="analytics-chart-card">
+      <h4>Acciones detectadas</h4>
+      <div id="actions-breakdown" class="analytics-per-source"></div>
+    </div>
+  </div>
+
+  <div class="analytics-chart-row">
+    <div class="analytics-chart-card">
+      <h4>Por fuente</h4>
+      <div id="per-source-table" class="analytics-per-source"></div>
+    </div>
+  </div>
+
+  <div class="analytics-events">
+    <h4>Eventos recientes</h4>
+    <div id="events-list" class="analytics-events-list"></div>
+  </div>
+</div>
+{% include "components/evidence_modal.html" %}
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
+<script>
+const MODULE_ID = 'tanques_gas';
+function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
+
+async function loadKPIs() {
+  const r = await fetch(`/api/analytics/${MODULE_ID}/summary`);
+  if (!r.ok) return;
+  const d = await r.json();
+  const counters = d.counters || {};
+  const sources = Object.keys(counters);
+  const todayStr = new Date().toISOString().slice(0,10);
+
+  let entradas = 0, salidas = 0, intrusiones = 0, smokeActive = false, todayCount = 0;
+  let allActions = {};
+  sources.forEach(sid => {
+    const c = counters[sid];
+    if (c) {
+      entradas += c.entrada ?? 0;
+      salidas += c.salida ?? 0;
+      if (c.action_count) {
+        Object.entries(c.action_count).forEach(([k, v]) => { allActions[k] = (allActions[k] || 0) + v; });
+        intrusiones += Object.values(c.action_count).reduce((a, b) => a + b, 0);
+      }
+      if (c.smoke_detected) smokeActive = true;
+    }
+  });
+  (d.daily || []).forEach(item => { if (item.day === todayStr) todayCount += item.count; });
+  if (entradas === 0 && d.event_counts) {
+    entradas = d.event_counts.entry ?? d.event_counts.entrada ?? 0;
+    salidas = d.event_counts.exit ?? d.event_counts.salida ?? 0;
+  }
+  setText('kpi-entradas', entradas > 0 ? entradas : '—');
+  setText('kpi-salidas', salidas > 0 ? salidas : '—');
+  setText('kpi-intrusiones', intrusiones > 0 ? intrusiones : '—');
+  setText('kpi-today', todayCount > 0 ? todayCount : '—');
+  setText('kpi-humo', smokeActive ? '🔥 Detectado' : '✅ Monitoreando');
+
+  // Actions breakdown
+  const actEl = document.getElementById('actions-breakdown');
+  const actKeys = Object.keys(allActions);
+  if (actKeys.length > 0) {
+    actEl.innerHTML = '<table class="ps-table"><tr><th>Acción</th><th>Conteo</th></tr>' +
+      actKeys.map(k => `<tr><td>${k}</td><td>${allActions[k]}</td></tr>`).join('') + '</table>';
+  } else {
+    actEl.innerHTML = '<p class="text-muted">Sin acciones registradas</p>';
+  }
+
+  // Per-source table
+  const psEl = document.getElementById('per-source-table');
+  if (sources.length > 0) {
+    psEl.innerHTML = '<table class="ps-table"><tr><th>Fuente</th><th>Entradas</th><th>Salidas</th><th>Humo</th></tr>' +
+      sources.map(sid => {
+        const c = counters[sid];
+        return `<tr><td>Fuente ${sid}</td><td>${c?.entrada ?? '—'}</td><td>${c?.salida ?? '—'}</td><td>${c?.smoke_detected ? '🔥' : '—'}</td></tr>`;
+      }).join('') + '</table>';
+  } else {
+    psEl.innerHTML = '<p class="text-muted">Sin datos de fuentes</p>';
+  }
+}
+
+let chart = null;
+async function loadTimeline() {
+  const r = await fetch(`/api/analytics/${MODULE_ID}/timeline`);
+  if (!r.ok) return;
+  const d = await r.json();
+  const ctx = document.getElementById('chart-timeline');
+  if (!ctx) return;
+  const labels = [...new Set((d.data || []).map(x => x.day))].sort();
+  const entryByDay = {}, exitByDay = {}, actionByDay = {};
+  (d.data || []).forEach(item => {
+    const et = item.event_type;
+    if (et === 'entry' || et === 'entrada') entryByDay[item.day] = (entryByDay[item.day] || 0) + item.count;
+    else if (et === 'exit' || et === 'salida') exitByDay[item.day] = (exitByDay[item.day] || 0) + item.count;
+    else actionByDay[item.day] = (actionByDay[item.day] || 0) + item.count;
+  });
+  const datasets = [];
+  const entryData = labels.map(l => entryByDay[l] || 0);
+  const exitData = labels.map(l => exitByDay[l] || 0);
+  const actionData = labels.map(l => actionByDay[l] || 0);
+  if (entryData.some(v => v > 0)) datasets.push({ label: 'Entradas', data: entryData, borderColor: '#22C55E', tension: 0.3 });
+  if (exitData.some(v => v > 0)) datasets.push({ label: 'Salidas', data: exitData, borderColor: '#EF4444', tension: 0.3 });
+  if (actionData.some(v => v > 0)) datasets.push({ label: 'Acciones', data: actionData, borderColor: '#8B5CF6', tension: 0.3, borderDash: [5, 5] });
+  if (chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: { responsive: true, plugins: { legend: { labels: { color: '#182A55' } } },
+      scales: { x: { ticks: { color: '#9D9FA2' } }, y: { ticks: { color: '#9D9FA2', stepSize: 1 } } } },
+  });
+}
+
+async function loadEvents() {
+  const r = await fetch(`/api/analytics/${MODULE_ID}/events?limit=20`);
+  if (!r.ok) return;
+  const d = await r.json();
+  const list = document.getElementById('events-list');
+  list.innerHTML = (d.events || []).map(e =>
+    `<div class="analytics-event-item">
+      <span class="analytics-event-time">${e.created_at || ''}</span>
+      <span class="analytics-event-type">${e.event_type}</span>
+      <span class="analytics-event-label">${e.label}</span>
+      ${e.capture_path ? `<button class="ev-btn-view" onclick="openEvidence('${MODULE_ID}', ${e.id})"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>` : ''}
+    </div>`
+  ).join('');
+}
+
+loadKPIs(); loadTimeline(); loadEvents();
+setInterval(loadKPIs, 5000);
+</script>
+{% endblock %}

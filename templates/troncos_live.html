@@ -162,21 +162,11 @@
         Conteo de Troncos
       </div>
       <div class="lv-count-big">
-        <div class="lv-count-num" id="cnt-cur">0</div>
-        <div class="lv-count-lbl">troncos en escena</div>
-      </div>
-      <div class="lv-inout">
-        <div class="lv-inout-card in">
-          <div class="lv-inout-val" id="cnt-in">0</div>
-          <div class="lv-inout-lbl">Entradas</div>
-        </div>
-        <div class="lv-inout-card out">
-          <div class="lv-inout-val" id="cnt-out">0</div>
-          <div class="lv-inout-lbl">Salidas</div>
-        </div>
+        <div class="lv-count-num" id="cnt-total">0</div>
+        <div class="lv-count-lbl">Conteo total</div>
       </div>
       <div class="lv-line-config">
-        <div class="lv-line-lbl">Línea de conteo (vertical)</div>
+        <div class="lv-line-lbl">Línea de conteo</div>
         <div class="lv-line-row">
           <input type="range" id="line-x-slider" min="10" max="90" step="1" value="{{ settings.get('troncos_line_x', '50') }}">
           <span class="lv-line-val" id="line-x-val">{{ settings.get('troncos_line_x', '50') }}%</span>
@@ -229,12 +219,8 @@ function startPoll() {
     const r = await fetch(`/api/troncos/sources/${SOURCE_ID}/stats`);
     if (!r.ok) return;
     const d = await r.json();
-    const curEl = document.getElementById("cnt-cur");
-    if (curEl) curEl.textContent = d.current_objects;
-    const inEl  = document.getElementById("cnt-in");
-    if (inEl)  inEl.textContent  = d.in_count;
-    const outEl = document.getElementById("cnt-out");
-    if (outEl) outEl.textContent = d.out_count;
+    const totalEl = document.getElementById("cnt-total");
+    if (totalEl) totalEl.textContent = d.total_count;
     document.getElementById("lv-ts").textContent =
       new Date().toLocaleTimeString("es-MX", { hour12: false });
   }, 1500);
@@ -267,7 +253,7 @@ if (lineSlider) {
 
 document.getElementById("btn-reset").addEventListener("click", async () => {
   await fetch(`/api/troncos/sources/${SOURCE_ID}/reset`, { method: "POST" });
-  ["cnt-cur","cnt-in","cnt-out"].forEach(id => {
+  ["cnt-total"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.textContent = "0";
   });

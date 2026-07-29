@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Analytics · Acciones{% endblock %}
+{% block page_title %}Analytics · {{ module.label }}{% endblock %}
+{% block content %}
+<div class="analytics-dashboard">
+  <div class="analytics-kpi-row">
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Violencia</span><span class="analytics-kpi-value" id="kpi-violencia">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg> Robo/Amenaza</span><span class="analytics-kpi-value" id="kpi-robo">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Sospechoso</span><span class="analytics-kpi-value" id="kpi-sospechoso">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg> Celular</span><span class="analytics-kpi-value" id="kpi-celular">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> Caída</span><span class="analytics-kpi-value" id="kpi-caida">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Hoy</span><span class="analytics-kpi-value" id="kpi-today">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Fuentes activas</span><span class="analytics-kpi-value" id="kpi-sources">—</span></div>
+  </div>
+
+  <div class="analytics-chart-row">
+    <div class="analytics-chart-card">
+      <h4>Timeline de detecciones</h4>
+      <canvas id="chart-timeline"></canvas>
+    </div>
+    <div class="analytics-chart-card">
+      <h4>Por fuente</h4>
+      <div id="per-source-table" class="analytics-per-source"></div>
+    </div>
+  </div>
+
+  <div class="analytics-events">
+    <h4>Detecciones recientes</h4>
+    <div id="events-list" class="analytics-events-list"></div>
+  </div>
+</div>
+{% include "components/evidence_modal.html" %}
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
+<script>
+const MODULE_ID = 'acciones';
+function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
+
+async function loadKPIs() {
+  const r = await fetch(`/api/analytics/${MODULE_ID}/summary`);
+  if (!r.ok) return;
+  const d = await r.json();
+  const counters = d.counters || {};
+  const sources = Object.keys(counters);
+  setText('kpi-sources', sources.length > 0 ? sources.length + (d.active ? ' activas' : '') : '—');
+
+  let totalViolencia = 0, totalRobo = 0, totalSospechoso = 0, totalCelular = 0, totalCaida = 0, todayVal = 0;
+  const todayStr = new Date().toISOString().slice(0,10);
+  sources.forEach(sid => {
+    const c = counters[sid];
+    if (c) {
+      totalViolencia += (c.violencia ?? 0);
+      totalRobo += (c.robo ?? 0);
+      totalSospechoso += (c.sospechoso ?? 0);
+      totalCelular += (c.celular ?? 0);
+      totalCaida += (c.caida ?? 0);
+    }
+  });
+  (d.daily || []).forEach(item => {
+    if (item.day === todayStr) todayVal += item.count;
+  });
+  setText('kpi-violencia', totalViolencia > 0 ? totalViolencia : '—');
+  setText('kpi-robo', totalRobo > 0 ? totalRobo : '—');
+  setText('kpi-sospechoso', totalSospechoso > 0 ? totalSospechoso : '—');
+  setText('kpi-celular', totalCelular > 0 ? totalCelular : '—');
+  setText('kpi-caida', totalCaida > 0 ? totalCaida : '—');
+  setText('kpi-today', todayVal > 0 ? todayVal : '—');
+
+  const psEl = document.getElementById('per-source-table');
+  if (sources.length > 0) {
+    psEl.innerHTML = '<table class="ps-table"><tr><th>Fuente</th><th>Violencia</th><th>Robo</th><th>Sospechoso</th><th>Celular</th><th>Caída</th></tr>' +
+      sources.map(sid => {
+        const c = counters[sid] || {};
+        return `<tr><td>Fuente ${sid}</td><td>${c.violencia ?? 0}</td><td>${c.robo ?? 0}</td><td>${c.sospechoso ?? 0}</td><td>${c.celular ?? 0}</td><td>${c.caida ?? 0}</td></tr>`;
+      }).join('') + '</table>';
+  } else {
+    psEl.innerHTML = '<p class="text-muted">Sin datos de fuentes</p>';
+  }
+}
+
+let timelineChart = null;
+async function loadTimeline() {
+  const r = await fetch(`/api/analytics/${MODULE_ID}/timeline`);
+  if (!r.ok) return;
+  const d = await r.json();
+  const ctx = document.getElementById('chart-timeline');
+  if (!ctx) return;
+  const dataMap = {};
+  (d.data || []).forEach(item => {
+    if (!dataMap[item.day]) dataMap[item.day] = {};
+    dataMap[item.day][item.event_type] = (dataMap[item.day][item.event_type] || 0) + item.count;
+  });
+  const labels = Object.keys(dataMap).sort();
+  const violenciaData = labels.map(day => dataMap[day]['violencia'] || 0);
+  const roboData = labels.map(day => dataMap[day]['robo'] || 0);
+  const sospechosoData = labels.map(day => dataMap[day]['sospechoso'] || 0);
+  const celularData = labels.map(day => dataMap[day]['celular'] || 0);
+  const caidaData = labels.map(day => dataMap[day]['caida'] || 0);
+  if (timelineChart) timelineChart.destroy();
+  timelineChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Violencia', data: violenciaData, backgroundColor: '#EF4444' },
+        { label: 'Robo', data: roboData, backgroundColor: '#F97316' },
+        { label: 'Sospechoso', data: sospechosoData, backgroundColor: '#F59E0B' },
+        { label: 'Celular', data: celularData, backgroundColor: '#3B82F6' },
+        { label: 'Caída', data: caidaData, backgroundColor: '#8B5CF6' },
+      ]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        x: { stacked: true, ticks: { color: '#9D9FA2' } },
+        y: { stacked: true, ticks: { color: '#9D9FA2', stepSize: 1 } }
+      },
+      plugins: { legend: { labels: { color: '#9D9FA2' } } }
+    },
+  });
+}
+
+async function loadEvents() {
+  const r = await fetch(`/api/analytics/${MODULE_ID}/events?limit=20`);
+  if (!r.ok) return;
+  const d = await r.json();
+  const list = document.getElementById('events-list');
+  list.innerHTML = (d.events || []).map(e =>
+    `<div class="analytics-event-item">
+      <span class="analytics-event-time">${e.created_at || ''}</span>
+      <span class="analytics-event-type">${e.event_type}</span>
+      <span class="analytics-event-label">${e.label}</span>
+      ${e.capture_path ? `<button class="ev-btn-view" onclick="openEvidence('${MODULE_ID}', ${e.id})"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>` : ''}
+    </div>`
+  ).join('');
+}
+
+loadKPIs(); loadTimeline(); loadEvents();
+setInterval(loadKPIs, 5000);
+</script>
+{% endblock %}

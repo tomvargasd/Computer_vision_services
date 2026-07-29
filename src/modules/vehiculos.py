@@ -11,8 +11,13 @@ from datetime import datetime
 from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor
 
+import torch
 from src.utils import get_device
-from src.modules.base import multi_acquire, multi_release, is_multi_enabled
+from src.modules.base import multi_acquire, multi_release, is_multi_enabled, BasePersistPipeline
+import logging
+from src.database import insert_module_event, save_module_counters, reset_module_counters
+
+logger = logging.getLogger("vision.vehiculos")
 
 MODEL_NAME  = "yolo11n.pt"
 CONF_THRESH = 0.35
@@ -276,7 +281,7 @@ def _detect_plate_cv2(vehicle_roi: np.ndarray) -> tuple[str, Optional[np.ndarray
     return "", None
 
 
-class VehiculosPipeline:
+class VehiculosPipeline(BasePersistPipeline):
     def __init__(self, source_id: int, source_path: str, func_state: dict,
                  conf_thresh: float = CONF_THRESH, half: bool = False,
                  model_path: str = None,
@@ -297,6 +302,7 @@ class VehiculosPipeline:
         self.classes     = classes or DEFAULT_VEHICLE_CLASSES
         self.line_mode   = line_mode
         self.line_pos    = line_pos
+        self._init_persistence("vehiculos", source_id)
 
         self.model: Optional[YOLO] = None
         self.plate_model: Optional[YOLO] = None
@@ -327,6 +333,12 @@ class VehiculosPipeline:
         os.makedirs(CAPTURES_DIR, exist_ok=True)
 
     def start(self) -> None:
+        saved = self._load_counters()
+        if saved:
+            self.total_in = saved.get("entrada", saved.get("total_in", 0))
+            self.total_out = saved.get("salida", saved.get("total_out", 0))
+            self.total_vehicles = saved.get("total_vehicles", 0)
+            self.plates_count = saved.get("plates_count", 0)
         self._stop.clear()
         self._ocr_pool = ThreadPoolExecutor(max_workers=OCR_WORKERS)
         self._thread = threading.Thread(
@@ -343,6 +355,16 @@ class VehiculosPipeline:
         if self._thread:
             self._thread.join(timeout=5)
         self._thread = None
+        save_module_counters(self._module_id, self._source_id, {
+            "entrada": self.total_in,
+            "salida": self.total_out,
+            "total_vehicles": self.total_vehicles,
+            "plates_count": self.plates_count,
+        })
+        if hasattr(self, 'plate_model') and self.plate_model is not None:
+            del self.plate_model
+        del self.model
+        torch.cuda.empty_cache()
 
     def is_alive(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
@@ -364,51 +386,74 @@ class VehiculosPipeline:
         return frame
 
     def _run(self) -> None:
-        self.model = YOLO(self.model_path)
-        self.model.to(get_device())
-
-        if self.plate_model_path:
-            try:
-                self.plate_model = YOLO(self.plate_model_path)
-                self.plate_model.to(get_device())
-            except Exception:
-                self.plate_model = None
-
-        _get_easyocr_reader()
-
         try:
-            src = int(self.source_path)
-        except (ValueError, TypeError):
-            src = self.source_path
+            self.model = YOLO(self.model_path)
+            self.model.to(get_device())
 
-        cap = cv2.VideoCapture(src)
-        if not cap.isOpened():
-            err = self._make_error_frame(
-                f"No se puede abrir: {self.source_path}")
-            with self._lock:
-                self._frame = err
-            while not self._stop.is_set():
-                time.sleep(0.5)
-            return
+            if self.plate_model_path:
+                try:
+                    self.plate_model = YOLO(self.plate_model_path)
+                    self.plate_model.to(get_device())
+                except Exception:
+                    self.plate_model = None
 
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            _get_easyocr_reader()
 
-        first_frame = True
-        while not self._stop.is_set() and cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                if isinstance(src, str) and "://" not in src:
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                    continue
-                break
-            if first_frame:
-                self._h, self._w = frame.shape[:2]
-                first_frame = False
-            annotated = self._process(frame)
-            with self._lock:
-                self._frame = annotated
-            time.sleep(self.fps_limit)
-        cap.release()
+            try:
+                src = int(self.source_path)
+            except (ValueError, TypeError):
+                src = self.source_path
+
+            cap = cv2.VideoCapture(src)
+            if not cap.isOpened():
+                err = self._make_error_frame(
+                    f"No se puede abrir: {self.source_path}")
+                with self._lock:
+                    self._frame = err
+                while not self._stop.is_set():
+                    time.sleep(0.5)
+                return
+
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+            first_frame = True
+            while not self._stop.is_set() and cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    if isinstance(src, str) and "://" not in src:
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                        continue
+                    break
+                if first_frame:
+                    self._h, self._w = frame.shape[:2]
+                    first_frame = False
+                annotated = self._process(frame)
+                with self._lock:
+                    self._frame = annotated
+                self._persist_counters({
+                    "total_in": self.total_in,
+                    "total_out": self.total_out,
+                    "total_vehicles": self.total_vehicles,
+                    "plates_count": self.plates_count,
+                })
+                time.sleep(self.fps_limit)
+
+            save_module_counters(self._module_id, self._source_id, {
+                "entrada": self.total_in,
+                "salida": self.total_out,
+                "total_vehicles": self.total_vehicles,
+                "plates_count": self.plates_count,
+            })
+            cap.release()
+        except Exception:
+            logger.exception("Fatal error in %s %s pipeline", self._module_id, self._source_id)
+            save_module_counters(self._module_id, self._source_id, {
+                "entrada": self.total_in,
+                "salida": self.total_out,
+                "total_vehicles": self.total_vehicles,
+                "plates_count": self.plates_count,
+            })
+            self._stop.set()
 
     def _process(self, frame: np.ndarray) -> np.ndarray:
         h, w = self._h, self._w
@@ -493,6 +538,7 @@ class VehiculosPipeline:
                     self.total_out += 1
                 self.total_vehicles += 1
 
+                cap_path = None
                 if tid not in self._captured:
                     self._captured.add(tid)
                     hf, wf = frame.shape[:2]
@@ -508,6 +554,7 @@ class VehiculosPipeline:
                     path = os.path.join(CAPTURES_DIR, fname)
                     cv2.imwrite(path, crop,
                                 [cv2.IMWRITE_JPEG_QUALITY, JPEG_Q])
+                    cap_path = f"/static/uploads/captures/vehiculos/{fname}"
 
                     item = {
                         "track_id": tid,
@@ -525,9 +572,13 @@ class VehiculosPipeline:
                         except RuntimeError:
                             pass
 
+                insert_module_event("vehiculos", self.source_id,
+                                    "crossing", f"Vehiculo ID {tid} {direction or 'in'}",
+                                    capture_path=cap_path)
+
         cv2.line(annotated, draw_p1, draw_p2, YELLOW, 2)
         cv2.putText(annotated,
-                    f"IN {self.total_in}  OUT {self.total_out}",
+                    f"Entrada {self.total_in}  Salida {self.total_out}",
                     (12, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, YELLOW, 2,
                     cv2.LINE_AA)
         cv2.putText(annotated,
@@ -635,9 +686,8 @@ class VehiculosPipeline:
             placas = list(self.placas_detectadas)
         return {
             "source_id": self.source_id,
-            "total_in": self.total_in,
-            "total_out": self.total_out,
-            "total_vehicles": self.total_vehicles,
+            "entrada": self.total_in,
+            "salida": self.total_out,
             "plates_count": self.plates_count,
             "registros": regs,
             "placas": placas,
@@ -663,6 +713,7 @@ class VehiculosPipeline:
         with self._lock:
             self.registros.clear()
             self.placas_detectadas.clear()
+        reset_module_counters(self._module_id, self._source_id)
 
 
 class VehiculosManager:
@@ -725,6 +776,7 @@ class VehiculosManager:
             return False
         if not p.is_alive():
             with self._lock:
+                p.multi_release()
                 self.pipelines.pop(source_id, None)
             return False
         return True

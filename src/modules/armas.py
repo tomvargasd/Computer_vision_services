@@ -18,9 +18,14 @@ from typing import Optional, Dict, List
 
 from ultralytics import YOLO
 
+import torch
 from src.utils import get_device
-from src.modules.base import multi_acquire, multi_release, is_multi_enabled
+from src.modules.base import multi_acquire, multi_release, is_multi_enabled, BasePersistPipeline
 from src.config import BASE_DIR
+import logging
+from src.database import insert_module_event, save_module_counters, reset_module_counters
+
+logger = logging.getLogger("vision.armas")
 
 # Palabras clave para identificar clase persona en cualquier modelo
 _PERSON_KEYWORDS = {"person", "persona", "people", "human", "pedestrian", "man", "woman", "without_weapon"}
@@ -67,7 +72,7 @@ def _weapon_type(class_name: str) -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-class ArmasPipeline:
+class ArmasPipeline(BasePersistPipeline):
     """Pipeline de análisis de video para una fuente específica de armas."""
 
     def __init__(
@@ -88,9 +93,10 @@ class ArmasPipeline:
         is_default = (self.model_path == DEFAULT_MODEL)
         self.conf_thresh = conf_thresh if conf_thresh is not None else (CONF_THRESH if is_default else CONF_THRESH_CUSTOM)
         self.fps_limit   = fps_limit
+        self._init_persistence("armas", source_id)
 
-        self.model: Optional[YOLO]         = None   # cargado en hilo
-        self._person_model: Optional[YOLO] = None   # secundario si el principal no tiene clase 0
+        self.model: Optional[YOLO]         = None
+        self._person_model: Optional[YOLO] = None
 
         self._frame: Optional[np.ndarray] = None
         self._lock  = threading.Lock()
@@ -98,31 +104,33 @@ class ArmasPipeline:
         self._thread: Optional[threading.Thread] = None
 
         # ── Stats ────────────────────────────────────────────────────────
-        self.weapon_current = 0         # armas visibles en el frame actual
-        self.total_weapons = 0           # acumulado histórico (por track ID)
+        self.total_weapons = 0
         self.total_blanca  = 0
         self.total_fuego   = 0
-        self.capture_count = 0           # total capturas guardadas
-        self._captures: Dict[int, List[str]] = {}  # {weapon_tid: ["url1", ...]}
-        self._last_cap_ts: Dict[int, float]  = {}  # throttle por weapon_tid
-        # Sets para deduplicar por track ID
+        self.capture_count = 0
+        self._captures: Dict[int, List[str]] = {}
+        self._last_cap_ts: Dict[int, float]  = {}
         self._weapon_ids_seen: set = set()
         self._blanca_ids_seen: set = set()
         self._fuego_ids_seen: set = set()
 
-        # Directorio de capturas para esta fuente
         self._cap_dir = os.path.join(CAPTURES_BASE, str(source_id))
         os.makedirs(self._cap_dir, exist_ok=True)
 
-        # ── Validación 3×5 frames ─────────────────────────────────────
-        self._round_buffer: List[bool] = []      # 5 frames del round actual
-        self._round_results: List[float] = []    # ratios de rounds completados (máx 3)
+        self._round_buffer: List[bool] = []
+        self._round_results: List[float] = []
         self._alert_active = False
         self._alert_timestamp: Optional[float] = None
 
     # ── Control ──────────────────────────────────────────────────────────
 
     def start(self) -> None:
+        saved = self._load_counters()
+        if saved:
+            self.total_weapons = saved.get("total_weapons", 0)
+            self.total_blanca = saved.get("total_blanca", 0)
+            self.total_fuego = saved.get("total_fuego", 0)
+            self.capture_count = saved.get("capture_count", 0)
         self._stop.clear()
         self._thread = threading.Thread(
             target=self._run,
@@ -136,6 +144,16 @@ class ArmasPipeline:
         if self._thread:
             self._thread.join(timeout=5)
         self._thread = None
+        save_module_counters(self._module_id, self._source_id, {
+            "total_weapons": self.total_weapons,
+            "total_blanca": self.total_blanca,
+            "total_fuego": self.total_fuego,
+            "capture_count": self.capture_count,
+        })
+        if hasattr(self, '_person_model') and self._person_model is not None:
+            del self._person_model
+        del self.model
+        torch.cuda.empty_cache()
 
     def is_alive(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
@@ -163,53 +181,75 @@ class ArmasPipeline:
         return frame
 
     def _run(self) -> None:
-        # Cargar modelo principal en el hilo (no bloquea el servidor)
-        self.model = YOLO(self.model_path)
-        self.model.to(get_device())
-
-        # Log de clases para diagnóstico
-        print(f"[ArmasPipeline] Modelo: {self.model_path}")
-        print(f"[ArmasPipeline] Clases ({len(self.model.names)}): {dict(self.model.names)}")
-
-        # Si ninguna clase se llama "person" → cargar YOLO11n de respaldo para personas
-        model_class_names = [n.lower() for n in self.model.names.values()]
-        main_has_person = any(k in n for n in model_class_names for k in _PERSON_KEYWORDS)
-        if not main_has_person and self.func_state.get("captura_rostro"):
-            print("[ArmasPipeline] Cargando modelo secundario para detección de personas...")
-            self._person_model = YOLO(DEFAULT_MODEL)
-            self._person_model.to(get_device())
-
         try:
-            src = int(self.source_path)
-        except (ValueError, TypeError):
-            src = self.source_path
+            # Cargar modelo principal en el hilo (no bloquea el servidor)
+            self.model = YOLO(self.model_path)
+            self.model.to(get_device())
 
-        cap = cv2.VideoCapture(src)
-        if not cap.isOpened():
-            err = self._make_error_frame(f"No se puede abrir: {self.source_path}")
-            with self._lock:
-                self._frame = err
-            while not self._stop.is_set():
-                time.sleep(0.5)
-            return
+            # Log de clases para diagnóstico
+            print(f"[ArmasPipeline] Modelo: {self.model_path}")
+            print(f"[ArmasPipeline] Clases ({len(self.model.names)}): {dict(self.model.names)}")
 
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            # Si ninguna clase se llama "person" → cargar YOLO11n de respaldo para personas
+            model_class_names = [n.lower() for n in self.model.names.values()]
+            main_has_person = any(k in n for n in model_class_names for k in _PERSON_KEYWORDS)
+            if not main_has_person and self.func_state.get("captura_rostro"):
+                print("[ArmasPipeline] Cargando modelo secundario para detección de personas...")
+                self._person_model = YOLO(DEFAULT_MODEL)
+                self._person_model.to(get_device())
 
-        while not self._stop.is_set() and cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                # Loop si es archivo local
-                if isinstance(src, str) and "://" not in src:
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                    continue
-                break
+            try:
+                src = int(self.source_path)
+            except (ValueError, TypeError):
+                src = self.source_path
 
-            annotated = self._process(frame)
-            with self._lock:
-                self._frame = annotated
-            time.sleep(self.fps_limit)
+            cap = cv2.VideoCapture(src)
+            if not cap.isOpened():
+                err = self._make_error_frame(f"No se puede abrir: {self.source_path}")
+                with self._lock:
+                    self._frame = err
+                while not self._stop.is_set():
+                    time.sleep(0.5)
+                return
 
-        cap.release()
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+            while not self._stop.is_set() and cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    # Loop si es archivo local
+                    if isinstance(src, str) and "://" not in src:
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                        continue
+                    break
+
+                annotated = self._process(frame)
+                with self._lock:
+                    self._frame = annotated
+                self._persist_counters({
+                    "total_weapons": self.total_weapons,
+                    "total_blanca": self.total_blanca,
+                    "total_fuego": self.total_fuego,
+                    "capture_count": self.capture_count,
+                })
+                time.sleep(self.fps_limit)
+
+            save_module_counters(self._module_id, self._source_id, {
+                "total_weapons": self.total_weapons,
+                "total_blanca": self.total_blanca,
+                "total_fuego": self.total_fuego,
+                "capture_count": self.capture_count,
+            })
+            cap.release()
+        except Exception:
+            logger.exception("Fatal error in %s %s pipeline", self._module_id, self._source_id)
+            save_module_counters(self._module_id, self._source_id, {
+                "total_weapons": self.total_weapons,
+                "total_blanca": self.total_blanca,
+                "total_fuego": self.total_fuego,
+                "capture_count": self.capture_count,
+            })
+            self._stop.set()
 
     # ── Procesado de frame ────────────────────────────────────────────────
 
@@ -310,11 +350,14 @@ class ArmasPipeline:
                         for (atid, apx1, apy1, apx2, apy2, _) in armed_persons:
                             if self.func_state.get("captura_rostro"):
                                 self._try_capture(frame, atid, apx1, apy1, apx2, apy2)
+                        caps = self._captures.get(armed_persons[0][0], []) if armed_persons else []
+                        insert_module_event(self._module_id, self._source_id,
+                                            "weapon_alert", "Alerta de arma detectada",
+                                            capture_path=caps[-1] if caps else None)
                     self._round_results = []
 
         # ── Dibujar + lógica ─────────────────────────────────────────────
         deteccion_on = self.func_state.get("deteccion_arma", True)
-        self.weapon_current = len(weapon_boxes) + len(armed_persons)
 
         if deteccion_on:
             # Armas sueltas — presencia sin ID
@@ -329,6 +372,10 @@ class ArmasPipeline:
                 if self._alert_active:
                     virtual_id = f"arma_{wid}" if wid is not None else f"arma_{wx1}_{wy1}"
                     self._capture_bbox(frame, virtual_id, wx1, wy1, wx2, wy2)
+                    caps = self._captures.get(virtual_id, [])
+                    insert_module_event(self._module_id, self._source_id,
+                                        "weapon_capture", f"Captura de arma ({wtype})",
+                                        capture_path=caps[-1] if caps else None)
 
             # Persona armada — ID estable de la persona
             for (tid, px1, py1, px2, py2, pconf) in armed_persons:
@@ -340,11 +387,15 @@ class ArmasPipeline:
 
                 if self.func_state.get("captura_rostro"):
                     self._try_capture(frame, tid, px1, py1, px2, py2)
+                    caps = self._captures.get(tid, [])
+                    insert_module_event(self._module_id, self._source_id,
+                                        "person_capture", f"Portador ID {tid}",
+                                        capture_path=caps[-1] if caps else None)
 
         # ── HUD ──────────────────────────────────────────────────────────
         cv2.putText(
             annotated,
-            f"Armas: {self.total_weapons}  En zona: {self.weapon_current}  Capturas: {self.capture_count}",
+            f"Armas: {self.total_weapons}  Blancas: {self.total_blanca}  Fuego: {self.total_fuego}  Capturas: {self.capture_count}",
             (12, h - 14),
             cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2, cv2.LINE_AA,
         )
@@ -430,7 +481,6 @@ class ArmasPipeline:
     def get_stats(self) -> dict:
         return {
             "source_id":       self.source_id,
-            "weapon_count":    self.weapon_current,
             "total_weapons":   self.total_weapons,
             "total_blanca":    self.total_blanca,
             "total_fuego":     self.total_fuego,
@@ -441,7 +491,6 @@ class ArmasPipeline:
         }
 
     def reset(self) -> None:
-        self.weapon_current = 0
         self.total_weapons  = 0
         self.total_blanca   = 0
         self.total_fuego    = 0
@@ -452,6 +501,7 @@ class ArmasPipeline:
         self._blanca_ids_seen.clear()
         self._fuego_ids_seen.clear()
         self._round_buffer = []
+        reset_module_counters(self._module_id, self._source_id)
         self._round_results = []
         self._alert_active = False
         self._alert_timestamp = None
@@ -517,6 +567,7 @@ class ArmasManager:
             return False
         if not p.is_alive():
             with self._lock:
+                p.multi_release()
                 self.pipelines.pop(source_id, None)
             return False
         return True

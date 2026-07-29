@@ -327,7 +327,7 @@ function addSourceToList(src) {
   li.id = `source-${src.id}`;
   li.addEventListener("click", () => window.location.href = `/module/${window.CURRENT_MODULE}/live/${src.id}`);
   const displayPath = src.path.includes("/static/uploads/videos/")
-    ? "📁 " + src.path.split("/").pop()
+    ? '<svg class="analytics-kpi-icon" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> ' + src.path.split("/").pop()
     : src.path;
   li.innerHTML = `
     <div class="source-icon">${src.type === "stream" ? streamIcon : videoIcon}</div>

@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}Analytics · Personas{% endblock %}
+{% block page_title %}Analytics · {{ module.label }}{% endblock %}
+{% block content %}
+<div class="analytics-dashboard">
+  <div class="analytics-kpi-row">
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> En el área</span><span class="analytics-kpi-value" id="kpi-current_persons_net">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Entradas</span><span class="analytics-kpi-value" id="kpi-in_count">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg> Salidas</span><span class="analytics-kpi-value" id="kpi-out_count">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Hoy</span><span class="analytics-kpi-value" id="kpi-today">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Permanencia máx</span><span class="analytics-kpi-value" id="kpi-max_dwell">—</span></div>
+  </div>
+
+  <div class="analytics-chart-row">
+    <div class="analytics-chart-card">
+      <h4>Timeline: Flujo de personas</h4>
+      <canvas id="chart-personas-timeline"></canvas>
+    </div>
+    <div class="analytics-chart-card">
+      <h4>Actividad por hora (hoy)</h4>
+      <canvas id="chart-personas-heatmap"></canvas>
+    </div>
+  </div>
+
+  <div class="analytics-chart-row">
+    <div class="analytics-chart-card">
+      <h4>Por fuente</h4>
+      <div id="per-source-table" class="analytics-per-source"></div>
+    </div>
+  </div>
+
+  <div class="analytics-events">
+    <h4>Últimos eventos</h4>
+    <div id="events-list" class="analytics-events-list"></div>
+  </div>
+</div>
+{% include "components/evidence_modal.html" %}
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
+<script>
+const MODULE_ID = 'personas';
+function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
+function fmtTime(s) {
+  if (s == null || s === 0 || s === '0') return '—';
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return m ? `${m}m ${sec}s` : `${sec}s`;
+}
+
+async function loadKPIs() {
+  const r = await fetch(`/api/analytics/${MODULE_ID}/summary`);
+  if (!r.ok) return;
+  const d = await r.json();
+  const counters = d.counters || {};
+  const sources = Object.keys(counters);
+  const todayStr = new Date().toISOString().slice(0,10);
+
+  let inCount = 0, outCount = 0, net = 0, maxDwell = 0, todayCount = 0;
+  sources.forEach(sid => {
+    const c = counters[sid];
+    if (c) {
+      inCount += c.in_count ?? 0;
+      outCount += c.out_count ?? 0;
+      net += c.current_persons_net ?? 0;
+      if ((c.max_dwell ?? 0) > maxDwell) maxDwell = c.max_dwell;
+    }
+  });
+  (d.daily || []).forEach(item => {
+    if (item.day === todayStr) todayCount += item.count;
+  });
+  if (inCount === 0 && d.event_counts) {
+    inCount = d.event_counts.person_entry ?? 0;
+    outCount = d.event_counts.person_exit ?? 0;
+  }
+  setText('kpi-current_persons_net', sources.length > 0 ? net : '—');
+  setText('kpi-in_count', inCount > 0 ? inCount : '—');
+  setText('kpi-out_count', outCount > 0 ? outCount : '—');
+  setText('kpi-today', todayCount > 0 ? todayCount : '—');
+  setText('kpi-max_dwell', fmtTime(maxDwell));
+
+  const psEl = document.getElementById('per-source-table');
+  if (sources.length > 0) {
+    psEl.innerHTML = '<table class="ps-table"><tr><th>Fuente</th><th>Entradas</th><th>Salidas</th><th>En área</th></tr>' +
+      sources.map(sid => {
+        const c = counters[sid];
+        return `<tr><td>Fuente ${sid}</td><td>${c?.in_count ?? '—'}</td><td>${c?.out_count ?? '—'}</td><td>${c?.current_persons_net ?? '—'}</td></tr>`;
+      }).join('') + '</table>';
+  } else {
+    psEl.innerHTML = '<p class="text-muted">Sin datos de fuentes</p>';
+  }
+
+  // Build hourly heatmap from today's events
+  buildHeatmap(d.events || []);
+}
+
+let timelineChart = null;
+function buildTimeline(data) {
+  const ctx = document.getElementById('chart-personas-timeline');
+  if (!ctx || !data) return;
+  const dayMap = {};
+  const entryDayMap = {}, exitDayMap = {};
+  (data || []).forEach(item => {
+    dayMap[item.day] = true;
+    if (item.event_type === 'entry' || item.event_type === 'person_entry') entryDayMap[item.day] = (entryDayMap[item.day] || 0) + item.count;
+    else if (item.event_type === 'exit' || item.event_type === 'person_exit') exitDayMap[item.day] = (exitDayMap[item.day] || 0) + item.count;
+    else { entryDayMap[item.day] = (entryDayMap[item.day] || 0) + (item.in_count || 0); exitDayMap[item.day] = (exitDayMap[item.day] || 0) + (item.out_count || 0); }
+  });
+  const labels = Object.keys(dayMap).sort();
+  const inData = labels.map(l => entryDayMap[l] || 0);
+  const outData = labels.map(l => exitDayMap[l] || 0);
+  if (timelineChart) timelineChart.destroy();
+  timelineChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Entradas', data: inData, borderColor: '#22C55E', tension: 0.3, fill: false },
+        { label: 'Salidas', data: outData, borderColor: '#EF4444', tension: 0.3, fill: false },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#182A55' } } },
+      scales: { x: { ticks: { color: '#9D9FA2' } }, y: { ticks: { color: '#9D9FA2', stepSize: 1 } } },
+    },
+  });
+}
+
+let heatmapChart = null;
+function buildHeatmap(events) {
+  const ctx = document.getElementById('chart-personas-heatmap');
+  if (!ctx) return;
+  const hours = Array(24).fill(0);
+  const todayStr = new Date().toISOString().slice(0,10);
+  (events || []).forEach(e => {
+    if ((e.created_at || '').slice(0,10) !== todayStr) return;
+    const h = parseInt((e.created_at || '').slice(11, 13));
+    if (!isNaN(h) && h >= 0 && h < 24) hours[h]++;
+  });
+  if (heatmapChart) heatmapChart.destroy();
+  const labels = Array.from({length: 24}, (_, i) => `${i}:00`);
+  heatmapChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Eventos', data: hours, backgroundColor: '#3B82F6' }] },
+    options: { responsive: true, plugins: { legend: { display: false } },
+      scales: { x: { ticks: { color: '#9D9FA2', maxTicksLimit: 12 } }, y: { ticks: { color: '#9D9FA2', stepSize: 1 } } } },
+  });
+}
+
+async function loadTimelineData() {
+  const r = await fetch(`/api/analytics/${MODULE_ID}/timeline`);
+  if (!r.ok) return;
+  const d = await r.json();
+  buildTimeline(d.data);
+}
+
+async function loadEvents() {
+  const r = await fetch(`/api/analytics/${MODULE_ID}/events?limit=20`);
+  if (!r.ok) return;
+  const d = await r.json();
+  const list = document.getElementById('events-list');
+  list.innerHTML = (d.events || []).map(e =>
+    `<div class="analytics-event-item">
+      <span class="analytics-event-time">${e.created_at || ''}</span>
+      <span class="analytics-event-type">${e.event_type}</span>
+      <span class="analytics-event-label">${e.label}</span>
+      ${e.capture_path ? `<button class="ev-btn-view" onclick="openEvidence('${MODULE_ID}', ${e.id})"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>` : ''}
+    </div>`
+  ).join('');
+}
+
+loadKPIs(); loadTimelineData(); loadEvents();
+setInterval(loadKPIs, 5000);
+</script>
+{% endblock %}

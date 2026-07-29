@@ -7,8 +7,13 @@ import numpy as np
 from typing import Optional, Dict
 from ultralytics import YOLO
 
+import torch
 from src.utils import get_device
-from src.modules.base import multi_acquire, multi_release, is_multi_enabled
+from src.modules.base import multi_acquire, multi_release, is_multi_enabled, BasePersistPipeline
+import logging
+from src.database import insert_module_event, save_module_counters, reset_module_counters
+
+logger = logging.getLogger("vision.carga_descarga")
 
 MODEL_NAME  = "yolo11n.pt"
 CONF_THRESH = 0.35
@@ -20,7 +25,7 @@ YELLOW = (0, 255, 255)
 WHITE  = (255, 255, 255)
 
 
-class CargaDescargaPipeline:
+class CargaDescargaPipeline(BasePersistPipeline):
     def __init__(self, source_id: int, source_path: str, func_state: dict,
                  conf_thresh: float = CONF_THRESH, half: bool = False,
                  model_path: str = None, classes: list = None,
@@ -36,6 +41,7 @@ class CargaDescargaPipeline:
         self.line_mode   = line_mode
         self.line_pos    = line_pos
         self.fps_limit   = fps_limit
+        self._init_persistence("carga_descarga", source_id)
 
         self.model = None
         self._frame: Optional[np.ndarray] = None
@@ -45,7 +51,6 @@ class CargaDescargaPipeline:
 
         self.total_in       = 0
         self.total_out      = 0
-        self.current_objects = 0
         self._h = 0
         self._w = 0
 
@@ -56,6 +61,10 @@ class CargaDescargaPipeline:
         self._inverted = False
 
     def start(self) -> None:
+        saved = self._load_counters()
+        if saved:
+            self.total_in = saved.get("entrada", saved.get("total_in", 0))
+            self.total_out = saved.get("salida", saved.get("total_out", 0))
         self._stop.clear()
         self._thread = threading.Thread(
             target=self._run, daemon=True,
@@ -68,6 +77,9 @@ class CargaDescargaPipeline:
         if self._thread:
             self._thread.join(timeout=5)
         self._thread = None
+        save_module_counters(self._module_id, self._source_id, {"entrada": self.total_in, "salida": self.total_out})
+        del self.model
+        torch.cuda.empty_cache()
 
     def is_alive(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
@@ -85,44 +97,51 @@ class CargaDescargaPipeline:
         return frame
 
     def _run(self) -> None:
-        self.model = YOLO(self.model_path)
-        self.model.to(get_device())
-
         try:
-            src = int(self.source_path)
-        except (ValueError, TypeError):
-            src = self.source_path
+            self.model = YOLO(self.model_path)
+            self.model.to(get_device())
 
-        cap = cv2.VideoCapture(src)
-        if not cap.isOpened():
-            err = self._make_error_frame(f"No se puede abrir: {self.source_path}")
-            with self._lock:
-                self._frame = err
-            while not self._stop.is_set():
-                time.sleep(0.5)
-            return
+            try:
+                src = int(self.source_path)
+            except (ValueError, TypeError):
+                src = self.source_path
 
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            cap = cv2.VideoCapture(src)
+            if not cap.isOpened():
+                err = self._make_error_frame(f"No se puede abrir: {self.source_path}")
+                with self._lock:
+                    self._frame = err
+                while not self._stop.is_set():
+                    time.sleep(0.5)
+                return
 
-        first_frame = True
-        while not self._stop.is_set() and cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                if isinstance(src, str) and "://" not in src:
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                    continue
-                break
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
-            if first_frame:
-                self._h, self._w = frame.shape[:2]
-                first_frame = False
+            first_frame = True
+            while not self._stop.is_set() and cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    if isinstance(src, str) and "://" not in src:
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                        continue
+                    break
 
-            annotated = self._process(frame)
-            with self._lock:
-                self._frame = annotated
-            time.sleep(self.fps_limit)
+                if first_frame:
+                    self._h, self._w = frame.shape[:2]
+                    first_frame = False
 
-        cap.release()
+                annotated = self._process(frame)
+                with self._lock:
+                    self._frame = annotated
+                self._persist_counters({"total_in": self.total_in, "total_out": self.total_out})
+                time.sleep(self.fps_limit)
+
+            save_module_counters(self._module_id, self._source_id, {"entrada": self.total_in, "salida": self.total_out})
+            cap.release()
+        except Exception:
+            logger.exception("Fatal error in %s %s pipeline", self._module_id, self._source_id)
+            save_module_counters(self._module_id, self._source_id, {"entrada": self.total_in, "salida": self.total_out})
+            self._stop.set()
 
     def _process(self, frame: np.ndarray) -> np.ndarray:
         h, w = self._h, self._w
@@ -212,6 +231,9 @@ class CargaDescargaPipeline:
                 else:
                     self.total_out += 1
 
+                insert_module_event("carga_descarga", self.source_id,
+                                    "crossing", f"ID {tid} {dir_actual}")
+
                 from src.database import insert_carga_descarga_detection
                 try:
                     insert_carga_descarga_detection(
@@ -229,16 +251,12 @@ class CargaDescargaPipeline:
                 del self._prev_pos[tid]
                 self._cross_state.pop(tid, None)
 
-        self.current_objects = len(active_ids)
-
         cv2.line(annotated, draw_p1, draw_p2, PURPLE, 2)
         mode_label = "Horizontal" if self.line_mode == "horizontal" else "Vertical"
-        in_lbl = "DESCARGA" if self._inverted else "CARGA"
-        out_lbl = "CARGA" if self._inverted else "DESCARGA"
+        in_lbl = "Salida" if self._inverted else "Entrada"
+        out_lbl = "Entrada" if self._inverted else "Salida"
         cv2.putText(annotated, f"Linea {mode_label}  {in_lbl} {self.total_in}  {out_lbl} {self.total_out}",
                     (12, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.65, YELLOW, 2, cv2.LINE_AA)
-        cv2.putText(annotated, f"Objetos: {self.current_objects}",
-                    (12, h - 14), cv2.FONT_HERSHEY_SIMPLEX, 0.6, WHITE, 2, cv2.LINE_AA)
 
         return annotated
 
@@ -253,9 +271,8 @@ class CargaDescargaPipeline:
     def get_stats(self) -> dict:
         return {
             "source_id":       self.source_id,
-            "current_objects": self.current_objects,
-            "in_count":        self.total_in,
-            "out_count":       self.total_out,
+            "entrada":         self.total_in,
+            "salida":          self.total_out,
             "line_mode":       self.line_mode,
             "line_pos":        self.line_pos,
             "inverted":        self._inverted,
@@ -276,6 +293,8 @@ class CargaDescargaPipeline:
         self.model_path = model_path
         self.classes = classes
         self.model_id = model_id
+        if hasattr(self, 'model') and self.model is not None:
+            del self.model
         self.model = YOLO(model_path)
         self.model.to(get_device())
 
@@ -285,6 +304,7 @@ class CargaDescargaPipeline:
         self._prev_pos.clear()
         self._cross_state.clear()
         self._counted.clear()
+        reset_module_counters(self._module_id, self._source_id)
 
 
 class CargaDescargaManager:
@@ -338,6 +358,7 @@ class CargaDescargaManager:
             return False
         if not p.is_alive():
             with self._lock:
+                p.multi_release()
                 self.pipelines.pop(source_id, None)
             return False
         return True

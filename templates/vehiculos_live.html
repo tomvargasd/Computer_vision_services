@@ -275,11 +275,6 @@
           Conteo de Vehículos
         </div>
 
-        <div class="lv-count-big">
-          <div class="lv-count-num" id="cnt-vehiculos">0</div>
-          <div class="lv-count-lbl">vehículos totales</div>
-        </div>
-
         <div class="lv-row-group">
           <div class="lv-stat-card">
             <div class="lv-stat-val in" id="cnt-in">0</div>
@@ -447,9 +442,8 @@ async function fetchStats() {
 }
 
 function updateStats(d) {
-  document.getElementById("cnt-vehiculos").textContent = d.total_vehicles ?? 0;
-  document.getElementById("cnt-in").textContent = d.total_in ?? 0;
-  document.getElementById("cnt-out").textContent = d.total_out ?? 0;
+  document.getElementById("cnt-in").textContent = d.entrada ?? 0;
+  document.getElementById("cnt-out").textContent = d.salida ?? 0;
   document.getElementById("cnt-plates").textContent = d.plates_count ?? 0;
   document.getElementById("cnt-plates-tab").textContent = d.plates_count ?? 0;
 
@@ -595,7 +589,6 @@ document.getElementById("btn-reset").addEventListener("click", async () => {
   lastPlacasJson = "";
   document.getElementById("reg-list").innerHTML = '<p style="font-size:0.75rem;color:#9D9FA2;font-style:italic">Esperando detecciones…</p>';
   document.getElementById("plate-list").innerHTML = '<p style="font-size:0.75rem;color:#9D9FA2;font-style:italic">No se han detectado placas aún.</p>';
-  document.getElementById("cnt-vehiculos").textContent = "0";
   document.getElementById("cnt-in").textContent = "0";
   document.getElementById("cnt-out").textContent = "0";
   document.getElementById("cnt-plates").textContent = "0";

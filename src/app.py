@@ -14,8 +14,12 @@ from src.config import (
 from src.database import (
     init_db, get_settings, set_setting,
     get_modules_state, db_toggle_module, db_toggle_function,
-    get_sources, add_source, update_source, delete_source,
+    get_sources, get_source, add_source, update_source, delete_source,
     MODULES_META,
+    save_module_counters, load_module_counters, reset_module_counters,
+    insert_module_event, get_module_events, get_module_analytics,
+    save_source_config, get_source_config, get_source_config_value,
+    delete_source_config,
 )
 
 from src.modules.personas import PersonasManager
@@ -30,6 +34,26 @@ from src.modules.epp import EppManager
 from src.modules.smoke import SmokeManager
 from src.modules.vehiculos import VehiculosManager
 from src.modules.tanques_gas import TanquesGasManager
+
+
+# ─────────────────────────────────────────────
+# Vistas de Analytics (v3.0)
+# ─────────────────────────────────────────────
+
+ANALYTICS_TEMPLATES = {
+    "personas": "analytics_personas.html",
+    "armas": "analytics_armas.html",
+    "acciones": "analytics_acciones.html",
+    "troncos": "analytics_troncos.html",
+    "pallets": "analytics_pallets.html",
+    "cajas": "analytics_cajas.html",
+    "reglamento": "analytics_reglamento.html",
+    "carga_descarga": "analytics_carga_descarga.html",
+    "epp": "analytics_epp.html",
+    "smoke": "analytics_smoke.html",
+    "vehiculos": "analytics_vehiculos.html",
+    "tanques_gas": "analytics_tanques_gas.html",
+}
 
 
 def _normalize_path(path, src_type):
@@ -82,6 +106,28 @@ def allowed_model(filename):
 @app.context_processor
 def inject_globals():
     return {"settings": get_settings(), "modules": get_modules_state()}
+
+
+# ─────────────────────────────────────────────
+# Vistas de Analytics (v3.0)
+# ─────────────────────────────────────────────
+
+@app.route("/analytics")
+def analytics_view():
+    modules = get_modules_state()
+    return render_template("analytics.html", modules=modules)
+
+
+@app.route("/analytics/<module_id>")
+def analytics_module_view(module_id):
+    if module_id not in MODULES_META:
+        return render_template("404.html"), 404
+    tmpl = ANALYTICS_TEMPLATES.get(module_id)
+    if not tmpl:
+        return render_template("404.html"), 404
+    modules = get_modules_state()
+    settings = get_settings()
+    return render_template(tmpl, module_id=module_id, module=modules[module_id], settings=settings)
 
 
 # ─────────────────────────────────────────────
@@ -206,6 +252,10 @@ def api_toggle_function(module_id, func_id):
         "cajas": CajasManager,
         "reglamento": ReglamentoManager,
         "carga_descarga": CargaDescargaManager,
+        "epp": EppManager,
+        "smoke": SmokeManager,
+        "vehiculos": VehiculosManager,
+        "tanques_gas": TanquesGasManager,
     }
     mgr = mgr_map.get(module_id)
     if mgr:
@@ -453,8 +503,46 @@ def _stream_response(module_id, source_id):
 
 
 # ─────────────────────────────────────────────
+# Fábrica de rutas estándar para módulos
+# ─────────────────────────────────────────────
+
+def _register_standard_routes(app, module_id, manager_class, extra_routes=None):
+    _MANAGERS[module_id] = manager_class
+
+    @app.route(f"/api/{module_id}/sources/<int:source_id>/stop",
+               endpoint=f"{module_id}_stop", methods=["POST"])
+    def _stop(source_id):
+        manager_class.get().stop(source_id)
+        return jsonify({"stopped": source_id})
+
+    @app.route(f"/api/{module_id}/sources/<int:source_id>/stats",
+               endpoint=f"{module_id}_stats")
+    def _stats(source_id):
+        stats = manager_class.get().get_stats(source_id)
+        if stats is None:
+            return jsonify({"error": "Pipeline no activo"}), 404
+        return jsonify(stats)
+
+    @app.route(f"/api/{module_id}/sources/<int:source_id>/reset",
+               endpoint=f"{module_id}_reset", methods=["POST"])
+    def _reset(source_id):
+        manager_class.get().reset(source_id)
+        return jsonify({"reset": source_id})
+
+    @app.route(f"/api/{module_id}/stream/<int:source_id>",
+               endpoint=f"{module_id}_stream")
+    def _stream(source_id):
+        return _stream_response(module_id, source_id)
+
+    if extra_routes:
+        extra_routes(app)
+
+
+# ─────────────────────────────────────────────
 # API Personas
 # ─────────────────────────────────────────────
+
+_register_standard_routes(app, "personas", PersonasManager)
 
 @app.route("/api/personas/sources/<int:source_id>/start", methods=["POST"])
 def personas_start(source_id):
@@ -477,26 +565,6 @@ def personas_start(source_id):
     return jsonify({"started": source_id})
 
 
-@app.route("/api/personas/sources/<int:source_id>/stop", methods=["POST"])
-def personas_stop(source_id):
-    PersonasManager.get().stop(source_id)
-    return jsonify({"stopped": source_id})
-
-
-@app.route("/api/personas/sources/<int:source_id>/stats")
-def personas_stats(source_id):
-    stats = PersonasManager.get().get_stats(source_id)
-    if stats is None:
-        return jsonify({"error": "Pipeline no activo"}), 404
-    return jsonify(stats)
-
-
-@app.route("/api/personas/sources/<int:source_id>/reset", methods=["POST"])
-def personas_reset(source_id):
-    PersonasManager.get().reset(source_id)
-    return jsonify({"reset": source_id})
-
-
 @app.route("/api/personas/sources/<int:source_id>/line-y", methods=["POST"])
 def personas_line_y(source_id):
     data = request.get_json(silent=True) or {}
@@ -506,14 +574,11 @@ def personas_line_y(source_id):
     return jsonify({"line_y_pct": pct})
 
 
-@app.route("/api/personas/stream/<int:source_id>")
-def personas_stream(source_id):
-    return _stream_response("personas", source_id)
-
-
 # ─────────────────────────────────────────────
 # API Armas
 # ─────────────────────────────────────────────
+
+_register_standard_routes(app, "armas", ArmasManager)
 
 @app.route("/api/armas/sources/<int:source_id>/start", methods=["POST"])
 def armas_start(source_id):
@@ -535,34 +600,11 @@ def armas_start(source_id):
     return jsonify({"started": source_id})
 
 
-@app.route("/api/armas/sources/<int:source_id>/stop", methods=["POST"])
-def armas_stop(source_id):
-    ArmasManager.get().stop(source_id)
-    return jsonify({"stopped": source_id})
-
-
-@app.route("/api/armas/sources/<int:source_id>/stats")
-def armas_stats(source_id):
-    stats = ArmasManager.get().get_stats(source_id)
-    if stats is None:
-        return jsonify({"error": "Pipeline no activo"}), 404
-    return jsonify(stats)
-
-
-@app.route("/api/armas/sources/<int:source_id>/reset", methods=["POST"])
-def armas_reset(source_id):
-    ArmasManager.get().reset(source_id)
-    return jsonify({"reset": source_id})
-
-
-@app.route("/api/armas/stream/<int:source_id>")
-def armas_stream(source_id):
-    return _stream_response("armas", source_id)
-
-
 # ─────────────────────────────────────────────
 # API Acciones
 # ─────────────────────────────────────────────
+
+_register_standard_routes(app, "acciones", AccionesManager)
 
 @app.route("/api/acciones/sources/<int:source_id>/start", methods=["POST"])
 def acciones_start(source_id):
@@ -582,31 +624,6 @@ def acciones_start(source_id):
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 429
     return jsonify({"started": source_id})
-
-
-@app.route("/api/acciones/sources/<int:source_id>/stop", methods=["POST"])
-def acciones_stop(source_id):
-    AccionesManager.get().stop(source_id)
-    return jsonify({"stopped": source_id})
-
-
-@app.route("/api/acciones/sources/<int:source_id>/stats")
-def acciones_stats(source_id):
-    stats = AccionesManager.get().get_stats(source_id)
-    if stats is None:
-        return jsonify({"error": "Pipeline no activo"}), 404
-    return jsonify(stats)
-
-
-@app.route("/api/acciones/sources/<int:source_id>/reset", methods=["POST"])
-def acciones_reset(source_id):
-    AccionesManager.get().reset(source_id)
-    return jsonify({"reset": source_id})
-
-
-@app.route("/api/acciones/stream/<int:source_id>")
-def acciones_stream(source_id):
-    return _stream_response("acciones", source_id)
 
 
 @app.route("/api/acciones/sources/<int:source_id>/teach/data")
@@ -653,6 +670,8 @@ def acciones_teach_save(source_id):
 # API Troncos
 # ─────────────────────────────────────────────
 
+_register_standard_routes(app, "troncos", TroncosManager)
+
 @app.route("/api/troncos/sources/<int:source_id>/start", methods=["POST"])
 def troncos_start(source_id):
     sources = get_sources("troncos")
@@ -674,26 +693,6 @@ def troncos_start(source_id):
     return jsonify({"started": source_id})
 
 
-@app.route("/api/troncos/sources/<int:source_id>/stop", methods=["POST"])
-def troncos_stop(source_id):
-    TroncosManager.get().stop(source_id)
-    return jsonify({"stopped": source_id})
-
-
-@app.route("/api/troncos/sources/<int:source_id>/stats")
-def troncos_stats(source_id):
-    stats = TroncosManager.get().get_stats(source_id)
-    if stats is None:
-        return jsonify({"error": "Pipeline no activo"}), 404
-    return jsonify(stats)
-
-
-@app.route("/api/troncos/sources/<int:source_id>/reset", methods=["POST"])
-def troncos_reset(source_id):
-    TroncosManager.get().reset(source_id)
-    return jsonify({"reset": source_id})
-
-
 @app.route("/api/troncos/sources/<int:source_id>/line-x", methods=["POST"])
 def troncos_line_x(source_id):
     data = request.get_json(silent=True) or {}
@@ -703,14 +702,11 @@ def troncos_line_x(source_id):
     return jsonify({"line_x_pct": pct})
 
 
-@app.route("/api/troncos/stream/<int:source_id>")
-def troncos_stream(source_id):
-    return _stream_response("troncos", source_id)
-
-
 # ─────────────────────────────────────────────
 # API Pallets
 # ─────────────────────────────────────────────
+
+_register_standard_routes(app, "pallets", PalletsManager)
 
 @app.route("/api/pallets/sources/<int:source_id>/start", methods=["POST"])
 def pallets_start(source_id):
@@ -739,26 +735,6 @@ def pallets_start(source_id):
     return jsonify({"started": source_id})
 
 
-@app.route("/api/pallets/sources/<int:source_id>/stop", methods=["POST"])
-def pallets_stop(source_id):
-    PalletsManager.get().stop(source_id)
-    return jsonify({"stopped": source_id})
-
-
-@app.route("/api/pallets/sources/<int:source_id>/stats")
-def pallets_stats(source_id):
-    stats = PalletsManager.get().get_stats(source_id)
-    if stats is None:
-        return jsonify({"error": "Pipeline no activo"}), 404
-    return jsonify(stats)
-
-
-@app.route("/api/pallets/sources/<int:source_id>/reset", methods=["POST"])
-def pallets_reset(source_id):
-    PalletsManager.get().reset(source_id)
-    return jsonify({"reset": source_id})
-
-
 @app.route("/api/pallets/sources/<int:source_id>/area", methods=["POST"])
 def pallets_area(source_id):
     data = request.get_json(silent=True) or {}
@@ -770,14 +746,11 @@ def pallets_area(source_id):
     return jsonify({"x1": x1, "y1": y1, "x2": x2, "y2": y2})
 
 
-@app.route("/api/pallets/stream/<int:source_id>")
-def pallets_stream(source_id):
-    return _stream_response("pallets", source_id)
-
-
 # ─────────────────────────────────────────────
 # API Cajas
 # ─────────────────────────────────────────────
+
+_register_standard_routes(app, "cajas", CajasManager)
 
 @app.route("/api/cajas/sources/<int:source_id>/start", methods=["POST"])
 def cajas_start(source_id):
@@ -800,26 +773,6 @@ def cajas_start(source_id):
     return jsonify({"started": source_id})
 
 
-@app.route("/api/cajas/sources/<int:source_id>/stop", methods=["POST"])
-def cajas_stop(source_id):
-    CajasManager.get().stop(source_id)
-    return jsonify({"stopped": source_id})
-
-
-@app.route("/api/cajas/sources/<int:source_id>/stats")
-def cajas_stats(source_id):
-    stats = CajasManager.get().get_stats(source_id)
-    if stats is None:
-        return jsonify({"error": "Pipeline no activo"}), 404
-    return jsonify(stats)
-
-
-@app.route("/api/cajas/sources/<int:source_id>/reset", methods=["POST"])
-def cajas_reset(source_id):
-    CajasManager.get().reset(source_id)
-    return jsonify({"reset": source_id})
-
-
 @app.route("/api/cajas/sources/<int:source_id>/line-y", methods=["POST"])
 def cajas_line_y(source_id):
     data = request.get_json(silent=True) or {}
@@ -829,14 +782,11 @@ def cajas_line_y(source_id):
     return jsonify({"line_y_pct": pct})
 
 
-@app.route("/api/cajas/stream/<int:source_id>")
-def cajas_stream(source_id):
-    return _stream_response("cajas", source_id)
-
-
 # ─────────────────────────────────────────────
 # API Reglamento
 # ─────────────────────────────────────────────
+
+_register_standard_routes(app, "reglamento", ReglamentoManager)
 
 @app.route("/api/reglamento/sources/<int:source_id>/start", methods=["POST"])
 def reglamento_start(source_id):
@@ -864,26 +814,6 @@ def reglamento_start(source_id):
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 429
     return jsonify({"started": source_id})
-
-
-@app.route("/api/reglamento/sources/<int:source_id>/stop", methods=["POST"])
-def reglamento_stop(source_id):
-    ReglamentoManager.get().stop(source_id)
-    return jsonify({"stopped": source_id})
-
-
-@app.route("/api/reglamento/sources/<int:source_id>/stats")
-def reglamento_stats(source_id):
-    stats = ReglamentoManager.get().get_stats(source_id)
-    if stats is None:
-        return jsonify({"error": "Pipeline no activo"}), 404
-    return jsonify(stats)
-
-
-@app.route("/api/reglamento/sources/<int:source_id>/reset", methods=["POST"])
-def reglamento_reset(source_id):
-    ReglamentoManager.get().reset(source_id)
-    return jsonify({"reset": source_id})
 
 
 @app.route("/api/reglamento/sources/<int:source_id>/area", methods=["POST"])
@@ -919,11 +849,6 @@ def reglamento_evidencias(source_id):
     if stats is None:
         return jsonify([])
     return jsonify(stats.get("evidencias", []))
-
-
-@app.route("/api/reglamento/stream/<int:source_id>")
-def reglamento_stream(source_id):
-    return _stream_response("reglamento", source_id)
 
 
 @app.route("/api/reglamento/settings/jpeg-q", methods=["POST"])
@@ -966,6 +891,8 @@ def reglamento_frame_step():
 # API Carga / Descarga
 # ─────────────────────────────────────────────
 
+_register_standard_routes(app, "carga_descarga", CargaDescargaManager)
+
 @app.route("/api/carga_descarga/sources/<int:source_id>/start", methods=["POST"])
 def carga_descarga_start(source_id):
     sources = get_sources("carga_descarga")
@@ -998,26 +925,6 @@ def carga_descarga_start(source_id):
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 429
     return jsonify({"started": source_id})
-
-
-@app.route("/api/carga_descarga/sources/<int:source_id>/stop", methods=["POST"])
-def carga_descarga_stop(source_id):
-    CargaDescargaManager.get().stop(source_id)
-    return jsonify({"stopped": source_id})
-
-
-@app.route("/api/carga_descarga/sources/<int:source_id>/stats")
-def carga_descarga_stats(source_id):
-    stats = CargaDescargaManager.get().get_stats(source_id)
-    if stats is None:
-        return jsonify({"error": "Pipeline no activo"}), 404
-    return jsonify(stats)
-
-
-@app.route("/api/carga_descarga/sources/<int:source_id>/reset", methods=["POST"])
-def carga_descarga_reset(source_id):
-    CargaDescargaManager.get().reset(source_id)
-    return jsonify({"reset": source_id})
 
 
 @app.route("/api/carga_descarga/sources/<int:source_id>/line-mode", methods=["POST"])
@@ -1087,14 +994,11 @@ def carga_descarga_models_list(source_id):
     return jsonify(models)
 
 
-@app.route("/api/carga_descarga/stream/<int:source_id>")
-def carga_descarga_stream(source_id):
-    return _stream_response("carga_descarga", source_id)
-
-
 # ─────────────────────────────────────────────
 # API EPP
 # ─────────────────────────────────────────────
+
+_register_standard_routes(app, "epp", EppManager)
 
 @app.route("/api/epp/sources/<int:source_id>/start", methods=["POST"])
 def epp_start(source_id):
@@ -1116,26 +1020,6 @@ def epp_start(source_id):
     return jsonify({"started": source_id})
 
 
-@app.route("/api/epp/sources/<int:source_id>/stop", methods=["POST"])
-def epp_stop(source_id):
-    EppManager.get().stop(source_id)
-    return jsonify({"stopped": source_id})
-
-
-@app.route("/api/epp/sources/<int:source_id>/stats")
-def epp_stats(source_id):
-    stats = EppManager.get().get_stats(source_id)
-    if stats is None:
-        return jsonify({"error": "Pipeline no activo"}), 404
-    return jsonify(stats)
-
-
-@app.route("/api/epp/sources/<int:source_id>/reset", methods=["POST"])
-def epp_reset(source_id):
-    EppManager.get().reset(source_id)
-    return jsonify({"reset": source_id})
-
-
 @app.route("/api/epp/sources/<int:source_id>/master", methods=["POST"])
 def epp_master(source_id):
     data = request.get_json(silent=True) or {}
@@ -1152,14 +1036,11 @@ def epp_required(source_id):
     return jsonify({"required": sorted(classes)})
 
 
-@app.route("/api/epp/stream/<int:source_id>")
-def epp_stream(source_id):
-    return _stream_response("epp", source_id)
-
-
 # ─────────────────────────────────────────────
 # API Smoke / Humo-Fuego
 # ─────────────────────────────────────────────
+
+_register_standard_routes(app, "smoke", SmokeManager)
 
 @app.route("/api/smoke/sources/<int:source_id>/start", methods=["POST"])
 def smoke_start(source_id):
@@ -1181,34 +1062,11 @@ def smoke_start(source_id):
     return jsonify({"started": source_id})
 
 
-@app.route("/api/smoke/sources/<int:source_id>/stop", methods=["POST"])
-def smoke_stop(source_id):
-    SmokeManager.get().stop(source_id)
-    return jsonify({"stopped": source_id})
-
-
-@app.route("/api/smoke/sources/<int:source_id>/stats")
-def smoke_stats(source_id):
-    stats = SmokeManager.get().get_stats(source_id)
-    if stats is None:
-        return jsonify({"error": "Pipeline no activo"}), 404
-    return jsonify(stats)
-
-
-@app.route("/api/smoke/sources/<int:source_id>/reset", methods=["POST"])
-def smoke_reset(source_id):
-    SmokeManager.get().reset(source_id)
-    return jsonify({"reset": source_id})
-
-
-@app.route("/api/smoke/stream/<int:source_id>")
-def smoke_stream(source_id):
-    return _stream_response("smoke", source_id)
-
-
 # ─────────────────────────────────────────────
 # API Vehículos
 # ─────────────────────────────────────────────
+
+_register_standard_routes(app, "vehiculos", VehiculosManager)
 
 @app.route("/api/vehiculos/sources/<int:source_id>/start", methods=["POST"])
 def vehiculos_start(source_id):
@@ -1233,26 +1091,6 @@ def vehiculos_start(source_id):
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 429
     return jsonify({"started": source_id})
-
-
-@app.route("/api/vehiculos/sources/<int:source_id>/stop", methods=["POST"])
-def vehiculos_stop(source_id):
-    VehiculosManager.get().stop(source_id)
-    return jsonify({"stopped": source_id})
-
-
-@app.route("/api/vehiculos/sources/<int:source_id>/stats")
-def vehiculos_stats(source_id):
-    stats = VehiculosManager.get().get_stats(source_id)
-    if stats is None:
-        return jsonify({"error": "Pipeline no activo"}), 404
-    return jsonify(stats)
-
-
-@app.route("/api/vehiculos/sources/<int:source_id>/reset", methods=["POST"])
-def vehiculos_reset(source_id):
-    VehiculosManager.get().reset(source_id)
-    return jsonify({"reset": source_id})
 
 
 @app.route("/api/vehiculos/sources/<int:source_id>/line-mode", methods=["POST"])
@@ -1297,14 +1135,11 @@ def vehiculos_upload_plate_model():
     return jsonify({"model": fname})
 
 
-@app.route("/api/vehiculos/stream/<int:source_id>")
-def vehiculos_stream(source_id):
-    return _stream_response("vehiculos", source_id)
-
-
 # ─────────────────────────────────────────────
 # API Tanques de Gas
 # ─────────────────────────────────────────────
+
+_register_standard_routes(app, "tanques_gas", TanquesGasManager)
 
 @app.route("/api/tanques_gas/sources/<int:source_id>/start", methods=["POST"])
 def tanques_gas_start(source_id):
@@ -1328,26 +1163,6 @@ def tanques_gas_start(source_id):
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 429
     return jsonify({"started": source_id})
-
-
-@app.route("/api/tanques_gas/sources/<int:source_id>/stop", methods=["POST"])
-def tanques_gas_stop(source_id):
-    TanquesGasManager.get().stop(source_id)
-    return jsonify({"stopped": source_id})
-
-
-@app.route("/api/tanques_gas/sources/<int:source_id>/stats")
-def tanques_gas_stats(source_id):
-    stats = TanquesGasManager.get().get_stats(source_id)
-    if stats is None:
-        return jsonify({"error": "Pipeline no activo"}), 404
-    return jsonify(stats)
-
-
-@app.route("/api/tanques_gas/sources/<int:source_id>/reset", methods=["POST"])
-def tanques_gas_reset(source_id):
-    TanquesGasManager.get().reset(source_id)
-    return jsonify({"reset": source_id})
 
 
 @app.route("/api/tanques_gas/sources/<int:source_id>/line-mode", methods=["POST"])
@@ -1499,11 +1314,6 @@ def tanques_gas_upload_smoke_model():
     return jsonify({"model": fname})
 
 
-@app.route("/api/tanques_gas/stream/<int:source_id>")
-def tanques_gas_stream(source_id):
-    return _stream_response("tanques_gas", source_id)
-
-
 # ─────────────────────────────────────────────
 # API Fuentes (sources) CRUD
 # ─────────────────────────────────────────────
@@ -1529,6 +1339,11 @@ def api_add_source():
 @app.route("/api/sources/<int:source_id>", methods=["PUT", "DELETE"])
 def api_source_crud(source_id):
     if request.method == "DELETE":
+        src = get_source(source_id)
+        if src:
+            mgr = _get_manager(src["module_id"])
+            if mgr:
+                mgr.stop(source_id)
         result = delete_source(source_id)
         return jsonify(result)
     data = request.get_json(silent=True) or {}
@@ -1559,3 +1374,113 @@ def api_upload_video():
     dest = os.path.join(VIDEOS_FOLDER, fname)
     f.save(dest)
     return jsonify({"path": os.path.join("static", "uploads", "videos", fname)})
+
+
+# ─────────────────────────────────────────────
+# Source Config API (v3.0)
+# ─────────────────────────────────────────────
+
+@app.route("/api/sources/<int:source_id>/config", methods=["GET", "POST"])
+def api_source_config(source_id):
+    if request.method == "POST":
+        data = request.get_json(silent=True) or {}
+        for key, value in data.items():
+            save_source_config(source_id, key, str(value))
+        return jsonify({"saved": True})
+    return jsonify(get_source_config(source_id))
+
+
+@app.route("/api/sources/<int:source_id>/config/<key>", methods=["GET", "POST"])
+def api_source_config_key(source_id, key):
+    if request.method == "POST":
+        data = request.get_json(silent=True) or {}
+        value = data.get("value", "")
+        save_source_config(source_id, key, str(value))
+        return jsonify({"key": key, "value": value})
+    default = request.args.get("default")
+    value = get_source_config_value(source_id, key, default)
+    return jsonify({"key": key, "value": value})
+
+
+# ─────────────────────────────────────────────
+# Analytics API (v3.0)
+# ─────────────────────────────────────────────
+
+@app.route("/api/analytics/<module_id>/summary")
+def api_analytics_summary(module_id):
+    if module_id not in MODULES_META:
+        return jsonify({"error": "Módulo no encontrado"}), 404
+    days = request.args.get("days", 7, type=int)
+    source_id = request.args.get("source_id", None, type=int)
+    mgr = _get_manager(module_id)
+    active_sources = []
+    if mgr:
+        with mgr._lock:
+            active_sources = list(mgr.pipelines.keys())
+
+    counters = {}
+    if active_sources:
+        for sid in active_sources:
+            stats = mgr.get_stats(sid)
+            if stats:
+                counters[str(sid)] = stats
+    else:
+        for src in get_sources(module_id):
+            sid = src["id"]
+            persisted = load_module_counters(module_id, sid)
+            if persisted:
+                counters[str(sid)] = persisted
+
+    data = get_module_analytics(module_id, source_id, days)
+
+    return jsonify({
+        "counters": counters,
+        "events": data["last_events"],
+        "daily": data["daily"],
+        "active": len(active_sources) > 0,
+        "active_sources": active_sources,
+        "event_counts": data["event_counts"],
+    })
+
+
+@app.route("/api/analytics/<module_id>/events")
+def api_analytics_events(module_id):
+    if module_id not in MODULES_META:
+        return jsonify({"error": "Módulo no encontrado"}), 404
+    days = request.args.get("days", 7, type=int)
+    source_id = request.args.get("source_id", None, type=int)
+    event_type = request.args.get("event_type", None)
+    limit = request.args.get("limit", 100, type=int)
+    events = get_module_events(module_id, source_id, event_type, days, limit)
+    return jsonify({"events": events})
+
+
+@app.route("/api/analytics/<module_id>/timeline")
+def api_analytics_timeline(module_id):
+    if module_id not in MODULES_META:
+        return jsonify({"error": "Módulo no encontrado"}), 404
+    days = request.args.get("days", 7, type=int)
+    source_id = request.args.get("source_id", None, type=int)
+    data = get_module_analytics(module_id, source_id, days)
+    return jsonify({"data": data["daily"]})
+
+
+# ─────────────────────────────────────────────
+# Evidence API (v3.0)
+# ─────────────────────────────────────────────
+
+@app.route("/api/evidences/<module_id>/<int:event_id>")
+def api_evidence(module_id, event_id):
+    if module_id not in MODULES_META:
+        return jsonify({"error": "Módulo no encontrado"}), 404
+    events = get_module_events(module_id, limit=100)
+    event = next((e for e in events if e["id"] == event_id), None)
+    if not event:
+        return jsonify({"error": "Evento no encontrado"}), 404
+    capture_url = event.get("capture_path")
+    extra_paths = event.get("extra_paths", [])
+    return jsonify({
+        "event": event,
+        "capture_url": capture_url,
+        "extra_urls": extra_paths,
+    })

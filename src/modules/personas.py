@@ -19,9 +19,14 @@ import numpy as np
 from typing import Optional, Dict
 from ultralytics import YOLO
 
+import torch
 from src.utils import get_device
-from src.modules.base import multi_acquire, multi_release, is_multi_enabled
+from src.modules.base import multi_acquire, multi_release, is_multi_enabled, BasePersistPipeline
 from src.config import BASE_DIR
+import logging
+from src.database import insert_module_event, save_module_counters, reset_module_counters
+
+logger = logging.getLogger("vision.personas")
 
 MODEL_NAME  = "yolo11n.pt"   # descarga automática en ~/.ultralytics/ la 1ª vez
 PERSON_CLS  = 0              # clase "person" en COCO
@@ -35,7 +40,7 @@ WHITE  = (255, 255, 255)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-class PersonasPipeline:
+class PersonasPipeline(BasePersistPipeline):
     """
     Un pipeline de análisis de video para una fuente específica.
 
@@ -53,6 +58,7 @@ class PersonasPipeline:
         self.model_path  = model_path or MODEL_NAME
         self.line_y_pct  = line_y_pct
         self.fps_limit   = fps_limit
+        self._init_persistence("personas", source_id)
 
         # Modelo — se carga en el hilo para que /start responda de inmediato
         self.model = None
@@ -92,6 +98,10 @@ class PersonasPipeline:
     # ── Control del pipeline ─────────────────────────────────────────────────
 
     def start(self) -> None:
+        saved = self._load_counters()
+        if saved:
+            self.total_in = saved.get("in_count", saved.get("total_in", 0))
+            self.total_out = saved.get("out_count", saved.get("total_out", 0))
         self._stop.clear()
         self._thread = threading.Thread(
             target=self._run,
@@ -105,6 +115,14 @@ class PersonasPipeline:
         if self._thread:
             self._thread.join(timeout=5)
         self._thread = None
+        save_module_counters(self._module_id, self._source_id, {
+            "in_count": self.total_in,
+            "out_count": self.total_out,
+            "current_persons_net": self.current_persons_net,
+            "max_dwell": self._max_dwell or 0,
+        })
+        del self.model
+        torch.cuda.empty_cache()
 
     def is_alive(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
@@ -128,52 +146,72 @@ class PersonasPipeline:
         return frame
 
     def _run(self) -> None:
-        # Cargar modelo en el hilo (evita bloquear /start)
-        self.model = YOLO(self.model_path)
-        self.model.to(get_device())
-
-        # Soporte para índice de cámara numérico o ruta/URL
         try:
-            src = int(self.source_path)
-        except (ValueError, TypeError):
-            src = self.source_path
+            # Cargar modelo en el hilo (evita bloquear /start)
+            self.model = YOLO(self.model_path)
+            self.model.to(get_device())
 
-        cap = cv2.VideoCapture(src)
-        if not cap.isOpened():
-            # Mostrar error en el stream en lugar de negro
-            err = self._make_error_frame(f"No se puede abrir: {self.source_path}")
-            with self._lock:
-                self._frame = err
-            # Mantener vivo para que el stream sirva el frame de error
-            while not self._stop.is_set():
-                time.sleep(0.5)
-            return
+            # Soporte para índice de cámara numérico o ruta/URL
+            try:
+                src = int(self.source_path)
+            except (ValueError, TypeError):
+                src = self.source_path
 
-        # Reducir buffer para streams (reduce latencia)
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            cap = cv2.VideoCapture(src)
+            if not cap.isOpened():
+                # Mostrar error en el stream en lugar de negro
+                err = self._make_error_frame(f"No se puede abrir: {self.source_path}")
+                with self._lock:
+                    self._frame = err
+                # Mantener vivo para que el stream sirva el frame de error
+                while not self._stop.is_set():
+                    time.sleep(0.5)
+                return
 
-        first_frame = True
-        while not self._stop.is_set() and cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                # Archivo de video → loop; stream caído → salir
-                if isinstance(src, str) and "://" not in src:
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                    continue
-                break
+            # Reducir buffer para streams (reduce latencia)
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
-            if first_frame:
-                self._h, self._w = frame.shape[:2]
-                self._heatmap_acc = np.zeros((self._h, self._w), dtype=np.float32)
-                first_frame = False
+            first_frame = True
+            while not self._stop.is_set() and cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    # Archivo de video → loop; stream caído → salir
+                    if isinstance(src, str) and "://" not in src:
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                        continue
+                    break
 
-            annotated = self._process(frame)
+                if first_frame:
+                    self._h, self._w = frame.shape[:2]
+                    self._heatmap_acc = np.zeros((self._h, self._w), dtype=np.float32)
+                    first_frame = False
 
-            with self._lock:
-                self._frame = annotated
-            time.sleep(self.fps_limit)
+                annotated = self._process(frame)
 
-        cap.release()
+                with self._lock:
+                    self._frame = annotated
+                self._persist_counters({
+                    "total_in": self.total_in,
+                    "total_out": self.total_out,
+                })
+                time.sleep(self.fps_limit)
+
+            save_module_counters(self._module_id, self._source_id, {
+                "in_count": self.total_in,
+                "out_count": self.total_out,
+                "current_persons_net": self.current_persons_net,
+                "max_dwell": self._dwell_max or 0,
+            })
+            cap.release()
+        except Exception:
+            logger.exception("Fatal error in %s %s pipeline", self._module_id, self._source_id)
+            save_module_counters(self._module_id, self._source_id, {
+                "in_count": self.total_in,
+                "out_count": self.total_out,
+                "current_persons_net": self.current_persons_net,
+                "max_dwell": self._dwell_max or 0,
+            })
+            self._stop.set()
 
     # ── Procesado de un frame ─────────────────────────────────────────────────
 
@@ -224,17 +262,16 @@ class PersonasPipeline:
 
                     if crossed_up:
                         if state == "none":
-                            # Entra por primera vez
                             self.total_in += 1
+                            insert_module_event("personas", self.source_id,
+                                                "entry", f"Persona ID {tid}")
                             self._cross_state[tid] = "inside"
-                        # state == "inside": ya estaba dentro, ignora rebote
-                        # state == "done":   ciclo completo, no contar de nuevo
 
                     elif crossed_down:
                         if state in ("none", "inside"):
-                            # Sale (state "none" cubre personas que ya estaban
-                            # dentro cuando arrancó el sistema)
                             self.total_out += 1
+                            insert_module_event("personas", self.source_id,
+                                                "exit", f"Persona ID {tid}")
                             self._cross_state[tid] = "done"
                         # state == "done": ya salió antes, ignorar
 
@@ -368,6 +405,7 @@ class PersonasPipeline:
         self._dwell_max = 0.0
         self._dwell_min = float('inf')
         self._dwell_completed_count = 0
+        reset_module_counters(self._module_id, self._source_id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -424,6 +462,7 @@ class PersonasManager:
         if not p.is_alive():
             # auto-limpiar pipeline muerto
             with self._lock:
+                p.multi_release()
                 self.pipelines.pop(source_id, None)
             return False
         return True

@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Analytics · Cajas{% endblock %}
+{% block page_title %}Analytics · {{ module.label }}{% endblock %}
+{% block content %}
+<div class="analytics-dashboard">
+  <div class="analytics-kpi-row">
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3 8 12 13 21 8"/></svg> Conteo total</span><span class="analytics-kpi-value" id="kpi-total">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Hoy</span><span class="analytics-kpi-value" id="kpi-today">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Fuentes activas</span><span class="analytics-kpi-value" id="kpi-sources">—</span></div>
+  </div>
+
+  <div class="analytics-chart-row">
+    <div class="analytics-chart-card">
+      <h4>Timeline de detecciones</h4>
+      <canvas id="chart-timeline"></canvas>
+    </div>
+    <div class="analytics-chart-card">
+      <h4>Por fuente</h4>
+      <div id="per-source-table" class="analytics-per-source"></div>
+    </div>
+  </div>
+
+  <div class="analytics-events">
+    <h4>Detecciones recientes</h4>
+    <div id="events-list" class="analytics-events-list"></div>
+  </div>
+</div>
+{% include "components/evidence_modal.html" %}
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
+<script>
+const MODULE_ID = 'cajas';
+function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
+
+async function loadKPIs() {
+  const r = await fetch(`/api/analytics/${MODULE_ID}/summary`);
+  if (!r.ok) return;
+  const d = await r.json();
+  const counters = d.counters || {};
+  const sources = Object.keys(counters);
+  setText('kpi-sources', sources.length > 0 ? sources.length + (d.active ? ' activas' : '') : '—');
+
+  let totalVal = 0, todayVal = 0;
+  const todayStr = new Date().toISOString().slice(0,10);
+  sources.forEach(sid => {
+    const c = counters[sid];
+    if (c) totalVal += (c.total_count ?? 0);
+  });
+  (d.daily || []).forEach(item => {
+    if (item.day === todayStr) todayVal += item.count;
+  });
+  if (totalVal > 0) setText('kpi-total', totalVal);
+  else if (d.event_counts) setText('kpi-total', Object.values(d.event_counts).reduce((a,b)=>a+b,0) || '—');
+  setText('kpi-today', todayVal > 0 ? todayVal : '—');
+
+  const psEl = document.getElementById('per-source-table');
+  if (sources.length > 0) {
+    psEl.innerHTML = '<table class="ps-table"><tr><th>Fuente</th><th>Conteo</th></tr>' +
+      sources.map(sid => `<tr><td>Fuente ${sid}</td><td>${counters[sid]?.total_count ?? '—'}</td></tr>`).join('') +
+      '</table>';
+  } else {
+    psEl.innerHTML = '<p class="text-muted">Sin datos de fuentes</p>';
+  }
+}
+
+let timelineChart = null;
+async function loadTimeline() {
+  const r = await fetch(`/api/analytics/${MODULE_ID}/timeline`);
+  if (!r.ok) return;
+  const d = await r.json();
+  const ctx = document.getElementById('chart-timeline');
+  if (!ctx) return;
+  const dayMap = {};
+  (d.data || []).forEach(item => { dayMap[item.day] = (dayMap[item.day] || 0) + item.count; });
+  const labels = Object.keys(dayMap).sort();
+  const data = labels.map(l => dayMap[l]);
+  if (timelineChart) timelineChart.destroy();
+  timelineChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Detecciones', data, backgroundColor: '#3B82F6' }] },
+    options: { responsive: true, plugins: { legend: { display: false } },
+      scales: { x: { ticks: { color: '#9D9FA2' } }, y: { ticks: { color: '#9D9FA2', stepSize: 1 } } } },
+  });
+}
+
+async function loadEvents() {
+  const r = await fetch(`/api/analytics/${MODULE_ID}/events?limit=20`);
+  if (!r.ok) return;
+  const d = await r.json();
+  const list = document.getElementById('events-list');
+  list.innerHTML = (d.events || []).map(e =>
+    `<div class="analytics-event-item">
+      <span class="analytics-event-time">${e.created_at || ''}</span>
+      <span class="analytics-event-type">${e.event_type}</span>
+      <span class="analytics-event-label">${e.label}</span>
+      ${e.capture_path ? `<button class="ev-btn-view" onclick="openEvidence('${MODULE_ID}', ${e.id})"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>` : ''}
+    </div>`
+  ).join('');
+}
+
+loadKPIs(); loadTimeline(); loadEvents();
+setInterval(loadKPIs, 5000);
+</script>
+{% endblock %}

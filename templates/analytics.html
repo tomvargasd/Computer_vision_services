@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Analytics · CVVision{% endblock %}
+{% block page_title %}Analytics · Métricas del Sistema{% endblock %}
+
+{% block content %}
+<div class="analytics-page">
+  <div class="analytics-search">
+    <input type="text" class="analytics-search-input" id="analytics-search" placeholder="Buscar módulo…">
+  </div>
+
+  <div class="analytics-grid" id="analytics-grid">
+    {% for mod_id, mod in modules.items() %}
+    <a href="{{ url_for('analytics_module_view', module_id=mod_id) }}" class="analytics-card" data-module="{{ mod_id }}">
+      <div class="analytics-card-icon">{{ mod.label[:2] }}</div>
+      <div class="analytics-card-body">
+        <h4 class="analytics-card-title">{{ mod.label }}</h4>
+        <div class="analytics-card-kpi" id="kpi-{{ mod_id }}">—</div>
+      </div>
+      <div class="analytics-card-status" id="status-{{ mod_id }}">
+        <span class="status-dot {% if mod.enabled %}on{% endif %}"></span>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  <div class="analytics-footer">
+    <span><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> En vivo ahora: <strong id="active-pipelines">0</strong> pipelines activos</span>
+  </div>
+</div>
+
+{% include "components/evidence_modal.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
+<script>
+document.getElementById("analytics-search").addEventListener("input", function() {
+  const q = this.value.toLowerCase();
+  document.querySelectorAll(".analytics-card").forEach(card => {
+    const title = card.querySelector(".analytics-card-title").textContent.toLowerCase();
+    card.style.display = title.includes(q) ? "" : "none";
+  });
+});
+</script>
+{% endblock %}

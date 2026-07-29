@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Analytics · Armas{% endblock %}
+{% block page_title %}Analytics · {{ module.label }}{% endblock %}
+{% block content %}
+<div class="analytics-dashboard">
+  <div class="analytics-kpi-row">
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Alertas totales</span><span class="analytics-kpi-value" id="kpi-total_weapons">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M14.5 2L10 6.5l3 3L6.5 16l-3-3L2 14.5 7.5 20l2-2-3-3 6.5-6.5 3 3L22 6.5z"/></svg> Armas blancas</span><span class="analytics-kpi-value" id="kpi-total_blanca">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M12 2L9.5 6.5 12 10 9.5 13.5 12 17l-2.5 3.5"/><path d="M12 2l2.5 4.5L12 10l2.5 3.5L12 17l2.5 3.5"/></svg> Armas de fuego</span><span class="analytics-kpi-value" id="kpi-total_fuego">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Hoy</span><span class="analytics-kpi-value" id="kpi-today">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg> Capturas rostro</span><span class="analytics-kpi-value" id="kpi-capture_count">—</span></div>
+  </div>
+
+  <div class="analytics-chart-row">
+    <div class="analytics-chart-card">
+      <h4>Timeline: Alertas de armas</h4>
+      <canvas id="chart-armas-timeline"></canvas>
+    </div>
+    <div class="analytics-chart-card">
+      <h4>Por fuente</h4>
+      <div id="per-source-table" class="analytics-per-source"></div>
+    </div>
+  </div>
+
+  <div class="analytics-events">
+    <h4>Últimas alertas</h4>
+    <div id="events-list" class="analytics-events-list"></div>
+  </div>
+</div>
+{% include "components/evidence_modal.html" %}
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
+<script>
+const MODULE_ID = 'armas';
+function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
+
+async function loadKPIs() {
+  const r = await fetch(`/api/analytics/${MODULE_ID}/summary`);
+  if (!r.ok) return;
+  const d = await r.json();
+  const counters = d.counters || {};
+  const sources = Object.keys(counters);
+  const todayStr = new Date().toISOString().slice(0,10);
+
+  let totals = { total_weapons: 0, total_blanca: 0, total_fuego: 0, capture_count: 0 };
+  let todayCount = 0;
+  sources.forEach(sid => {
+    const c = counters[sid];
+    if (c) {
+      totals.total_weapons += c.total_weapons ?? 0;
+      totals.total_blanca += c.total_blanca ?? 0;
+      totals.total_fuego += c.total_fuego ?? 0;
+      totals.capture_count += c.capture_count ?? 0;
+    }
+  });
+  (d.daily || []).forEach(item => { if (item.day === todayStr) todayCount += item.count; });
+  if (totals.total_weapons === 0 && d.event_counts) {
+    totals.total_weapons = (d.event_counts.weapon_detected ?? 0) + (d.event_counts.blanca ?? 0) + (d.event_counts.fuego ?? 0);
+    totals.total_blanca = d.event_counts.blanca ?? 0;
+    totals.total_fuego = d.event_counts.fuego ?? 0;
+    totals.capture_count = d.event_counts.face_capture ?? 0;
+  }
+  setText('kpi-total_weapons', totals.total_weapons > 0 ? totals.total_weapons : '—');
+  setText('kpi-total_blanca', totals.total_blanca > 0 ? totals.total_blanca : '—');
+  setText('kpi-total_fuego', totals.total_fuego > 0 ? totals.total_fuego : '—');
+  setText('kpi-capture_count', totals.capture_count > 0 ? totals.capture_count : '—');
+  setText('kpi-today', todayCount > 0 ? todayCount : '—');
+
+  const psEl = document.getElementById('per-source-table');
+  if (sources.length > 0) {
+    psEl.innerHTML = '<table class="ps-table"><tr><th>Fuente</th><th>Blanca</th><th>Fuego</th><th>Capturas</th><th>Total</th></tr>' +
+      sources.map(sid => {
+        const c = counters[sid];
+        const b = c?.total_blanca ?? 0, f = c?.total_fuego ?? 0, cap = c?.capture_count ?? 0;
+        const t = b + f + cap;
+        return `<tr><td>Fuente ${sid}</td><td>${b || '—'}</td><td>${f || '—'}</td><td>${cap || '—'}</td><td>${t || '—'}</td></tr>`;
+      }).join('') + '</table>';
+  } else {
+    psEl.innerHTML = '<p class="text-muted">Sin datos de fuentes</p>';
+  }
+}
+
+let timelineChart = null;
+async function loadTimeline() {
+  const r = await fetch(`/api/analytics/${MODULE_ID}/timeline`);
+  if (!r.ok) return;
+  const d = await r.json();
+  const ctx = document.getElementById('chart-armas-timeline');
+  if (!ctx) return;
+  const dayMap = {};
+  const typeDayMap = {};
+  (d.data || []).forEach(item => {
+    dayMap[item.day] = (dayMap[item.day] || 0) + item.count;
+    if (!typeDayMap[item.event_type]) typeDayMap[item.event_type] = {};
+    typeDayMap[item.event_type][item.day] = (typeDayMap[item.event_type][item.day] || 0) + item.count;
+  });
+  const labels = Object.keys(dayMap).sort();
+  const datasets = [
+    { label: 'Blanca', data: labels.map(l => typeDayMap['blanca']?.[l] || 0), backgroundColor: '#F97316' },
+    { label: 'Fuego', data: labels.map(l => typeDayMap['fuego']?.[l] || 0), backgroundColor: '#EF4444' },
+    { label: 'Persona', data: labels.map(l => typeDayMap['weapon_detected']?.[l] || 0), backgroundColor: '#3B82F6' },
+  ];
+  if (timelineChart) timelineChart.destroy();
+  timelineChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: datasets.filter(ds => ds.data.some(v => v > 0)) },
+    options: { responsive: true, plugins: { legend: { labels: { color: '#182A55' } } },
+      scales: { x: { stacked: true, ticks: { color: '#9D9FA2' } },
+               y: { stacked: true, ticks: { color: '#9D9FA2', stepSize: 1 } } } },
+  });
+}
+
+async function loadEvents() {
+  const r = await fetch(`/api/analytics/${MODULE_ID}/events?limit=20`);
+  if (!r.ok) return;
+  const d = await r.json();
+  const list = document.getElementById('events-list');
+  list.innerHTML = (d.events || []).map(e =>
+    `<div class="analytics-event-item">
+      <span class="analytics-event-time">${e.created_at || ''}</span>
+      <span class="analytics-event-type">${e.event_type}</span>
+      <span class="analytics-event-label">${e.label}</span>
+      ${e.capture_path ? `<button class="ev-btn-view" onclick="openEvidence('${MODULE_ID}', ${e.id})"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>` : ''}
+    </div>`
+  ).join('');
+}
+
+loadKPIs(); loadTimeline(); loadEvents();
+setInterval(loadKPIs, 5000);
+</script>
+{% endblock %}

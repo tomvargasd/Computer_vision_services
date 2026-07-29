@@ -7,8 +7,13 @@ import numpy as np
 from typing import Optional, Dict
 from ultralytics import YOLO
 
+import torch
 from src.utils import get_device
-from src.modules.base import multi_acquire, multi_release, is_multi_enabled
+from src.modules.base import multi_acquire, multi_release, is_multi_enabled, BasePersistPipeline
+import logging
+from src.database import save_module_counters, reset_module_counters, insert_module_event
+
+logger = logging.getLogger("vision.troncos")
 
 MODEL_NAME  = "yolo11n.pt"
 CONF_THRESH = 0.35
@@ -20,7 +25,7 @@ YELLOW = (0, 255, 255)
 WHITE  = (255, 255, 255)
 
 
-class TroncosPipeline:
+class TroncosPipeline(BasePersistPipeline):
     def __init__(self, source_id: int, source_path: str, func_state: dict,
                  conf_thresh: float = CONF_THRESH, half: bool = False,
                  model_path: str = None, line_x_pct: int = 50,
@@ -33,6 +38,7 @@ class TroncosPipeline:
         self.model_path  = model_path or MODEL_NAME
         self.line_x_pct  = line_x_pct
         self.fps_limit   = fps_limit
+        self._init_persistence("troncos", source_id)
 
         self.model = None
         self._frame: Optional[np.ndarray] = None
@@ -41,14 +47,15 @@ class TroncosPipeline:
         self._thread: Optional[threading.Thread] = None
 
         self.total_in   = 0
-        self.total_out  = 0
         self._prev_cx: Dict[int, int] = {}
         self._cross_state: Dict[int, str] = {}
-        self.current_objects = 0
         self._h = 0
         self._w = 0
 
     def start(self) -> None:
+        saved = self._load_counters()
+        if saved:
+            self.total_in = saved.get("total_count", saved.get("total_in", 0))
         self._stop.clear()
         self._thread = threading.Thread(
             target=self._run, daemon=True,
@@ -61,6 +68,9 @@ class TroncosPipeline:
         if self._thread:
             self._thread.join(timeout=5)
         self._thread = None
+        save_module_counters(self._module_id, self._source_id, {"total_count": self.total_in})
+        del self.model
+        torch.cuda.empty_cache()
 
     def is_alive(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
@@ -78,44 +88,51 @@ class TroncosPipeline:
         return frame
 
     def _run(self) -> None:
-        self.model = YOLO(self.model_path)
-        self.model.to(get_device())
-
         try:
-            src = int(self.source_path)
-        except (ValueError, TypeError):
-            src = self.source_path
+            self.model = YOLO(self.model_path)
+            self.model.to(get_device())
 
-        cap = cv2.VideoCapture(src)
-        if not cap.isOpened():
-            err = self._make_error_frame(f"No se puede abrir: {self.source_path}")
-            with self._lock:
-                self._frame = err
-            while not self._stop.is_set():
-                time.sleep(0.5)
-            return
+            try:
+                src = int(self.source_path)
+            except (ValueError, TypeError):
+                src = self.source_path
 
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            cap = cv2.VideoCapture(src)
+            if not cap.isOpened():
+                err = self._make_error_frame(f"No se puede abrir: {self.source_path}")
+                with self._lock:
+                    self._frame = err
+                while not self._stop.is_set():
+                    time.sleep(0.5)
+                return
 
-        first_frame = True
-        while not self._stop.is_set() and cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                if isinstance(src, str) and "://" not in src:
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                    continue
-                break
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
-            if first_frame:
-                self._h, self._w = frame.shape[:2]
-                first_frame = False
+            first_frame = True
+            while not self._stop.is_set() and cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    if isinstance(src, str) and "://" not in src:
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                        continue
+                    break
 
-            annotated = self._process(frame)
-            with self._lock:
-                self._frame = annotated
-            time.sleep(self.fps_limit)
+                if first_frame:
+                    self._h, self._w = frame.shape[:2]
+                    first_frame = False
 
-        cap.release()
+                annotated = self._process(frame)
+                with self._lock:
+                    self._frame = annotated
+                self._persist_counters({"total_in": self.total_in})
+                time.sleep(self.fps_limit)
+
+            save_module_counters(self._module_id, self._source_id, {"total_count": self.total_in})
+            cap.release()
+        except Exception:
+            logger.exception("Fatal error in %s %s pipeline", self._module_id, self._source_id)
+            save_module_counters(self._module_id, self._source_id, {"total_count": self.total_in})
+            self._stop.set()
 
     def _process(self, frame: np.ndarray) -> np.ndarray:
         h, w   = self._h, self._w
@@ -152,9 +169,11 @@ class TroncosPipeline:
                         if state == "none":
                             self.total_in += 1
                             self._cross_state[tid] = "inside"
+                            insert_module_event("troncos", self._source_id,
+                                                "tronco_crossing",
+                                                f"Tronco ID[{tid}] cruzó línea")
                     elif crossed_right:
                         if state in ("none", "inside"):
-                            self.total_out += 1
                             self._cross_state[tid] = "done"
 
                 self._prev_cx[tid] = cx
@@ -169,15 +188,10 @@ class TroncosPipeline:
         for tid in gone:
             self._prev_cx.pop(tid, None)
 
-        self.current_objects = len(active_ids)
-
         if self.func_state.get("conteo"):
             cv2.line(annotated, (line_x, 0), (line_x, h), PURPLE, 2)
-            cv2.putText(annotated, f"IN {self.total_in}   OUT {self.total_out}",
+            cv2.putText(annotated, f"Total: {self.total_in}",
                         (12, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.8, YELLOW, 2, cv2.LINE_AA)
-
-        cv2.putText(annotated, f"Objetos: {self.current_objects}",
-                    (12, h - 14), cv2.FONT_HERSHEY_SIMPLEX, 0.6, WHITE, 2, cv2.LINE_AA)
 
         return annotated
 
@@ -192,19 +206,20 @@ class TroncosPipeline:
     def get_stats(self) -> dict:
         return {
             "source_id":       self.source_id,
-            "current_objects": self.current_objects,
-            "in_count":        self.total_in,
-            "out_count":       self.total_out,
+            "total_count":     self.total_in,
         }
 
     def set_line_x(self, pct: int) -> None:
         self.line_x_pct = max(0, min(100, pct))
 
-    def reset(self) -> None:
+    def _on_daily_reset(self):
         self.total_in  = 0
-        self.total_out = 0
         self._prev_cx.clear()
         self._cross_state.clear()
+
+    def reset(self) -> None:
+        self._on_daily_reset()
+        reset_module_counters(self._module_id, self._source_id)
 
 
 class TroncosManager:
@@ -257,6 +272,7 @@ class TroncosManager:
             return False
         if not p.is_alive():
             with self._lock:
+                p.multi_release()
                 self.pipelines.pop(source_id, None)
             return False
         return True

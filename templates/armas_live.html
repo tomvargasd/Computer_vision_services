@@ -236,11 +236,8 @@
       </div>
 
       <div class="lv-count-big">
-        <div class="lv-count-num" id="cnt-armas">0</div>
-        <div class="lv-count-lbl">armas únicas en escena</div>
-      </div>
-      <div style="display:flex;gap:8px;margin-bottom:6px;font-size:0.7rem;color:#9D9FA2;justify-content:center;">
-        <span>Total detectadas: <strong id="cnt-total-armas" style="color:#182A55;">0</strong></span>
+        <div class="lv-count-num" id="cnt-total-armas">0</div>
+        <div class="lv-count-lbl">armas detectadas</div>
       </div>
 
       <div class="lv-tipo-row">
@@ -263,7 +260,7 @@
       </div>
       <div style="background:#FEF2F2;border:2px solid #EF4444;border-radius:10px;padding:14px;">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-          <span style="font-size:1.8rem;">⚠️</span>
+          <svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           <div>
             <div style="font-size:0.85rem;font-weight:700;color:#EF4444;">Arma validada en escena</div>
             <div style="font-size:0.68rem;color:#9D9FA2;" id="alerta-ts">—</div>
@@ -419,7 +416,6 @@ async function fetchStats() {
 }
 
 function updateStats(d) {
-  document.getElementById("cnt-armas").textContent    = d.weapon_count ?? 0;
   document.getElementById("cnt-total-armas").textContent = d.total_weapons ?? 0;
   document.getElementById("cnt-capturas").textContent = d.capture_count ?? 0;
   document.getElementById("cnt-blanca").textContent   = d.total_blanca ?? 0;
@@ -536,7 +532,6 @@ document.getElementById("btn-reset").addEventListener("click", async () => {
     <p style="font-size:0.75rem;color:#1a3050;font-style:italic" id="cap-empty-msg">
       Las capturas aparecerán aquí cuando se detecte un arma y se active la captura de rostro.
     </p>`;
-  document.getElementById("cnt-armas").textContent    = "0";
   document.getElementById("cnt-total-armas").textContent = "0";
   document.getElementById("cnt-capturas").textContent = "0";
   document.getElementById("cnt-blanca").textContent   = "0";

@@ -257,18 +257,6 @@
   <div class="lv-panel">
 
     <!-- ── 1. Personas detectadas ───────────────────────── -->
-    <div class="lv-section">
-      <div class="lv-section-title">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0 1 12 0v2"/></svg>
-        Personas en escena
-      </div>
-      <div class="lv-count-big">
-        <div class="lv-count-num" id="cnt-persons">0</div>
-        <div class="lv-count-lbl">personas detectadas</div>
-      </div>
-    </div>
-
-
     <!-- ── 2. Galería de capturas ─────────────────────────── -->
     <div class="lv-section" style="height:600px;overflow-y:auto">
       <div class="lv-section-title">
@@ -482,13 +470,11 @@ async function fetchStats() {
     const r = await fetch(`/api/acciones/sources/${SOURCE_ID}/stats`);
     if (!r.ok) return;
     const d = await r.json();
-    document.getElementById("cnt-persons").textContent = d.current_persons ?? 0;
-    const al = d.alerts || {};
-    document.getElementById("cnt-violencia").textContent  = al.violencia  ?? 0;
-    document.getElementById("cnt-robo").textContent       = al.robo       ?? 0;
-    document.getElementById("cnt-sospechoso").textContent = al.sospechoso ?? 0;
-    document.getElementById("cnt-celular").textContent    = al.celular    ?? 0;
-    document.getElementById("cnt-caida").textContent      = al.caida      ?? 0;
+    document.getElementById("cnt-violencia").textContent  = d.violencia  ?? 0;
+    document.getElementById("cnt-robo").textContent       = d.robo       ?? 0;
+    document.getElementById("cnt-sospechoso").textContent = d.sospechoso ?? 0;
+    document.getElementById("cnt-celular").textContent    = d.celular    ?? 0;
+    document.getElementById("cnt-caida").textContent      = d.caida      ?? 0;
     renderGallery(d.captures || {});
     const now = new Date();
     document.getElementById("lv-ts").textContent =
@@ -653,18 +639,18 @@ function renderTeach(data) {
         });
         const d = await r.json();
         if (d.ok) {
-          showToast(`✅ Persona #${tid} guardada como "${ACTION_LABELS[action]}"`);
+          showToast(`Persona #${tid} guardada como "${ACTION_LABELS[action]}"`);
           btn.textContent = "✓ Guardado";
           sel.disabled = true;
         } else {
           btn.disabled = false;
           btn.textContent = "Guardar";
-          showToast("❌ Error al guardar");
+          showToast("Error al guardar");
         }
       } catch (_) {
         btn.disabled = false;
         btn.textContent = "Guardar";
-        showToast("❌ Error de red");
+        showToast("Error de red");
       }
     });
   });

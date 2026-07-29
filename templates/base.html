@@ -28,6 +28,12 @@
       Dashboard
     </a>
 
+    <a href="{{ url_for('analytics_view') }}"
+       class="nav-item {% if request.endpoint == 'analytics_view' %}active{% endif %}">
+      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+      <span>Analytics</span>
+    </a>
+
     <div class="nav-section-label">Módulos</div>
 
     <a href="{{ url_for('module_view', module_id='tanques_gas') }}"
@@ -145,6 +151,7 @@
 </main>
 
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/evidence-modal.js') }}"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>
