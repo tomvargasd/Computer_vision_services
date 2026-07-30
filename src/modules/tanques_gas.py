@@ -104,7 +104,7 @@ class TanquesGasPipeline(BasePersistPipeline):
     def __init__(self, source_id: int, source_path: str, func_state: dict,
                  conf_thresh: float = CONF_THRESH, half: bool = False,
                  model_path: str = None, pose_model_path: str = None,
-                 smoke_model_path: str = None,
+                 smoke_model_path: str = None, smoke_conf: float = 0.35,
                  line_mode: str = "horizontal", line_pos: int = 50,
                  fps_limit: float = 0.0):
         self.source_id   = source_id
@@ -116,6 +116,7 @@ class TanquesGasPipeline(BasePersistPipeline):
         self.classes     = TANK_CLASSES
         self.pose_model_path = pose_model_path or POSE_MODEL
         self.smoke_model_path = smoke_model_path or MODEL_NAME
+        self.smoke_conf  = smoke_conf
         self.line_mode   = line_mode
         self.line_pos    = line_pos
         self.fps_limit   = fps_limit
@@ -307,7 +308,7 @@ class TanquesGasPipeline(BasePersistPipeline):
         # ── Run main det model (ByteTrack) for counting ──
         if self.func_state.get("conteo") or self.func_state.get("areas_restringidas"):
             results = self.model.track(
-                frame, persist=True, conf=self.conf_thresh,
+            frame, persist=True, conf=self.conf_thresh,
                 iou=IOU_THRESH, half=self.half, verbose=False,
                 tracker="bytetrack.yaml", classes=self.classes,
             )
@@ -740,7 +741,7 @@ class TanquesGasPipeline(BasePersistPipeline):
         h, w = self._h, self._w
 
         results = self.smoke_model.track(
-            frame, persist=True, conf=self.conf_thresh,
+            frame, persist=True, conf=self.smoke_conf,
             iou=IOU_THRESH, half=self.half, verbose=False,
             tracker="bytetrack.yaml",
         )
@@ -982,7 +983,7 @@ class TanquesGasManager:
     def start(self, source_id: int, source_path: str, func_state: dict,
               conf_thresh: float = CONF_THRESH, half: bool = False,
               model_path: str = None, pose_model_path: str = None,
-              smoke_model_path: str = None,
+              smoke_model_path: str = None, smoke_conf: float = 0.35,
               line_mode: str = "horizontal", line_pos: int = 50,
               fps_limit: float = 0.0) -> None:
         if not multi_acquire():
@@ -992,7 +993,7 @@ class TanquesGasManager:
         with self._lock:
             p = TanquesGasPipeline(source_id, source_path, func_state.copy(),
                                    conf_thresh, half, model_path,
-                                   pose_model_path, smoke_model_path,
+                                   pose_model_path, smoke_model_path, smoke_conf,
                                    line_mode, line_pos, fps_limit=fps_limit)
             p.start()
             self.pipelines[source_id] = p

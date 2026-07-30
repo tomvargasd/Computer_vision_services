@@ -228,6 +228,28 @@
           </div>
         </div>
       </div>
+
+      <!-- Umbral Humo/Fuego -->
+      {% set smoke_conf_val = ((settings.get('tanques_gas_smoke_conf') or '0.35') | float * 100) | int %}
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <svg class="settings-section-icon" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <span class="settings-section-title">Umbral de Humo/Fuego</span>
+        </div>
+        <div class="settings-section-body">
+          <div class="param-row">
+            <div class="param-info">
+              <span class="param-label">Confianza mínima</span>
+              <span class="param-desc">Umbral de detección para el modelo de humo/fuego (0 – 100 %)</span>
+            </div>
+            <div class="param-control">
+              <input type="range" class="conf-slider" id="smoke-conf-slider-tanques_gas"
+                     min="1" max="99" step="1" value="{{ smoke_conf_val }}">
+              <span class="conf-value" id="smoke-conf-value-tanques_gas">{{ smoke_conf_val }}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
       {% endif %}
 
       {% if mid == 'vehiculos' %}
@@ -832,6 +854,27 @@ if (plateSlider) {
         });
         if (!r.ok) throw new Error(await r.text());
       } catch (e) { console.error("Error guardando umbral de placas:", e); }
+    }, 600);
+  });
+}
+
+const smokeSlider  = document.getElementById("smoke-conf-slider-tanques_gas");
+const smokeDisplay = document.getElementById("smoke-conf-value-tanques_gas");
+if (smokeSlider) {
+  let debounceTimer;
+  smokeSlider.addEventListener("input", () => {
+    smokeDisplay.textContent = smokeSlider.value + "%";
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(async () => {
+      const conf = parseFloat(smokeSlider.value) / 100;
+      try {
+        const r = await fetch("/api/settings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tanques_gas_smoke_conf: String(conf) }),
+        });
+        if (!r.ok) throw new Error(await r.text());
+      } catch (e) { console.error("Error guardando umbral de humo:", e); }
     }, 600);
   });
 }

@@ -160,6 +160,7 @@ DEFAULT_SETTINGS = [
     ("tanques_gas_half", "0"),
     ("tanques_gas_pose_model", ""),
     ("tanques_gas_smoke_model", ""),
+    ("tanques_gas_smoke_conf", "0.35"),
     ("tanques_gas_line_mode", "horizontal"),
     ("tanques_gas_line_pos", "50"),
 ]

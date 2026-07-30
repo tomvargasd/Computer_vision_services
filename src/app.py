@@ -1159,6 +1159,7 @@ def tanques_gas_start(source_id):
             s.get("tanques_gas_model") or None,
             s.get("tanques_gas_pose_model") or None,
             s.get("tanques_gas_smoke_model") or None,
+            float(s.get("tanques_gas_smoke_conf", "0.35")),
             s.get("tanques_gas_line_mode", "horizontal"),
             int(s.get("tanques_gas_line_pos", "50")),
             fps_limit=fps_limit)
