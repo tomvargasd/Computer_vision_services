@@ -5,6 +5,8 @@ import os
 import uuid
 import time
 import json
+import random
+from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 
 from src.config import (
@@ -1463,6 +1465,424 @@ def api_analytics_timeline(module_id):
     source_id = request.args.get("source_id", None, type=int)
     data = get_module_analytics(module_id, source_id, days)
     return jsonify({"data": data["daily"]})
+
+
+# ─────────────────────────────────────────────
+# API Tanques de Gas — Dashboard Analítico (v3.0)
+# ─────────────────────────────────────────────
+
+import random
+from datetime import datetime, timedelta
+
+@app.route("/api/analytics/tanques_gas/comprehensive")
+def api_tanques_gas_comprehensive():
+    sources = get_sources("tanques_gas")
+    if not sources:
+        return jsonify({"kpis": {}, "sources": [], "dailyTimeline": [], "eventTypeDistribution": {}, "actionDistribution": {}, "recentEvents": [], "empty": True})
+
+    source_ids = [s["id"] for s in sources]
+    source_map  = {s["id"]: s for s in sources}
+
+    counters_all = {}
+    for sid in source_ids:
+        counters_all[sid] = load_module_counters("tanques_gas", sid)
+
+    today_str = datetime.now().strftime("%Y-%m-%d")
+
+    # ── KPIs ──
+    total_entradas = sum(counters_all[sid].get("entrada", 0) if isinstance(counters_all[sid], dict) else 0 for sid in source_ids)
+    total_salidas  = sum(counters_all[sid].get("salida", 0) if isinstance(counters_all[sid], dict) else 0 for sid in source_ids)
+
+    analytics = get_module_analytics("tanques_gas", days=365)
+    daily_raw = analytics["daily"]
+
+    today_events = sum(d["count"] for d in daily_raw if d["day"] == today_str)
+
+    total_eventos = sum(d["count"] for d in daily_raw)
+
+    total_acciones = 0
+    entries_by_source = {}
+    exits_by_source = {}
+    acciones_by_source = {}
+    smoke_sources = []
+
+    for sid in source_ids:
+        c = counters_all.get(sid, {})
+        if not isinstance(c, dict):
+            c = {}
+        ent = c.get("entrada", 0) or 0
+        sal = c.get("salida", 0) or 0
+        entries_by_source[sid] = ent
+        exits_by_source[sid] = sal
+
+        act_count = c.get("action_count", {})
+        if isinstance(act_count, str):
+            try:
+                act_count = json.loads(act_count)
+            except Exception:
+                act_count = {}
+        if isinstance(act_count, dict):
+            acc = sum(v for v in act_count.values() if isinstance(v, (int, float)))
+        else:
+            acc = 0
+        acciones_by_source[sid] = acc
+        total_acciones += acc
+
+        sd = c.get("smoke_detected", 0)
+        if sd:
+            smoke_sources.append(sid)
+
+
+    ocupacion_neta = total_entradas - total_salidas
+    ratio_es = round(total_entradas / total_salidas, 2) if total_salidas > 0 else total_entradas
+
+    # Daily timeline — aggregate by date
+    daily_agg = {}
+    for d in daily_raw:
+        day = d["day"]
+        et = d["event_type"]
+        cnt = d["count"]
+        if day not in daily_agg:
+            daily_agg[day] = {"day": day, "entradas": 0, "salidas": 0, "acciones": 0, "smoke": 0}
+        if et in ("entry", "entrada"):
+            daily_agg[day]["entradas"] += cnt
+        elif et in ("exit", "salida"):
+            daily_agg[day]["salidas"] += cnt
+        elif et == "smoke_detected":
+            daily_agg[day]["smoke"] += cnt
+        else:
+            daily_agg[day]["acciones"] += cnt
+
+    daily_timeline = sorted(daily_agg.values(), key=lambda x: x["day"])
+
+    # Event type distribution
+    event_type_dist = {"entry": 0, "exit": 0, "smoke_detected": 0, "action": 0}
+    for d in daily_raw:
+        et = d["event_type"]
+        cnt = d["count"]
+        if et in ("entry", "entrada"):
+            event_type_dist["entry"] += cnt
+        elif et in ("exit", "salida"):
+            event_type_dist["exit"] += cnt
+        elif et == "smoke_detected":
+            event_type_dist["smoke_detected"] += cnt
+        else:
+            event_type_dist["action"] += cnt
+
+    # Action distribution
+    action_dist = {}
+    for sid in source_ids:
+        c = counters_all.get(sid, {})
+        if isinstance(c, dict):
+            ac = c.get("action_count", {})
+            if isinstance(ac, str):
+                try:
+                    ac = json.loads(ac)
+                except Exception:
+                    ac = {}
+            if isinstance(ac, dict):
+                for act_name, act_cnt in ac.items():
+                    action_dist[act_name] = action_dist.get(act_name, 0) + (act_cnt if isinstance(act_cnt, (int, float)) else 0)
+
+    # Per-source breakdown
+    total_all = total_entradas + total_salidas + total_acciones
+    source_list = []
+    for sid in source_ids:
+        c = counters_all.get(sid, {})
+        if not isinstance(c, dict):
+            c = {}
+        ent = entries_by_source.get(sid, 0)
+        sal = exits_by_source.get(sid, 0)
+        acc = acciones_by_source.get(sid, 0)
+        smk = sid in smoke_sources
+        contrib = round((ent / total_entradas * 100), 1) if total_entradas > 0 else 0
+        source_list.append({
+            "id": sid,
+            "name": source_map[sid]["name"],
+            "entradas": ent,
+            "salidas": sal,
+            "acciones": acc,
+            "smoke": smk,
+            "contribucion": contrib,
+        })
+
+    source_list.sort(key=lambda x: x["entradas"], reverse=True)
+
+    # Historical KPIs from daily data
+    daily_totals = [d["entradas"] + d["salidas"] + d["acciones"] + d["smoke"] for d in daily_timeline]
+    promedio_diario = round(sum(daily_totals) / len(daily_totals), 1) if daily_totals else 0
+    pico_diario = max(daily_totals) if daily_totals else 0
+    pico_dia = ""
+    for d in daily_timeline:
+        if d["entradas"] + d["salidas"] + d["acciones"] + d["smoke"] == pico_diario:
+            pico_dia = d["day"]
+            break
+
+    fuente_top_id = max(entries_by_source, key=entries_by_source.get) if entries_by_source else None
+    fuente_top = None
+    if fuente_top_id:
+        fuente_top = {
+            "id": fuente_top_id,
+            "name": source_map[fuente_top_id]["name"],
+            "entradas": entries_by_source[fuente_top_id],
+        }
+
+    total_smoke_events = event_type_dist.get("smoke_detected", 0)
+
+    kpis = {
+        "totalEntradas": total_entradas,
+        "totalSalidas": total_salidas,
+        "ocupacionNeta": ocupacion_neta,
+        "ratioES": ratio_es,
+        "eventosHoy": today_events,
+        "alertasHumo": len(smoke_sources),
+        "promedioDiario": promedio_diario,
+        "picoDiario": pico_diario,
+        "picoDia": pico_dia,
+        "totalEventos": total_eventos if total_eventos > 0 else total_entradas + total_salidas + total_acciones + total_smoke_events,
+        "totalAcciones": total_acciones,
+        "totalSmoke": total_smoke_events,
+        "fuenteTop": fuente_top,
+    }
+
+    # Recent events
+    raw_events = get_module_events("tanques_gas", days=365, limit=200)
+    recent_events = []
+    for e in raw_events:
+        recent_events.append({
+            "id": e["id"],
+            "source_id": e["source_id"],
+            "source_name": source_map.get(e["source_id"], {}).get("name", f"Fuente {e['source_id']}"),
+            "event_type": e["event_type"],
+            "label": e.get("label", ""),
+            "created_at": e.get("created_at", ""),
+            "has_capture": bool(e.get("capture_path")),
+        })
+
+    return jsonify({
+        "kpis": kpis,
+        "sources": source_list,
+        "dailyTimeline": daily_timeline,
+        "eventTypeDistribution": event_type_dist,
+        "actionDistribution": action_dist,
+        "recentEvents": recent_events,
+        "totalEvents": len(raw_events),
+        "empty": False,
+    })
+
+
+@app.route("/api/analytics/tanques_gas/seed", methods=["POST"])
+def api_tanques_gas_seed():
+    sources = get_sources("tanques_gas")
+    if not sources:
+        return jsonify({"error": "No hay fuentes registradas. Registre al menos una fuente primero."}), 400
+
+    # Clear existing data
+    from src.database import get_conn
+    with get_conn() as conn:
+        conn.execute("DELETE FROM module_events WHERE module_id='tanques_gas'")
+        conn.execute("DELETE FROM module_counters WHERE module_id='tanques_gas'")
+        conn.commit()
+
+    # Reset smoke status in active pipelines
+    mgr = _get_manager("tanques_gas")
+    if mgr:
+        with mgr._lock:
+            for sid, pipeline in list(mgr.pipelines.items()):
+                try:
+                    pipeline.smoke_detected = False
+                    pipeline.alert_triggered = False
+                    pipeline.total_in = 0
+                    pipeline.total_out = 0
+                    pipeline._action_count = {}
+                    pipeline.first_detection_time = None
+                    pipeline._counted_tracks = set()
+                except Exception:
+                    pass
+
+    source_ids  = [s["id"] for s in sources]
+    source_names = {s["id"]: s["name"] for s in sources}
+    n_sources = len(source_ids)
+
+    action_types = [
+        ("levantar", 0.40), ("transportar", 0.30),
+        ("inspeccionar", 0.20), ("descargar", 0.10),
+    ]
+    action_labels_map = {
+        "levantar": "Levantando tanque",
+        "transportar": "Transportando tanque",
+        "inspeccionar": "Inspeccionando tanque",
+        "descargar": "Descargando tanque",
+    }
+
+    # Base activity per source (weight determines relative intensity)
+    source_weights = [1.0, 3.5, 2.0, 0.8, 2.5]  # F1, F2, F3, F4, F5...
+    entry_exit_ratio = [0.75, 0.72, 0.70, 0.55, 0.70]  # entry/(entry+exit)
+
+    start_date = datetime(2026, 7, 1)
+    end_date   = datetime(2026, 7, 29)
+    all_events = []
+
+    base_entries_per_day = 30
+    current = start_date
+    while current <= end_date:
+        weekday = current.weekday()  # 0=Mon, 6=Sun
+        is_weekend = weekday >= 5
+        day_factor = 0.3 if is_weekend else 1.3
+
+        # 5% chance of anomaly day
+        is_anomaly = random.random() < 0.05
+        anomaly_factor = 0 if random.random() < 0.5 else 2.5  # maintenance or spike
+
+        day_str = current.strftime("%Y-%m-%d")
+
+        for idx, sid in enumerate(source_ids):
+            w_idx = min(idx, len(source_weights) - 1)
+            weight = source_weights[w_idx]
+            e_ratio = entry_exit_ratio[min(idx, len(entry_exit_ratio) - 1)]
+
+            if is_anomaly:
+                daily_base = max(0, int(base_entries_per_day * weight * anomaly_factor * random.uniform(0.8, 1.2)))
+            else:
+                daily_base = max(0, int(base_entries_per_day * weight * day_factor * random.uniform(0.7, 1.3)))
+
+            daily_entries = max(0, int(daily_base * e_ratio))
+            daily_exits   = max(0, daily_base - daily_entries)
+
+            # Add some randomness
+            daily_entries = max(0, int(daily_entries * random.uniform(0.85, 1.15)))
+            daily_exits   = max(0, int(daily_exits * random.uniform(0.85, 1.15)))
+
+            # Generate timestamps distributed across 8am-6pm
+            hours_pool = []
+            for h in range(8, 19):
+                freq = 1.0
+                if 9 <= h <= 11:
+                    freq = 2.5  # morning peak
+                elif 15 <= h <= 17:
+                    freq = 2.0  # afternoon peak
+                elif 12 <= h <= 13:
+                    freq = 0.5  # lunch lull
+                hours_pool.extend([h] * int(freq * 4))
+
+            for _ in range(daily_entries):
+                h = random.choice(hours_pool)
+                m = random.randint(0, 59)
+                s = random.randint(0, 59)
+                ts = f"{day_str} {h:02d}:{m:02d}:{s:02d}"
+                all_events.append((sid, "entry", "Tanque detectado", "", ts))
+
+            for _ in range(daily_exits):
+                h = random.choice(hours_pool)
+                m = random.randint(0, 59)
+                s = random.randint(0, 59)
+                ts = f"{day_str} {h:02d}:{m:02d}:{s:02d}"
+                all_events.append((sid, "exit", "Tanque en salida", "", ts))
+
+            # Actions — 10-30% of entries
+            action_count = max(0, int(daily_entries * random.uniform(0.10, 0.30)))
+            for _ in range(action_count):
+                h = random.choice(hours_pool)
+                m = random.randint(0, 59)
+                s = random.randint(0, 59)
+                ts = f"{day_str} {h:02d}:{m:02d}:{s:02d}"
+                # Pick action type by weighted random
+                r = random.random()
+                cum = 0
+                chosen_action = "levantar"
+                for at, prob in action_types:
+                    cum += prob
+                    if r <= cum:
+                        chosen_action = at
+                        break
+                all_events.append((sid, chosen_action, action_labels_map[chosen_action], "", ts))
+
+            # Smoke — rare events
+            if random.random() < 0.03:  # ~3% of source-days
+                h = random.randint(8, 17)
+                m = random.randint(0, 59)
+                s = random.randint(0, 59)
+                ts = f"{day_str} {h:02d}:{m:02d}:{s:02d}"
+                all_events.append((sid, "smoke_detected", "Humo o fuego detectado", "", ts))
+
+        current += timedelta(days=1)
+
+    # Batch insert events
+    with get_conn() as conn:
+        conn.executemany(
+            """INSERT INTO module_events(module_id, source_id, event_type, label, description, created_at)
+               VALUES ('tanques_gas', ?, ?, ?, ?, ?)""",
+            all_events,
+        )
+        conn.commit()
+
+    # Recalculate and save counters per source
+    for sid in source_ids:
+        totals = {"entry": 0, "exit": 0, "smoke_detected": 0}
+        actions_local = {}
+        with get_conn() as conn:
+            rows = conn.execute(
+                "SELECT event_type, COUNT(*) as cnt FROM module_events WHERE module_id='tanques_gas' AND source_id=? GROUP BY event_type",
+                (sid,),
+            ).fetchall()
+            for r in rows:
+                et = r["event_type"]
+                cnt = r["cnt"]
+                if et in ("entry",):
+                    totals["entry"] += cnt
+                elif et in ("exit",):
+                    totals["exit"] += cnt
+                elif et == "smoke_detected":
+                    totals["smoke_detected"] += cnt
+                else:
+                    actions_local[et] = actions_local.get(et, 0) + cnt
+
+        counters = {
+            "entrada": totals["entry"],
+            "salida": totals["exit"],
+            "smoke_detected": totals["smoke_detected"],
+            "action_count": json.dumps(actions_local),
+        }
+        save_module_counters("tanques_gas", sid, counters)
+
+    # Get total generated
+    with get_conn() as conn:
+        total_gen = conn.execute(
+            "SELECT COUNT(*) as cnt FROM module_events WHERE module_id='tanques_gas'"
+        ).fetchone()["cnt"]
+
+    return jsonify({
+        "success": True,
+        "message": f"Datos generados: {total_gen} eventos en {n_sources} fuentes (2026-07-01 → 2026-07-29)",
+        "total_events": total_gen,
+        "sources_used": n_sources,
+    })
+
+
+@app.route("/api/analytics/tanques_gas/clear", methods=["POST"])
+def api_tanques_gas_clear():
+    from src.database import get_conn
+    with get_conn() as conn:
+        conn.execute("DELETE FROM module_events WHERE module_id='tanques_gas'")
+        conn.execute("DELETE FROM module_counters WHERE module_id='tanques_gas'")
+        conn.commit()
+
+    mgr = _get_manager("tanques_gas")
+    if mgr:
+        with mgr._lock:
+            for pipeline in list(mgr.pipelines.values()):
+                try:
+                    pipeline.smoke_detected = False
+                    pipeline.alert_triggered = False
+                    pipeline.total_in = 0
+                    pipeline.total_out = 0
+                    pipeline._action_count = {}
+                    pipeline.first_detection_time = None
+                    pipeline._counted_tracks = set()
+                except Exception:
+                    pass
+
+    return jsonify({"success": True, "message": "Datos eliminados correctamente"})
 
 
 # ─────────────────────────────────────────────

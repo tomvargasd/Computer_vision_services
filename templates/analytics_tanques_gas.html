@@ -1,151 +1,832 @@
 {% extends "base.html" %}
-{% block title %}Analytics · Tanques de Gas{% endblock %}
-{% block page_title %}Analytics · {{ module.label }}{% endblock %}
+{% block title %}Dashboard · Tanques de Gas{% endblock %}
+{% block page_title %}Dashboard Analítico · {{ module.label }}{% endblock %}
 {% block content %}
-<div class="analytics-dashboard">
-  <div class="analytics-kpi-row">
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Entradas</span><span class="analytics-kpi-value" id="kpi-entradas">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg> Salidas</span><span class="analytics-kpi-value" id="kpi-salidas">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Intrusiones</span><span class="analytics-kpi-value" id="kpi-intrusiones">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Hoy</span><span class="analytics-kpi-value" id="kpi-today">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M12 2L9.5 6.5 12 10 9.5 13.5 12 17l-2.5 3.5"/><path d="M12 2l2.5 4.5L12 10l2.5 3.5L12 17l2.5 3.5"/></svg> Humo/Fuego</span><span class="analytics-kpi-value" id="kpi-humo">—</span></div>
+<div class="tg-dashboard" id="dashboard-container">
+
+  <!-- Toolbar -->
+  <div class="tg-toolbar">
+    <div class="tg-toolbar-group">
+      <label style="font-size:0.72rem;color:var(--muted)">Fuente:</label>
+      <select class="tg-filter-select" id="filter-source">
+        <option value="all">Todas las fuentes</option>
+      </select>
+    </div>
+    <div class="tg-toolbar-group">
+      <label style="font-size:0.72rem;color:var(--muted)">Rango:</label>
+      <select class="tg-filter-select" id="filter-range">
+        <option value="7">7 días</option>
+        <option value="15">15 días</option>
+        <option value="29" selected>29 días</option>
+        <option value="60">60 días</option>
+        <option value="365">Todo</option>
+      </select>
+    </div>
+    <button class="tg-btn tg-btn-refresh" id="btn-refresh" title="Actualizar">↻</button>
+    <div class="tg-toolbar-group" style="margin-left:auto">
+      <div class="tg-btn tg-btn-pdf" tabindex="0">
+        📄 Exportar PDF
+        <div class="tg-pdf-dropdown">
+          <button class="tg-pdf-dropdown-item" onclick="exportPDF('todo')">Todo (completo)</button>
+          <button class="tg-pdf-dropdown-item" onclick="exportPDF('resumen')">Resumen ejecutivo</button>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <div class="analytics-chart-row">
-    <div class="analytics-chart-card">
-      <h4>Timeline multicapa</h4>
+  <!-- KPI Global Strip (max 6) -->
+  <div class="tg-kpi-strip" id="kpi-strip">
+    <div class="tg-kpi-card blue"><div class="tg-kpi-label">Entradas</div><div class="tg-kpi-value" id="kpi-entradas">—</div><div class="tg-kpi-sub">totales</div></div>
+    <div class="tg-kpi-card green"><div class="tg-kpi-label">Salidas</div><div class="tg-kpi-value" id="kpi-salidas">—</div><div class="tg-kpi-sub">totales</div></div>
+    <div class="tg-kpi-card orange"><div class="tg-kpi-label">Ocupación Neta</div><div class="tg-kpi-value" id="kpi-ocupacion">—</div><div class="tg-kpi-sub">entradas − salidas</div></div>
+    <div class="tg-kpi-card purple"><div class="tg-kpi-label">Ratio E/S</div><div class="tg-kpi-value" id="kpi-ratio">—</div><div class="tg-kpi-sub">entradas por salida</div></div>
+    <div class="tg-kpi-card cyan"><div class="tg-kpi-label">Eventos Hoy</div><div class="tg-kpi-value" id="kpi-hoy">—</div><div class="tg-kpi-sub">actividad del día</div></div>
+    <div class="tg-kpi-card red"><div class="tg-kpi-label">Alertas Humo</div><div class="tg-kpi-value" id="kpi-humo">—</div><div class="tg-kpi-sub" id="kpi-humo-sub">fuentes con alerta</div></div>
+  </div>
+
+  <!-- Charts Row 1: Doughnut + Line -->
+  <div class="tg-chart-pair">
+    <div class="tg-chart-card">
+      <h4>📊 Entradas / Salidas por fuente</h4>
+      <canvas id="chart-pie-fuentes"></canvas>
+    </div>
+    <div class="tg-chart-card">
+      <h4>📈 Timeline 29 días</h4>
       <canvas id="chart-timeline"></canvas>
     </div>
-    <div class="analytics-chart-card">
-      <h4>Acciones detectadas</h4>
-      <div id="actions-breakdown" class="analytics-per-source"></div>
+  </div>
+
+  <!-- KPI Mini Row + Bar Chart -->
+  <div class="tg-chart-pair">
+    <div class="tg-chart-card">
+      <h4>📊 Ranking de fuentes</h4>
+      <canvas id="chart-bar-fuentes"></canvas>
+    </div>
+    <div class="tg-section-card" style="justify-content:center">
+      <div class="tg-kpi-mini-row">
+        <div class="tg-kpi-mini"><span class="tg-kpi-mini-label">Promedio Diario</span><span class="tg-kpi-mini-value" id="kpi-promedio">—</span><span class="tg-kpi-mini-sub">eventos/día</span></div>
+        <div class="tg-kpi-mini"><span class="tg-kpi-mini-label">Pico Diario</span><span class="tg-kpi-mini-value" id="kpi-pico">—</span><span class="tg-kpi-mini-sub" id="kpi-pico-sub">—</span></div>
+        <div class="tg-kpi-mini"><span class="tg-kpi-mini-label">Total Eventos</span><span class="tg-kpi-mini-value" id="kpi-total-eventos">—</span><span class="tg-kpi-mini-sub">en el período</span></div>
+        <div class="tg-kpi-mini"><span class="tg-kpi-mini-label">Acciones</span><span class="tg-kpi-mini-value" id="kpi-acciones">—</span><span class="tg-kpi-mini-sub">detectadas</span></div>
+      </div>
     </div>
   </div>
 
-  <div class="analytics-chart-row">
-    <div class="analytics-chart-card">
-      <h4>Por fuente</h4>
-      <div id="per-source-table" class="analytics-per-source"></div>
+  <!-- Charts Row 3: Doughnut Acciones + Polar Area -->
+  <div class="tg-chart-pair-equal">
+    <div class="tg-chart-card">
+      <h4>🎯 Acciones detectadas</h4>
+      <canvas id="chart-acciones"></canvas>
+    </div>
+    <div class="tg-chart-card">
+      <h4>🔵 Distribución por tipo de evento</h4>
+      <canvas id="chart-polar"></canvas>
     </div>
   </div>
 
-  <div class="analytics-events">
-    <h4>Eventos recientes</h4>
-    <div id="events-list" class="analytics-events-list"></div>
+  <!-- Source Table -->
+  <div class="tg-table-container">
+    <h4>📋 Detalle por fuente</h4>
+    <input class="tg-table-search" id="source-search" type="text" placeholder="Buscar fuente..." oninput="filterSourceTable()">
+    <table class="tg-table" id="source-table">
+      <thead>
+        <tr>
+          <th onclick="sortSourceTable(0)" data-col="0"># <span class="sort-icon">↕</span></th>
+          <th onclick="sortSourceTable(1)" data-col="1">Fuente <span class="sort-icon">↕</span></th>
+          <th onclick="sortSourceTable(2)" data-col="2" class="sort-desc">Entradas <span class="sort-icon">↕</span></th>
+          <th onclick="sortSourceTable(3)" data-col="3">Salidas <span class="sort-icon">↕</span></th>
+          <th onclick="sortSourceTable(4)" data-col="4">Acciones <span class="sort-icon">↕</span></th>
+          <th onclick="sortSourceTable(5)" data-col="5">Humo <span class="sort-icon">↕</span></th>
+          <th onclick="sortSourceTable(6)" data-col="6">% Contribución <span class="sort-icon">↕</span></th>
+        </tr>
+      </thead>
+      <tbody id="source-table-body"></tbody>
+    </table>
   </div>
+
+  <!-- Events List -->
+  <div class="tg-events-container">
+    <h4>📜 Historial de eventos</h4>
+    <div class="tg-event-filters">
+      <button class="tg-event-chip active" data-type="all" onclick="filterEvents('all')">Todos</button>
+      <button class="tg-event-chip" data-type="entry" onclick="filterEvents('entry')">Entradas</button>
+      <button class="tg-event-chip" data-type="exit" onclick="filterEvents('exit')">Salidas</button>
+      <button class="tg-event-chip" data-type="smoke_detected" onclick="filterEvents('smoke_detected')">Humo</button>
+      <button class="tg-event-chip" data-type="action" onclick="filterEvents('action')">Acciones</button>
+      <span style="color:var(--muted);font-size:0.72rem;margin:0 4px">|</span>
+      <label style="font-size:0.72rem;color:var(--muted)">Desde:</label>
+      <input class="tg-event-date-input" type="date" id="filter-date-from" onchange="applyEventFilters()">
+      <label style="font-size:0.72rem;color:var(--muted)">Hasta:</label>
+      <input class="tg-event-date-input" type="date" id="filter-date-to" onchange="applyEventFilters()">
+      <input class="tg-event-search" type="text" id="filter-event-search" placeholder="Buscar en eventos..." oninput="applyEventFilters()">
+    </div>
+    <div class="tg-event-list" id="event-list"></div>
+    <div class="tg-pagination" id="event-pagination"></div>
+  </div>
+
 </div>
+
 {% include "components/evidence_modal.html" %}
 {% endblock %}
+
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
 <script>
 const MODULE_ID = 'tanques_gas';
-function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
+let allData = null;
+let charts = {};
+let eventData = [];
+let eventFiltered = [];
+let eventPage = 0;
+const EVENT_PAGE_SIZE = 25;
 
-async function loadKPIs() {
-  const r = await fetch(`/api/analytics/${MODULE_ID}/summary`);
-  if (!r.ok) return;
-  const d = await r.json();
-  const counters = d.counters || {};
-  const sources = Object.keys(counters);
-  const todayStr = new Date().toISOString().slice(0,10);
+// ── Color palette ──
+const COLORS = {
+  blue:    '#3B82F6', green:   '#22C55E', orange:  '#F59E0B',
+  purple:  '#8B5CF6', cyan:    '#06B6D4', red:     '#EF4444',
+  pink:    '#EC4899', indigo:  '#6366F1', teal:    '#14B8A6',
+  yellow:  '#EAB308',
+};
+const SOURCE_COLORS = ['#3B82F6','#22C55E','#F59E0B','#8B5CF6','#EC4899','#06B6D4','#6366F1','#14B8A6'];
+const SOURCE_ENTRY_COLORS = ['#3B82F6','#22C55E','#F59E0B','#8B5CF6','#EC4899'];
+const SOURCE_EXIT_COLORS  = ['#93C5FD','#86EFAC','#FCD34D','#C4B5FD','#F9A8D4'];
 
-  let entradas = 0, salidas = 0, intrusiones = 0, smokeActive = false, todayCount = 0;
-  let allActions = {};
-  sources.forEach(sid => {
-    const c = counters[sid];
-    if (c) {
-      entradas += c.entrada ?? 0;
-      salidas += c.salida ?? 0;
-      if (c.action_count) {
-        Object.entries(c.action_count).forEach(([k, v]) => { allActions[k] = (allActions[k] || 0) + v; });
-        intrusiones += Object.values(c.action_count).reduce((a, b) => a + b, 0);
-      }
-      if (c.smoke_detected) smokeActive = true;
+// ── Helpers ──
+function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val ?? '—'; }
+
+function formatNumber(n) {
+  if (n === null || n === undefined || n === '—') return '—';
+  return Number(n).toLocaleString();
+}
+
+function showToast(msg, isError) {
+  const existing = document.querySelector('.seed-toast');
+  if (existing) existing.remove();
+  const t = document.createElement('div');
+  t.className = 'seed-toast' + (isError ? ' error' : '');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+// ── Load comprehensive data ──
+async function loadData() {
+  const refreshBtn = document.getElementById('btn-refresh');
+  refreshBtn.classList.add('spin');
+
+  try {
+    const days = document.getElementById('filter-range').value;
+    const srcFilter = document.getElementById('filter-source').value;
+    let url = `/api/analytics/${MODULE_ID}/comprehensive`;
+    if (srcFilter !== 'all') url += `?source_id=${srcFilter}`;
+
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('Error al cargar datos');
+    allData = await r.json();
+
+    if (allData.empty) {
+      showEmptyState();
+      return;
     }
-  });
-  (d.daily || []).forEach(item => { if (item.day === todayStr) todayCount += item.count; });
-  if (entradas === 0 && d.event_counts) {
-    entradas = d.event_counts.entry ?? d.event_counts.entrada ?? 0;
-    salidas = d.event_counts.exit ?? d.event_counts.salida ?? 0;
-  }
-  setText('kpi-entradas', entradas > 0 ? entradas : '—');
-  setText('kpi-salidas', salidas > 0 ? salidas : '—');
-  setText('kpi-intrusiones', intrusiones > 0 ? intrusiones : '—');
-  setText('kpi-today', todayCount > 0 ? todayCount : '—');
-  setText('kpi-humo', smokeActive ? '🔥 Detectado' : '✅ Monitoreando');
 
-  // Actions breakdown
-  const actEl = document.getElementById('actions-breakdown');
-  const actKeys = Object.keys(allActions);
-  if (actKeys.length > 0) {
-    actEl.innerHTML = '<table class="ps-table"><tr><th>Acción</th><th>Conteo</th></tr>' +
-      actKeys.map(k => `<tr><td>${k}</td><td>${allActions[k]}</td></tr>`).join('') + '</table>';
+    renderKPIs(allData.kpis);
+    renderCharts(allData);
+    renderSourceTable(allData.sources);
+    eventData = allData.recentEvents || [];
+    applyEventFilters();
+  } catch (e) {
+    console.error(e);
+    showToast('Error al cargar datos del dashboard', true);
+  }
+
+  refreshBtn.classList.remove('spin');
+}
+
+function showEmptyState() {
+  document.querySelectorAll('.tg-kpi-card .tg-kpi-value').forEach(el => el.textContent = '—');
+  document.querySelectorAll('.tg-kpi-mini-value').forEach(el => el.textContent = '—');
+  document.querySelectorAll('.tg-kpi-sub').forEach(el => el.textContent = '—');
+  document.getElementById('kpi-humo-sub').textContent = 'fuentes con alerta';
+  document.getElementById('source-table-body').innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">Sin datos — usa "Poblar datos de prueba" en la configuración del módulo</td></tr>';
+  document.getElementById('event-list').innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">Sin eventos registrados</div>';
+  document.getElementById('event-pagination').innerHTML = '';
+  Object.values(charts).forEach(c => { if (c) c.destroy(); });
+  charts = {};
+}
+
+// ── Render KPIs ──
+function renderKPIs(kpis) {
+  if (!kpis) return;
+  setText('kpi-entradas', formatNumber(kpis.totalEntradas));
+  setText('kpi-salidas', formatNumber(kpis.totalSalidas));
+  setText('kpi-ocupacion', formatNumber(kpis.ocupacionNeta));
+  setText('kpi-ratio', kpis.ratioES != null ? kpis.ratioES : '—');
+  setText('kpi-hoy', formatNumber(kpis.eventosHoy));
+  setText('kpi-humo', formatNumber(kpis.alertasHumo));
+  document.getElementById('kpi-humo-sub').textContent = kpis.alertasHumo === 1 ? 'fuente con alerta' : 'fuentes con alerta';
+
+  setText('kpi-promedio', kpis.promedioDiario != null ? kpis.promedioDiario : '—');
+  setText('kpi-pico', kpis.picoDiario != null ? kpis.picoDiario : '—');
+  setText('kpi-pico-sub', kpis.picoDia || '—');
+  setText('kpi-total-eventos', formatNumber(kpis.totalEventos));
+  setText('kpi-acciones', formatNumber(kpis.totalAcciones));
+}
+
+// ── Charts ──
+function renderCharts(data) {
+  // Destroy existing charts
+  Object.values(charts).forEach(c => { if (c) { try { c.destroy(); } catch(e) {} } });
+  charts = {};
+
+  if (!data.sources || data.sources.length === 0) return;
+
+  // 1. Doughnut: Entradas/Salidas por fuente
+  const pieCtx = document.getElementById('chart-pie-fuentes');
+  if (pieCtx) {
+    const labels = [];
+    const values = [];
+    const colors = [];
+    const srcColors = ['#3B82F6','#22C55E','#F59E0B','#8B5CF6','#EC4899','#06B6D4','#6366F1','#14B8A6'];
+    data.sources.forEach((s, i) => {
+      const c = srcColors[i % srcColors.length];
+      labels.push(`${s.name} · Entradas`);
+      values.push(s.entradas);
+      colors.push(c);
+    });
+    data.sources.forEach((s, i) => {
+      const c = srcColors[i % srcColors.length];
+      labels.push(`${s.name} · Salidas`);
+      values.push(s.salidas);
+      colors.push(c + '66');
+    });
+    charts.pie = new Chart(pieCtx, {
+      type: 'doughnut',
+      data: { labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 1, borderColor: '#fff' }] },
+      options: {
+        responsive: true, maintainAspectRatio: true,
+        plugins: {
+          legend: { position: 'right', labels: { boxWidth: 12, padding: 8, font: { size: 10 }, color: '#182A55' } },
+          tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.raw.toLocaleString()}` } }
+        },
+        cutout: '55%',
+      }
+    });
+  }
+
+  // 2. Line: Timeline 29 days
+  const lineCtx = document.getElementById('chart-timeline');
+  if (lineCtx && data.dailyTimeline && data.dailyTimeline.length > 0) {
+    const labels = data.dailyTimeline.map(d => {
+      const parts = d.day.split('-');
+      return `${parts[2]}/${parts[1]}`;
+    });
+    const entryData = data.dailyTimeline.map(d => d.entradas);
+    const exitData = data.dailyTimeline.map(d => d.salidas);
+    const actionData = data.dailyTimeline.map(d => d.acciones);
+    const smokeData = data.dailyTimeline.map(d => d.smoke);
+
+    charts.line = new Chart(lineCtx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Entradas', data: entryData, borderColor: '#22C55E', backgroundColor: 'rgba(34,197,94,0.08)', fill: true, tension: 0.3, pointRadius: 2 },
+          { label: 'Salidas', data: exitData, borderColor: '#EF4444', backgroundColor: 'rgba(239,68,68,0.06)', fill: true, tension: 0.3, pointRadius: 2 },
+          { label: 'Acciones', data: actionData, borderColor: '#8B5CF6', borderDash: [5, 5], tension: 0.3, pointRadius: 2 },
+          { label: 'Humo', data: smokeData, borderColor: '#F59E0B', backgroundColor: 'rgba(245,158,11,0.15)', fill: true, tension: 0.3, pointRadius: 3, pointBackgroundColor: '#F59E0B' },
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: true,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { labels: { boxWidth: 12, padding: 8, font: { size: 10 }, color: '#182A55' } },
+        },
+        scales: {
+          x: { ticks: { font: { size: 9 }, color: '#9D9FA2', maxTicksLimit: 15 } },
+          y: { beginAtZero: true, ticks: { font: { size: 9 }, color: '#9D9FA2', stepSize: 1 } }
+        }
+      }
+    });
+  }
+
+  // 3. Horizontal Bar: Ranking fuentes
+  const barCtx = document.getElementById('chart-bar-fuentes');
+  if (barCtx) {
+    const sorted = [...data.sources].sort((a, b) => b.entradas - a.entradas);
+    const labels = sorted.map(s => s.name);
+    const entData = sorted.map(s => s.entradas);
+    const salData = sorted.map(s => s.salidas);
+
+    charts.bar = new Chart(barCtx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Entradas', data: entData, backgroundColor: '#3B82F6', borderRadius: 4 },
+          { label: 'Salidas', data: salData, backgroundColor: '#EF4444', borderRadius: 4 },
+        ]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: true,
+        plugins: {
+          legend: { labels: { boxWidth: 12, padding: 8, font: { size: 10 }, color: '#182A55' } },
+        },
+        scales: {
+          x: { beginAtZero: true, ticks: { font: { size: 9 }, color: '#9D9FA2', stepSize: 1 } },
+          y: { ticks: { font: { size: 10 }, color: '#182A55' } }
+        }
+      }
+    });
+  }
+
+  // 4. Doughnut: Acciones
+  const actCtx = document.getElementById('chart-acciones');
+  if (actCtx) {
+    const actData = data.actionDistribution || {};
+    const labels = Object.keys(actData);
+    const values = Object.values(actData);
+    if (labels.length > 0) {
+      const colorMap = ['#8B5CF6','#6366F1','#06B6D4','#14B8A6','#3B82F6'];
+      charts.acciones = new Chart(actCtx, {
+        type: 'doughnut',
+        data: {
+          labels,
+          datasets: [{ data: values, backgroundColor: colorMap.slice(0, labels.length), borderWidth: 1, borderColor: '#fff' }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: true,
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 12, padding: 8, font: { size: 10 }, color: '#182A55' } },
+          },
+          cutout: '55%',
+        }
+      });
+    } else {
+      charts.acciones = new Chart(actCtx, {
+        type: 'doughnut',
+        data: { labels: ['Sin datos'], datasets: [{ data: [1], backgroundColor: ['#E5E7EB'] }] },
+        options: { responsive: true, plugins: { legend: { display: false } } }
+      });
+    }
+  }
+
+  // 5. Polar Area: Tipo de evento
+  const polarCtx = document.getElementById('chart-polar');
+  if (polarCtx) {
+    const dist = data.eventTypeDistribution || {};
+    const labels = [];
+    const values = [];
+    const colorMap = { 'entry': '#22C55E', 'exit': '#EF4444', 'smoke_detected': '#F59E0B', 'action': '#8B5CF6' };
+    const labelMap = { 'entry': 'Entradas', 'exit': 'Salidas', 'smoke_detected': 'Humo/Fuego', 'action': 'Acciones' };
+    Object.entries(dist).forEach(([k, v]) => {
+      if (v > 0) { labels.push(labelMap[k] || k); values.push(v); }
+    });
+    if (labels.length > 0) {
+      charts.polar = new Chart(polarCtx, {
+        type: 'polarArea',
+        data: {
+          labels,
+          datasets: [{ data: values, backgroundColor: labels.map(l => colorMap[Object.keys(colorMap).find(k => labelMap[k] === l)] || '#3B82F6' + '88'), borderWidth: 1, borderColor: '#fff' }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: true,
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 12, padding: 8, font: { size: 10 }, color: '#182A55' } },
+          },
+          scales: { r: { ticks: { font: { size: 9 }, color: '#9D9FA2' }, grid: { color: 'rgba(0,0,0,0.06)' } } }
+        }
+      });
+    }
+  }
+}
+
+// ── Source Table ──
+let sourceSortCol = 2;
+let sourceSortDir = 'desc';
+let sourceSearchText = '';
+
+function renderSourceTable(sources) {
+  const tbody = document.getElementById('source-table-body');
+  if (!sources || sources.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">Sin fuentes registradas</td></tr>';
+    return;
+  }
+
+  let filtered = [...sources];
+  if (sourceSearchText) {
+    const q = sourceSearchText.toLowerCase();
+    filtered = filtered.filter(s => s.name.toLowerCase().includes(q));
+  }
+
+  filtered.sort((a, b) => {
+    const cols = ['id', 'name', 'entradas', 'salidas', 'acciones', 'smoke', 'contribucion'];
+    let va = a[cols[sourceSortCol]];
+    let vb = b[cols[sourceSortCol]];
+    if (typeof va === 'string') va = va.toLowerCase();
+    if (typeof vb === 'string') vb = vb.toLowerCase();
+    if (va < vb) return sourceSortDir === 'asc' ? -1 : 1;
+    if (va > vb) return sourceSortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  tbody.innerHTML = filtered.map((s, i) => {
+    const idx = i + 1;
+    const colorIdx = (s.id - 1) % SOURCE_COLORS.length;
+    const smokeHtml = s.smoke
+      ? '<span><span class="tg-smoke-dot on"></span>🔥 Sí</span>'
+      : '<span><span class="tg-smoke-dot off"></span>—</span>';
+    return `<tr>
+      <td>${idx}</td>
+      <td><span class="tg-source-badge s${colorIdx + 1}">${s.name}</span></td>
+      <td><strong>${s.entradas}</strong></td>
+      <td>${s.salidas}</td>
+      <td>${s.acciones}</td>
+      <td>${smokeHtml}</td>
+      <td>${s.contribucion}%</td>
+    </tr>`;
+  }).join('');
+}
+
+function sortSourceTable(col) {
+  if (sourceSortCol === col) {
+    sourceSortDir = sourceSortDir === 'asc' ? 'desc' : 'asc';
   } else {
-    actEl.innerHTML = '<p class="text-muted">Sin acciones registradas</p>';
+    sourceSortCol = col;
+    sourceSortDir = col === 2 ? 'desc' : 'asc';
+  }
+  document.querySelectorAll('#source-table th').forEach(th => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (parseInt(th.dataset.col) === col) th.classList.add(sourceSortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+  });
+  if (allData && allData.sources) renderSourceTable(allData.sources);
+}
+
+function filterSourceTable() {
+  sourceSearchText = document.getElementById('source-search').value;
+  if (allData && allData.sources) renderSourceTable(allData.sources);
+}
+
+// ── Events ──
+let eventTypeFilter = 'all';
+
+function filterEvents(type) {
+  eventTypeFilter = type;
+  eventPage = 0;
+  document.querySelectorAll('.tg-event-chip').forEach(chip => {
+    chip.classList.toggle('active', chip.dataset.type === type);
+  });
+  applyEventFilters();
+}
+
+function applyEventFilters() {
+  let filtered = [...eventData];
+
+  // Type filter
+  if (eventTypeFilter !== 'all') {
+    if (eventTypeFilter === 'action') {
+      const actionTypes = ['entry', 'exit', 'smoke_detected'];
+      filtered = filtered.filter(e => !actionTypes.includes(e.event_type));
+    } else {
+      filtered = filtered.filter(e => e.event_type === eventTypeFilter);
+    }
   }
 
-  // Per-source table
-  const psEl = document.getElementById('per-source-table');
-  if (sources.length > 0) {
-    psEl.innerHTML = '<table class="ps-table"><tr><th>Fuente</th><th>Entradas</th><th>Salidas</th><th>Humo</th></tr>' +
-      sources.map(sid => {
-        const c = counters[sid];
-        return `<tr><td>Fuente ${sid}</td><td>${c?.entrada ?? '—'}</td><td>${c?.salida ?? '—'}</td><td>${c?.smoke_detected ? '🔥' : '—'}</td></tr>`;
-      }).join('') + '</table>';
-  } else {
-    psEl.innerHTML = '<p class="text-muted">Sin datos de fuentes</p>';
+  // Date range
+  const fromStr = document.getElementById('filter-date-from').value;
+  const toStr = document.getElementById('filter-date-to').value;
+  if (fromStr) filtered = filtered.filter(e => (e.created_at || '').slice(0, 10) >= fromStr);
+  if (toStr) filtered = filtered.filter(e => (e.created_at || '').slice(0, 10) <= toStr);
+
+  // Text search
+  const searchText = document.getElementById('filter-event-search').value.toLowerCase();
+  if (searchText) {
+    filtered = filtered.filter(e =>
+      (e.event_type || '').toLowerCase().includes(searchText) ||
+      (e.label || '').toLowerCase().includes(searchText) ||
+      (e.source_name || '').toLowerCase().includes(searchText)
+    );
   }
+
+  eventFiltered = filtered;
+  renderEvents();
 }
 
-let chart = null;
-async function loadTimeline() {
-  const r = await fetch(`/api/analytics/${MODULE_ID}/timeline`);
-  if (!r.ok) return;
-  const d = await r.json();
-  const ctx = document.getElementById('chart-timeline');
-  if (!ctx) return;
-  const labels = [...new Set((d.data || []).map(x => x.day))].sort();
-  const entryByDay = {}, exitByDay = {}, actionByDay = {};
-  (d.data || []).forEach(item => {
-    const et = item.event_type;
-    if (et === 'entry' || et === 'entrada') entryByDay[item.day] = (entryByDay[item.day] || 0) + item.count;
-    else if (et === 'exit' || et === 'salida') exitByDay[item.day] = (exitByDay[item.day] || 0) + item.count;
-    else actionByDay[item.day] = (actionByDay[item.day] || 0) + item.count;
-  });
-  const datasets = [];
-  const entryData = labels.map(l => entryByDay[l] || 0);
-  const exitData = labels.map(l => exitByDay[l] || 0);
-  const actionData = labels.map(l => actionByDay[l] || 0);
-  if (entryData.some(v => v > 0)) datasets.push({ label: 'Entradas', data: entryData, borderColor: '#22C55E', tension: 0.3 });
-  if (exitData.some(v => v > 0)) datasets.push({ label: 'Salidas', data: exitData, borderColor: '#EF4444', tension: 0.3 });
-  if (actionData.some(v => v > 0)) datasets.push({ label: 'Acciones', data: actionData, borderColor: '#8B5CF6', tension: 0.3, borderDash: [5, 5] });
-  if (chart) chart.destroy();
-  chart = new Chart(ctx, {
-    type: 'line',
-    data: { labels, datasets },
-    options: { responsive: true, plugins: { legend: { labels: { color: '#182A55' } } },
-      scales: { x: { ticks: { color: '#9D9FA2' } }, y: { ticks: { color: '#9D9FA2', stepSize: 1 } } } },
-  });
+function renderEvents() {
+  const list = document.getElementById('event-list');
+  const pagination = document.getElementById('event-pagination');
+  const totalPages = Math.ceil(eventFiltered.length / EVENT_PAGE_SIZE) || 1;
+
+  if (eventPage >= totalPages) eventPage = totalPages - 1;
+  if (eventPage < 0) eventPage = 0;
+
+  const start = eventPage * EVENT_PAGE_SIZE;
+  const pageItems = eventFiltered.slice(start, start + EVENT_PAGE_SIZE);
+
+  if (pageItems.length === 0) {
+    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">No se encontraron eventos</div>';
+    pagination.innerHTML = '';
+    return;
+  }
+
+  const typeLabels = {
+    'entry': 'Entrada', 'exit': 'Salida', 'smoke_detected': 'Humo/Fuego',
+  };
+
+  list.innerHTML = pageItems.map(e => {
+    const et = e.event_type;
+    const isAction = !['entry', 'exit', 'smoke_detected'].includes(et);
+    const badgeType = isAction ? 'action' : et;
+    const badgeLabel = isAction ? et : (typeLabels[et] || et);
+    const sourceName = e.source_name || `Fuente ${e.source_id}`;
+    return `<div class="tg-event-item">
+      <span class="tg-event-time">${e.created_at || ''}</span>
+      <span class="tg-event-source">${sourceName}</span>
+      <span class="tg-event-type-badge ${badgeType}">${badgeLabel}</span>
+      <span class="tg-event-label">${e.label || ''}</span>
+      ${e.has_capture ? `<button class="tg-event-capture" onclick="openEvidence('${MODULE_ID}', ${e.id})" title="Ver evidencia">📷</button>` : '<span></span>'}
+    </div>`;
+  }).join('');
+
+  // Pagination
+  const pageBtns = [];
+  if (totalPages > 1) {
+    pageBtns.push(`<button class="tg-page-btn" onclick="changePage(${eventPage - 1})" ${eventPage === 0 ? 'disabled' : ''}>‹</button>`);
+    const startP = Math.max(0, Math.min(eventPage - 2, totalPages - 5));
+    const endP = Math.min(totalPages, startP + 5);
+    for (let i = startP; i < endP; i++) {
+      pageBtns.push(`<button class="tg-page-btn ${i === eventPage ? 'active' : ''}" onclick="changePage(${i})">${i + 1}</button>`);
+    }
+    pageBtns.push(`<button class="tg-page-btn" onclick="changePage(${eventPage + 1})" ${eventPage >= totalPages - 1 ? 'disabled' : ''}>›</button>`);
+    pageBtns.push(`<span class="tg-page-info">${eventPage * EVENT_PAGE_SIZE + 1}–${Math.min((eventPage + 1) * EVENT_PAGE_SIZE, eventFiltered.length)} de ${eventFiltered.length}</span>`);
+  }
+  pagination.innerHTML = pageBtns.join('');
 }
 
-async function loadEvents() {
-  const r = await fetch(`/api/analytics/${MODULE_ID}/events?limit=20`);
-  if (!r.ok) return;
-  const d = await r.json();
-  const list = document.getElementById('events-list');
-  list.innerHTML = (d.events || []).map(e =>
-    `<div class="analytics-event-item">
-      <span class="analytics-event-time">${e.created_at || ''}</span>
-      <span class="analytics-event-type">${e.event_type}</span>
-      <span class="analytics-event-label">${e.label}</span>
-      ${e.capture_path ? `<button class="ev-btn-view" onclick="openEvidence('${MODULE_ID}', ${e.id})"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>` : ''}
-    </div>`
-  ).join('');
+function changePage(page) {
+  eventPage = page;
+  renderEvents();
 }
 
-loadKPIs(); loadTimeline(); loadEvents();
-setInterval(loadKPIs, 5000);
+// ── PDF Export ──
+async function exportPDF(mode) {
+  const btn = document.querySelector('.tg-btn-pdf');
+  const origText = btn.innerHTML;
+  btn.innerHTML = '⏳ Generando PDF...';
+  btn.style.opacity = '0.6';
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageW = 210;
+    const pageH = 297;
+    const margin = 12;
+
+    const container = document.getElementById('dashboard-container');
+
+    // Title page or header
+    function addHeader(page, isFirst) {
+      page.setFontSize(16);
+      page.setFont('helvetica', 'bold');
+      page.text('Tanques de Gas — Dashboard Analítico', margin, margin + 8);
+      page.setFontSize(9);
+      page.setFont('helvetica', 'normal');
+      page.setTextColor(100);
+      const now = new Date();
+      const dateStr = now.toISOString().slice(0, 10) + ' ' + now.toTimeString().slice(0, 5);
+      page.text(`Generado: ${dateStr}  |  Rango: ${document.getElementById('filter-range').selectedOptions[0].text}`, margin, margin + 14);
+      page.setTextColor(0);
+    }
+
+    if (mode === 'todo') {
+      // Page 1: KPIs
+      addHeader(pdf, true);
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Métricas Globales', margin, margin + 26);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(10);
+
+      const kpis = allData?.kpis || {};
+      const items = [
+        ['Total Entradas', kpis.totalEntradas],
+        ['Total Salidas', kpis.totalSalidas],
+        ['Ocupación Neta', kpis.ocupacionNeta],
+        ['Ratio E/S', kpis.ratioES],
+        ['Eventos Hoy', kpis.eventosHoy],
+        ['Alertas Humo', kpis.alertasHumo],
+        ['Promedio Diario', kpis.promedioDiario],
+        ['Pico Diario', kpis.picoDiario],
+        ['Total Eventos', kpis.totalEventos],
+        ['Total Acciones', kpis.totalAcciones],
+      ];
+      items.forEach(([label, value], i) => {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        const x = margin + col * 90;
+        const y = margin + 36 + row * 8;
+        pdf.text(`${label}:`, x, y);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(String(value ?? '—'), x + 55, y);
+        pdf.setFont('helvetica', 'normal');
+      });
+
+      // KPIs continued: sources table (simple)
+      const sources = allData?.sources || [];
+      if (sources.length > 0) {
+        let yPos = margin + 62;
+        pdf.setFontSize(11);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('Detalle por Fuente', margin, yPos);
+        yPos += 6;
+
+        const headers = ['Fuente', 'Entradas', 'Salidas', 'Acciones', 'Humo', '%'];
+        const colWidths = [40, 22, 22, 22, 22, 22];
+        const startX = margin;
+
+        pdf.setFontSize(8);
+        pdf.setFont('helvetica', 'bold');
+        headers.forEach((h, i) => {
+          pdf.text(h, startX + colWidths.slice(0, i).reduce((a, b) => a + b, 0) + 2, yPos);
+        });
+        yPos += 1;
+        pdf.line(startX, yPos, startX + colWidths.reduce((a, b) => a + b, 0), yPos);
+        yPos += 3;
+
+        pdf.setFont('helvetica', 'normal');
+        sources.forEach(s => {
+          pdf.text(s.name, startX + 2, yPos);
+          pdf.text(String(s.entradas), startX + 42, yPos);
+          pdf.text(String(s.salidas), startX + 64, yPos);
+          pdf.text(String(s.acciones), startX + 86, yPos);
+          pdf.text(s.smoke ? 'Sí' : 'No', startX + 108, yPos);
+          pdf.text(s.contribucion + '%', startX + 130, yPos);
+          yPos += 5;
+          if (yPos > pageH - margin) {
+            pdf.addPage();
+            yPos = margin + 10;
+          }
+        });
+      }
+
+      // Page 2+: Capture charts as images
+      const chartIds = ['chart-pie-fuentes', 'chart-timeline', 'chart-bar-fuentes', 'chart-acciones', 'chart-polar'];
+      let chartPageCount = 0;
+      for (const cid of chartIds) {
+        const canvas = document.getElementById(cid);
+        if (!canvas) continue;
+        try {
+          const imgData = canvas.toDataURL('image/png');
+          if (chartPageCount > 0) pdf.addPage();
+          const imgW = pageW - margin * 2;
+          const imgH = (canvas.height / canvas.width) * imgW;
+          const yStart = margin + 10;
+          pdf.addImage(imgData, 'PNG', margin, yStart, imgW, Math.min(imgH, pageH - margin * 2 - 10));
+          chartPageCount++;
+        } catch (e) {
+          console.warn('Skipping chart', cid, e);
+        }
+      }
+
+      // Events list (simple)
+      if (allData?.recentEvents?.length > 0) {
+        pdf.addPage();
+        addHeader(pdf, false);
+        pdf.setFontSize(11);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('Eventos Recientes (últimos 50)', margin, margin + 24);
+        pdf.setFontSize(7);
+        pdf.setFont('helvetica', 'normal');
+
+        let yPos = margin + 30;
+        const evHeaders = ['Fecha/Hora', 'Tipo', 'Detalle'];
+        const evColW = [50, 25, 80];
+        pdf.setFont('helvetica', 'bold');
+        evHeaders.forEach((h, i) => {
+          pdf.text(h, margin + evColW.slice(0, i).reduce((a, b) => a + b, 0) + 2, yPos);
+        });
+        yPos += 1;
+        pdf.line(margin, yPos, margin + evColW.reduce((a, b) => a + b, 0), yPos);
+        yPos += 3;
+        pdf.setFont('helvetica', 'normal');
+
+        const events = allData.recentEvents.slice(0, 50);
+        events.forEach(e => {
+          const text = e.label || e.event_type;
+          pdf.text(e.created_at || '', margin + 2, yPos);
+          pdf.text(e.event_type, margin + 52, yPos);
+          const displayText = text.length > 40 ? text.slice(0, 38) + '...' : text;
+          pdf.text(displayText, margin + 78, yPos);
+          yPos += 4;
+          if (yPos > pageH - margin) {
+            pdf.addPage();
+            yPos = margin + 10;
+          }
+        });
+      }
+
+    } else {
+      // Resumen ejecutivo — 1 page
+      addHeader(pdf, true);
+
+      // KPI table
+      const kpis = allData?.kpis || {};
+      const items = [
+        ['Entradas', kpis.totalEntradas, 'Salidas', kpis.totalSalidas],
+        ['Ocupación Neta', kpis.ocupacionNeta, 'Ratio E/S', kpis.ratioES],
+        ['Eventos Hoy', kpis.eventosHoy, 'Alertas Humo', kpis.alertasHumo],
+        ['Promedio Diario', kpis.promedioDiario, 'Pico Diario', kpis.picoDiario],
+        ['Total Eventos', kpis.totalEventos, 'Acciones', kpis.totalAcciones],
+      ];
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Indicadores Clave', margin, margin + 26);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9);
+      items.forEach(([l1, v1, l2, v2], i) => {
+        const y = margin + 32 + i * 7;
+        pdf.text(`${l1}:  ${v1 ?? '—'}`, margin, y);
+        pdf.text(`${l2}:  ${v2 ?? '—'}`, margin + 90, y);
+      });
+
+      // Source summary
+      const sources = allData?.sources || [];
+      if (sources.length > 0) {
+        let y = margin + 72;
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('Fuentes', margin, y);
+        y += 5;
+        pdf.setFontSize(8);
+        const cols = ['Fuente', 'Ent', 'Sal', 'Acc', '%'];
+        const cw = [40, 18, 18, 18, 18];
+        pdf.setFont('helvetica', 'bold');
+        cols.forEach((h, i) => pdf.text(h, margin + cw.slice(0, i).reduce((a, b) => a + b, 0) + 2, y));
+        y += 1;
+        pdf.line(margin, y, margin + cw.reduce((a, b) => a + b, 0), y);
+        y += 3;
+        pdf.setFont('helvetica', 'normal');
+        sources.forEach(s => {
+          pdf.text(s.name, margin + 2, y);
+          pdf.text(String(s.entradas), margin + 42, y);
+          pdf.text(String(s.salidas), margin + 60, y);
+          pdf.text(String(s.acciones), margin + 78, y);
+          pdf.text(s.contribucion + '%', margin + 96, y);
+          y += 4.5;
+        });
+      }
+    }
+
+    pdf.save(`tanques_gas_dashboard_${new Date().toISOString().slice(0, 10)}.pdf`);
+    showToast('PDF exportado correctamente');
+  } catch (e) {
+    console.error('PDF error:', e);
+    showToast('Error al generar PDF', true);
+  }
+
+  btn.innerHTML = origText;
+  btn.style.opacity = '1';
+}
+
+// ── Source filter ──
+document.getElementById('filter-source').addEventListener('change', loadData);
+document.getElementById('filter-range').addEventListener('change', loadData);
+document.getElementById('btn-refresh').addEventListener('click', loadData);
+
+// ── Init ──
+async function init() {
+  // Populate source filter
+  try {
+    const r = await fetch(`/api/analytics/${MODULE_ID}/summary?days=365`);
+    if (r.ok) {
+      const d = await r.json();
+      const sel = document.getElementById('filter-source');
+      if (d.counters) {
+        Object.keys(d.counters).forEach(sid => {
+          const opt = document.createElement('option');
+          opt.value = sid;
+          opt.textContent = `Fuente ${sid}`;
+          sel.appendChild(opt);
+        });
+      }
+    }
+  } catch (e) {}
+
+  // Set default dates
+  const today = new Date();
+  const fromDate = new Date(2026, 6, 1); // July 1
+  const toDate = new Date(2026, 6, 29);  // July 29
+  document.getElementById('filter-date-from').value = fromDate.toISOString().slice(0, 10);
+  document.getElementById('filter-date-to').value = toDate.toISOString().slice(0, 10);
+
+  await loadData();
+  setInterval(loadData, 5000);
+}
+
+document.addEventListener('DOMContentLoaded', init);
 </script>
 {% endblock %}

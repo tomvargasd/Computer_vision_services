@@ -510,6 +510,10 @@ def save_module_counters(module_id: str, source_id: int, counters: dict) -> None
                 iv = 0
                 fv = value
                 sv = None
+            elif isinstance(value, dict) or isinstance(value, list):
+                iv = 0
+                fv = None
+                sv = json.dumps(value)
             else:
                 iv = 0
                 fv = None

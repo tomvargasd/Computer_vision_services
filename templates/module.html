@@ -108,6 +108,14 @@
 
 </div>
 
+  {% if module_id == 'tanques_gas' %}
+  <div class="seed-section">
+    <button class="btn-seed" id="btn-seed-tanques" onclick="seedTanquesGas()">Seed</button>
+    <button class="btn-seed-clear" onclick="clearTanquesGas()">Clear</button>
+    <span id="seed-status" style="margin-left:12px;font-size:0.78rem;color:var(--muted)"></span>
+  </div>
+  {% endif %}
+
 <!-- ══ MODAL: Añadir fuente ══════════════════════ -->
 <div class="modal-backdrop" id="modal-source" hidden>
   <div class="modal">
@@ -368,6 +376,59 @@ function openEditModal(id, name) {
 document.getElementById("edit-modal-close").addEventListener("click", () => editModal.hidden = true);
 document.getElementById("edit-cancel").addEventListener("click",      () => editModal.hidden = true);
 editModal.addEventListener("click", e => { if (e.target === editModal) editModal.hidden = true; });
+
+// ── Tanques de Gas: Seed / Clear ──
+async function seedTanquesGas() {
+  const btn = document.getElementById('btn-seed-tanques');
+  const status = document.getElementById('seed-status');
+  if (!confirm('¿Estás seguro? Esto reemplazará TODOS los datos existentes del módulo Tanques de Gas con nuevos datos de prueba (29 días).')) return;
+  btn.disabled = true;
+  status.textContent = 'Generando datos...';
+  try {
+    const r = await fetch('/api/analytics/tanques_gas/seed', { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) {
+      status.textContent = '❌ ' + (d.error || 'Error');
+      showToast('Error: ' + (d.error || 'No se pudieron generar los datos'), true);
+    } else {
+      status.textContent = '✅ ' + (d.message || 'Datos generados');
+      showToast('✅ ' + d.message);
+    }
+  } catch (e) {
+    status.textContent = '❌ Error de conexión';
+    showToast('Error de conexión al generar datos', true);
+  }
+  btn.disabled = false;
+  setTimeout(() => { if (status) status.textContent = ''; }, 5000);
+}
+
+async function clearTanquesGas() {
+  const status = document.getElementById('seed-status');
+  if (!confirm('¿Eliminar todos los eventos y contadores del módulo Tanques de Gas?')) return;
+  status.textContent = 'Limpiando...';
+  try {
+    const r = await fetch('/api/analytics/tanques_gas/clear', { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) {
+      status.textContent = '❌ Error';
+    } else {
+      status.textContent = '✅ ' + (d.message || 'Datos eliminados');
+    }
+  } catch (e) {
+    status.textContent = '❌ Error de conexión';
+  }
+  setTimeout(() => { if (status) status.textContent = ''; }, 5000);
+}
+
+function showToast(msg, isError) {
+  const existing = document.querySelector('.seed-toast');
+  if (existing) existing.remove();
+  const t = document.createElement('div');
+  t.className = 'seed-toast' + (isError ? ' error' : '');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
 
 document.getElementById("edit-confirm").addEventListener("click", async () => {
   const name = document.getElementById("edit-name").value.trim();
