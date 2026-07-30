@@ -6,6 +6,8 @@ import uuid
 import time
 import json
 import random
+import requests
+import re
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 
@@ -22,6 +24,9 @@ from src.database import (
     insert_module_event, get_module_events, get_module_analytics,
     save_source_config, get_source_config, get_source_config_value,
     delete_source_config,
+    create_chat_session, get_chat_sessions, get_chat_session,
+    update_chat_session_title, touch_chat_session,
+    delete_chat_session, add_chat_message, get_chat_messages,
 )
 
 from src.modules.personas import PersonasManager
@@ -1884,6 +1889,281 @@ def api_tanques_gas_clear():
                     pass
 
     return jsonify({"success": True, "message": "Datos eliminados correctamente"})
+
+
+# ─────────────────────────────────────────────
+# Chat API (v3.0)
+# ─────────────────────────────────────────────
+
+_MODULE_ALIASES = {
+    "tanques_gas": ["tanques de gas", "gas", "tanque", "tg"],
+    "personas": ["personas", "persona", "gente", "people"],
+    "armas": ["armas", "arma", "weapons", "gun"],
+    "acciones": ["acciones", "accion", "actions", "violencia", "robo", "caida"],
+    "troncos": ["troncos", "tronco", "logs", "madera"],
+    "pallets": ["pallets", "pallet", "tarimas", "tarima"],
+    "cajas": ["cajas", "caja", "boxes", "box"],
+    "reglamento": ["reglamento", "regulacion", "botas", "normas"],
+    "carga_descarga": ["carga", "descarga", "carga y descarga", "loading"],
+    "epp": ["epp", "protección", "casco", "chaleco"],
+    "smoke": ["smoke", "humo", "fuego", "fire", "incendio"],
+    "vehiculos": ["vehiculos", "vehiculo", "vehículo", "carros", "autos", "placa"],
+}
+
+_MODULE_KPI_DESCRIPTIONS = {
+    "tanques_gas": "entradas, salidas, ocupación neta, ratio E/S, acciones detectadas, alertas de humo",
+    "personas": "conteo de personas, tiempo de permanencia, mapa de calor",
+    "armas": "detección de armas, captura de rostro, tipo de arma (blanca/fuego)",
+    "acciones": "violencia, robo/amenaza, actividad sospechosa, uso de celular, caídas",
+    "troncos": "conteo de troncos",
+    "pallets": "conteo de pallets",
+    "cajas": "conteo de cajas",
+    "reglamento": "detección de botas, cumplimiento de tiempo, alertas",
+    "carga_descarga": "conteo de carga (entradas/salidas)",
+    "epp": "detección de EPP, alertas sin EPP, ranking de EPP",
+    "smoke": "detección de humo/fuego",
+    "vehiculos": "conteo de vehículos, detección de placas",
+}
+
+def _detect_modules(prompt: str) -> list:
+    prompt_lower = prompt.lower()
+    detected = []
+    for mod_id, aliases in _MODULE_ALIASES.items():
+        for alias in aliases:
+            if alias in prompt_lower:
+                detected.append(mod_id)
+                break
+    return detected
+
+def _extract_days(prompt: str) -> int:
+    prompt_lower = prompt.lower()
+    patterns = [
+        (r'(\d+)\s*dias?', 1), (r'(\d+)\s*días?', 1),
+        (r'(\d+)\s*d', 1), (r'\bhoy\b', 1), (r'\bayer\b', 1),
+        (r'\besta\s*semana\b', 7), (r'\beste\s*mes\b', 30),
+        (r'\bmes\b', 30), (r'\bsemana\b', 7),
+        (r'ultimos?\s*(\d+)', 1),
+    ]
+    for pattern, default in patterns:
+        m = re.search(pattern, prompt_lower)
+        if m:
+            try:
+                return int(m.group(1)) if m.lastindex else default
+            except (ValueError, IndexError):
+                return default
+    return 7
+
+def _fetch_module_data(module_id: str, days: int) -> dict:
+    from src.database import get_module_analytics, load_module_counters
+    sources = get_sources(module_id)
+    summary = get_module_analytics(module_id, days=days)
+
+    counters = {}
+    for src in sources:
+        c = load_module_counters(module_id, src["id"])
+        if c:
+            counters[src["name"]] = c
+
+    events = get_module_events(module_id, days=days, limit=10)
+    return {
+        "module_id": module_id,
+        "label": MODULES_META[module_id]["label"],
+        "kpis": _MODULE_KPI_DESCRIPTIONS.get(module_id, ""),
+        "sources": [{"id": s["id"], "name": s["name"], "type": s["type"]} for s in sources],
+        "event_counts": summary.get("event_counts", {}),
+        "total_events": sum(summary.get("event_counts", {}).values()),
+        "counters": counters,
+        "recent_events": [
+            {"type": e["event_type"], "label": e.get("label", ""), "time": e.get("created_at", "")}
+            for e in events[:5]
+        ],
+    }
+
+def _call_gemini(api_key: str, system_prompt: str, user_prompt: str) -> str:
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+    payload = {
+        "contents": [
+            {"role": "user", "parts": [{"text": system_prompt + "\n\n---\n\n" + user_prompt}]}
+        ],
+        "generationConfig": {
+            "temperature": 0.3,
+            "topK": 40,
+            "topP": 0.95,
+            "maxOutputTokens": 8192,
+        },
+        "safetySettings": [
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"}
+        ],
+    }
+    try:
+        r = requests.post(url, json=payload, timeout=60)
+        r.raise_for_status()
+        data = r.json()
+        candidates = data.get("candidates", [])
+        if not candidates:
+            return "Error: No se obtuvo respuesta del modelo."
+        parts = candidates[0].get("content", {}).get("parts", [])
+        if not parts:
+            return "Error: Respuesta vacía del modelo."
+        return parts[0].get("text", "Error: Sin texto en la respuesta.")
+    except requests.exceptions.Timeout:
+        return "Error: La solicitud a Gemini tardó demasiado. Intenta con un prompt más simple."
+    except requests.exceptions.HTTPError as e:
+        if r.status_code == 403:
+            return "Error: La API Key de Gemini no es válida o no tiene acceso a Gemini 2.0 Flash. Verifica en https://aistudio.google.com"
+        if r.status_code == 429:
+            return "Error: Límite de peticiones excedido. Espera un momento y vuelve a intentar."
+        return f"Error HTTP {r.status_code} al contactar Gemini."
+    except Exception as e:
+        return f"Error de conexión con Gemini: {str(e)}"
+
+def _build_system_prompt(detected_modules: list, module_data: dict) -> str:
+    lines = [
+        "Eres un analista de datos del sistema CVVision (Computer Vision).",
+        "Trabajas EXCLUSIVAMENTE con datos de módulos de detección.",
+        "",
+        "REGLAS ESTRICTAS:",
+        "- NO generes imágenes ni analices imágenes bajo ninguna circunstancia.",
+        "- NO accedas a datos de configuración del sistema.",
+        "- NO generes PDFs ni documentos descargables.",
+        "- Responde SIEMPRE en Markdown.",
+        "- Usa tablas, listas y formato para clarity.",
+        "- Si faltan datos o la solicitud no es clara, sugiere prompts alternativos.",
+        "- No menciones que eres una IA. Habla como si fueras el sistema.",
+        "- Prioriza datos concretos sobre explicaciones extensas.",
+        "- Si el usuario pide algo fuera del alcance (imágenes, PDFs, configuración), responde amablemente que no está disponible.",
+        "",
+    ]
+
+    if detected_modules:
+        lines.append("MÓDULOS DETECTADOS:")
+        for mod_id in detected_modules:
+            md = module_data.get(mod_id, {})
+            lines.append(f"\n### {md.get('label', mod_id)}")
+            lines.append(f"- KPIs disponibles: {md.get('kpis', '—')}")
+            if md.get("sources"):
+                lines.append(f"- Fuentes activas: {len(md['sources'])}")
+            if md.get("event_counts"):
+                lines.append(f"- Conteo de eventos por tipo: {json.dumps(md['event_counts'], indent=2)}")
+            if md.get("counters"):
+                for src_name, c in md["counters"].items():
+                    filtered = {k: v for k, v in c.items() if isinstance(v, (int, float))}
+                    if filtered:
+                        lines.append(f"- Contadores ({src_name}): {json.dumps(filtered)}")
+            if md.get("recent_events"):
+                lines.append(f"- Eventos recientes: {len(md['recent_events'])}")
+            lines.append("")
+    else:
+        lines.append("No se detectaron módulos específicos en la consulta.")
+        lines.append("Sugiere al usuario que pregunte sobre uno de estos módulos:")
+        for mod_id, meta in MODULES_META.items():
+            lines.append(f"- {meta['label']}: {_MODULE_KPI_DESCRIPTIONS.get(mod_id, '')}")
+        lines.append("")
+
+    lines.append("INSTRUCCIONES DEL USUARIO:")
+    return "\n".join(lines)
+
+
+@app.route("/api/chat", methods=["POST"])
+def api_chat():
+    data = request.get_json(silent=True) or {}
+    prompt = (data.get("prompt") or "").strip()
+    session_id = data.get("session_id") or ""
+
+    if not prompt:
+        return jsonify({"error": "El prompt no puede estar vacío"}), 400
+
+    settings = get_settings()
+    api_key = settings.get("gemini_api_key", "").strip()
+    if not api_key:
+        return jsonify({"error": "No hay API Key de Gemini configurada. Ve a Configuración > General para agregarla."}), 400
+
+    # Crear o reusar sesión
+    if not session_id:
+        session_id = create_chat_session(prompt[:60])
+    else:
+        session = get_chat_session(session_id)
+        if not session:
+            session_id = create_chat_session(prompt[:60])
+        else:
+            touch_chat_session(session_id)
+        # Auto-titular si es mensaje inicial
+        msg_count = len(get_chat_messages(session_id))
+        if msg_count == 0:
+            update_chat_session_title(session_id, prompt[:60])
+
+    # Guardar mensaje del usuario
+    add_chat_message(session_id, "user", prompt)
+
+    # Detectar módulos y fetch data
+    detected = _detect_modules(prompt)
+    days = _extract_days(prompt)
+
+    module_data = {}
+    for mod_id in detected:
+        try:
+            module_data[mod_id] = _fetch_module_data(mod_id, days)
+        except Exception as e:
+            module_data[mod_id] = {"error": str(e)}
+
+    # Construir prompts para Gemini
+    system_prompt = _build_system_prompt(detected, module_data)
+
+    # Llamar a Gemini
+    reply = _call_gemini(api_key, system_prompt, prompt)
+
+    # Guardar respuesta
+    add_chat_message(session_id, "model", reply)
+
+    return jsonify({
+        "reply": reply,
+        "session_id": session_id,
+    })
+
+
+@app.route("/api/chat/sessions", methods=["GET"])
+def api_chat_sessions():
+    sessions = get_chat_sessions()
+    return jsonify({"sessions": sessions})
+
+
+@app.route("/api/chat/session", methods=["POST"])
+def api_chat_create_session():
+    title = (request.get_json(silent=True) or {}).get("title", "Nueva sesión")
+    session_id = create_chat_session(title)
+    return jsonify({"session_id": session_id, "title": title}), 201
+
+
+@app.route("/api/chat/session/<session_id>", methods=["GET", "DELETE"])
+def api_chat_session(session_id):
+    if request.method == "DELETE":
+        delete_chat_session(session_id)
+        return jsonify({"deleted": True})
+    session = get_chat_session(session_id)
+    if not session:
+        return jsonify({"error": "Sesión no encontrada"}), 404
+    messages = get_chat_messages(session_id)
+    return jsonify({"session": session, "messages": messages})
+
+
+# ─────────────────────────────────────────────
+# Modules Order API
+# ─────────────────────────────────────────────
+
+@app.route("/api/modules/order", methods=["GET", "POST"])
+def api_modules_order():
+    if request.method == "POST":
+        data = request.get_json(silent=True) or {}
+        order = data.get("order", [])
+        valid = [m for m in order if m in MODULES_META]
+        set_setting("modules_order", ",".join(valid))
+        return jsonify({"saved": True, "order": valid})
+    raw = get_settings().get("modules_order", "")
+    if raw:
+        order = [m.strip() for m in raw.split(",") if m.strip() in MODULES_META]
+    else:
+        order = list(MODULES_META.keys())
+    return jsonify({"order": order})
 
 
 # ─────────────────────────────────────────────

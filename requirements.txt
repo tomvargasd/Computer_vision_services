@@ -6,3 +6,4 @@ opencv-python-headless>=4.8.0
 pytesseract>=0.3.10
 easyocr>=1.7.0
 lap>=0.5.12
+requests>=2.31.0

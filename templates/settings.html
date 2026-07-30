@@ -100,6 +100,59 @@
       </div>
     </div>
 
+    <!-- Gemini API Key -->
+    <div class="settings-section">
+      <div class="settings-section-header">
+        <svg class="settings-section-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/><path d="M13 7h-2v5l4.25 2.52.75-1.23-3.5-2.08V7z"/></svg>
+        <span class="settings-section-title">Integración Gemini IA</span>
+      </div>
+      <div class="settings-section-body">
+        <div class="settings-field">
+          <label class="settings-label" for="gemini-api-key-input">API Key de Gemini 2.0 Flash</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input class="settings-input" id="gemini-api-key-input" type="password"
+                   value="{{ settings.gemini_api_key }}"
+                   placeholder="AIzaSy... (Google AI Studio)"
+                   style="flex:1"/>
+            <button class="settings-save-btn" id="toggle-gemini-key-visibility" type="button" title="Mostrar/ocultar clave" style="padding:8px 12px;font-size:1rem">👁</button>
+          </div>
+          <span class="upload-hint">Obtén tu API key en <a href="https://aistudio.google.com" target="_blank" style="color:#182A55;font-weight:600">Google AI Studio</a> · Solo texto, no se envían imágenes</span>
+        </div>
+        <button class="settings-save-btn" id="save-gemini-key-btn">Guardar API Key</button>
+        <div class="settings-toast" id="gemini-toast">✓ API Key guardada correctamente</div>
+      </div>
+    </div>
+
+    <!-- Orden de Módulos -->
+    <div class="settings-section">
+      <div class="settings-section-header">
+        <svg class="settings-section-icon" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+        <span class="settings-section-title">Orden de Módulos en el Menú Lateral</span>
+      </div>
+      <div class="settings-section-body">
+        <span class="settings-label">Arrastra los módulos para reordenarlos en el sidebar</span>
+        <div class="modules-sortable-list" id="modules-sortable-list">
+          {% set order_raw = settings.get('modules_order', '') %}
+          {% if order_raw %}
+            {% set module_order = order_raw.split(',') %}
+          {% else %}
+            {% set module_order = ['tanques_gas','reglamento','epp','vehiculos','carga_descarga','personas','armas','acciones','troncos','pallets','cajas','smoke'] %}
+          {% endif %}
+          {% for mid in module_order %}
+            {% if mid in modules %}
+          <div class="sortable-item" draggable="true" data-module-id="{{ mid }}">
+            <span class="sortable-handle" title="Arrastrar">⠿</span>
+            <span class="sortable-label">{{ modules[mid].label }}</span>
+            <span class="status-dot {% if modules[mid]['enabled'] %}on{% endif %}"></span>
+          </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+        <button class="settings-save-btn" id="save-modules-order-btn">Guardar Orden</button>
+        <div class="settings-toast" id="order-toast">✓ Orden guardado correctamente</div>
+      </div>
+    </div>
+
   </div><!-- /panel-general -->
 
   <!-- ══ PANEL: Módulos ═══════════════════════════════ -->
@@ -1014,6 +1067,97 @@ document.getElementById("multi-detection-toggle").addEventListener("change", asy
 loadCargaModels();
 document.addEventListener("click", (e) => {
   if (e.target.id === "add-carga-model") addCargaModel();
+});
+
+// ══ Gemini API Key ════════════════════════════════════════════
+document.getElementById("save-gemini-key-btn").addEventListener("click", async () => {
+  const key = document.getElementById("gemini-api-key-input").value.trim();
+  try {
+    const r = await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ gemini_api_key: key }),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    showToast("gemini-toast");
+  } catch (e) { console.error(e); }
+});
+
+document.getElementById("toggle-gemini-key-visibility").addEventListener("click", () => {
+  const input = document.getElementById("gemini-api-key-input");
+  input.type = input.type === "password" ? "text" : "password";
+});
+
+// ══ Módulos reordenables (drag & drop nativo) ════════════════
+const sortableList = document.getElementById("modules-sortable-list");
+let dragSrcEl = null;
+
+function handleDragStart(e) {
+  dragSrcEl = this;
+  e.dataTransfer.effectAllowed = "move";
+  e.dataTransfer.setData("text/html", this.innerHTML);
+  this.classList.add("sortable-dragging");
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "move";
+  const target = e.target.closest(".sortable-item");
+  if (target && target !== dragSrcEl) {
+    const rect = target.getBoundingClientRect();
+    const mid = (rect.top + rect.bottom) / 2;
+    if (e.clientY < mid) {
+      sortableList.insertBefore(dragSrcEl, target);
+    } else {
+      sortableList.insertBefore(dragSrcEl, target.nextSibling);
+    }
+  }
+}
+
+function handleDragEnd() {
+  this.classList.remove("sortable-dragging");
+  document.querySelectorAll(".sortable-item").forEach(i => i.classList.remove("sortable-over"));
+}
+
+sortableList.addEventListener("dragstart", (e) => {
+  const item = e.target.closest(".sortable-item");
+  if (!item) return;
+  dragSrcEl = item;
+  e.dataTransfer.effectAllowed = "move";
+  item.classList.add("sortable-dragging");
+});
+
+sortableList.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "move";
+  const target = e.target.closest(".sortable-item");
+  if (target && target !== dragSrcEl) {
+    const rect = target.getBoundingClientRect();
+    const mid = (rect.top + rect.bottom) / 2;
+    if (e.clientY < mid) {
+      sortableList.insertBefore(dragSrcEl, target);
+    } else {
+      sortableList.insertBefore(dragSrcEl, target.nextSibling);
+    }
+  }
+});
+
+sortableList.addEventListener("dragend", () => {
+  document.querySelectorAll(".sortable-item").forEach(i => i.classList.remove("sortable-dragging"));
+});
+
+document.getElementById("save-modules-order-btn").addEventListener("click", async () => {
+  const items = sortableList.querySelectorAll(".sortable-item");
+  const order = Array.from(items).map(item => item.dataset.moduleId);
+  try {
+    const r = await fetch("/api/modules/order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order }),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    showToast("order-toast");
+  } catch (e) { console.error(e); }
 });
 </script>
 {% endblock %}

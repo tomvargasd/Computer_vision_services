@@ -163,6 +163,8 @@ DEFAULT_SETTINGS = [
     ("tanques_gas_smoke_conf", "0.35"),
     ("tanques_gas_line_mode", "horizontal"),
     ("tanques_gas_line_pos", "50"),
+    ("gemini_api_key", ""),
+    ("modules_order", ""),
 ]
 
 
@@ -252,6 +254,22 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_events_module  ON module_events(module_id, source_id);
             CREATE INDEX IF NOT EXISTS idx_events_time    ON module_events(created_at);
             CREATE INDEX IF NOT EXISTS idx_events_type    ON module_events(module_id, event_type);
+
+            CREATE TABLE IF NOT EXISTS chat_sessions (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL DEFAULT 'Nueva sesión',
+                created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+            );
+
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL,
+                role TEXT NOT NULL CHECK(role IN ('user','model')),
+                content TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
+            );
         """)
 
         # Migraciones v3.0 (no destructivas)
@@ -656,3 +674,79 @@ def delete_source_config(source_id: int) -> None:
     with get_conn() as conn:
         conn.execute("UPDATE sources SET config='{}' WHERE id=?", (source_id,))
         conn.commit()
+
+
+# ── Chat Sessions ────────────────────────────────────────────────────────────
+
+import uuid
+
+def create_chat_session(title: str = "Nueva sesión") -> str:
+    session_id = str(uuid.uuid4())
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO chat_sessions(id, title) VALUES (?, ?)",
+            (session_id, title),
+        )
+        conn.commit()
+    return session_id
+
+
+def get_chat_sessions() -> list:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, title, created_at, updated_at FROM chat_sessions ORDER BY updated_at DESC"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_chat_session(session_id: str) -> dict | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT id, title, created_at, updated_at FROM chat_sessions WHERE id=?",
+            (session_id,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def update_chat_session_title(session_id: str, title: str) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE chat_sessions SET title=?, updated_at=datetime('now','localtime') WHERE id=?",
+            (title, session_id),
+        )
+        conn.commit()
+
+
+def touch_chat_session(session_id: str) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE chat_sessions SET updated_at=datetime('now','localtime') WHERE id=?",
+            (session_id,),
+        )
+        conn.commit()
+
+
+def delete_chat_session(session_id: str) -> None:
+    with get_conn() as conn:
+        conn.execute("DELETE FROM chat_messages WHERE session_id=?", (session_id,))
+        conn.execute("DELETE FROM chat_sessions WHERE id=?", (session_id,))
+        conn.commit()
+
+
+def add_chat_message(session_id: str, role: str, content: str) -> int:
+    with get_conn() as conn:
+        cur = conn.execute(
+            "INSERT INTO chat_messages(session_id, role, content) VALUES (?, ?, ?)",
+            (session_id, role, content),
+        )
+        conn.commit()
+    return cur.lastrowid
+
+
+def get_chat_messages(session_id: str) -> list:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, role, content, created_at FROM chat_messages WHERE session_id=? ORDER BY id ASC",
+            (session_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]

@@ -24,8 +24,8 @@
 
   <nav class="sidebar-nav">
     <a href="{{ url_for('index') }}" class="nav-item {% if request.endpoint == 'index' %}active{% endif %}">
-      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-      Dashboard
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/><path d="M13 7h-2v5l4.25 2.52.75-1.23-3.5-2.08V7z"/></svg>
+      Sesiones
     </a>
 
     <a href="{{ url_for('analytics_view') }}"
@@ -36,86 +36,38 @@
 
     <div class="nav-section-label">Módulos</div>
 
-    <a href="{{ url_for('module_view', module_id='tanques_gas') }}"
-       class="nav-item {% if request.endpoint == 'module_view' and module_id == 'tanques_gas' %}active{% endif %}">
-      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0-10 10c0 4.42 2.65 8.17 6.35 9.95-.03-.17-.05-.34-.05-.5 0-2.76 2.24-5 5-5s5 2.24 5 5c0 .16-.02.33-.05.5C19.35 20.17 22 16.42 22 12A10 10 0 0 0 12 2z"/><circle cx="12" cy="12" r="3"/><path d="M12 6v2M12 16v2M6 12h2M16 12h2"/></svg>
-      <span>Tanques de Gas</span>
-      <span class="status-dot {% if modules['tanques_gas']['enabled'] %}on{% endif %}"></span>
-    </a>
+    {% set order_raw = settings.get('modules_order', '') %}
+    {% if order_raw %}
+      {% set module_order = order_raw.split(',') %}
+    {% else %}
+      {% set module_order = ['tanques_gas','reglamento','epp','vehiculos','carga_descarga','personas','armas','acciones','troncos','pallets','cajas','smoke'] %}
+    {% endif %}
 
-    <a href="{{ url_for('module_view', module_id='reglamento') }}"
-       class="nav-item {% if request.endpoint == 'module_view' and module_id == 'reglamento' %}active{% endif %}">
-      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 11 12 14 15 9"/></svg>
-      <span>Reglamento</span>
-      <span class="status-dot {% if modules['reglamento']['enabled'] %}on{% endif %}"></span>
-    </a>
-    <a href="{{ url_for('module_view', module_id='epp') }}"
-       class="nav-item {% if request.endpoint == 'module_view' and module_id == 'epp' %}active{% endif %}">
-      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
-      <span>EPP</span>
-      <span class="status-dot {% if modules['epp']['enabled'] %}on{% endif %}"></span>
-    </a>
-    <a href="{{ url_for('module_view', module_id='vehiculos') }}"
-       class="nav-item {% if request.endpoint == 'module_view' and module_id == 'vehiculos' %}active{% endif %}">
-      <svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="14" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
-      <span>Vehículos</span>
-      <span class="status-dot {% if modules['vehiculos']['enabled'] %}on{% endif %}"></span>
-    </a>
-    <a href="{{ url_for('module_view', module_id='carga_descarga') }}"
-       class="nav-item {% if request.endpoint == 'module_view' and module_id == 'carga_descarga' %}active{% endif %}">
-      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3 8 12 13 21 8"/></svg>
-      Carga y Descarga
-      <span class="status-dot {% if modules['carga_descarga']['enabled'] %}on{% endif %}"></span>
-    </a>
+    {% set module_icons = {
+      'tanques_gas': '<path d="M12 2a10 10 0 0 0-10 10c0 4.42 2.65 8.17 6.35 9.95-.03-.17-.05-.34-.05-.5 0-2.76 2.24-5 5-5s5 2.24 5 5c0 .16-.02.33-.05.5C19.35 20.17 22 16.42 22 12A10 10 0 0 0 12 2z"/><circle cx="12" cy="12" r="3"/><path d="M12 6v2M12 16v2M6 12h2M16 12h2"/>',
+      'reglamento': '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 11 12 14 15 9"/>',
+      'epp': '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>',
+      'vehiculos': '<rect x="3" y="3" width="18" height="14" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>',
+      'carga_descarga': '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3 8 12 13 21 8"/>',
+      'personas': '<circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0 1 12 0v2"/>',
+      'armas': '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+      'acciones': '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
+      'troncos': '<rect x="4" y="2" width="16" height="20" rx="2"/><line x1="12" y1="6" x2="12" y2="18"/><line x1="6" y1="10" x2="10" y2="10"/><line x1="14" y1="14" x2="18" y2="14"/>',
+      'pallets': '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 12h18M12 3v18"/>',
+      'cajas': '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>',
+      'smoke': '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+    } %}
 
-    <a href="{{ url_for('module_view', module_id='personas') }}"
-       class="nav-item {% if request.endpoint == 'module_view' and module_id == 'personas' %}active{% endif %}">
-      <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0 1 12 0v2"/></svg>
-      Detección de Personas
-      <span class="status-dot {% if modules['personas']['enabled'] %}on{% endif %}"></span>
+    {% for mid in module_order %}
+      {% if mid in modules %}
+    <a href="{{ url_for('module_view', module_id=mid) }}"
+       class="nav-item {% if request.endpoint == 'module_view' and module_id == mid %}active{% endif %}">
+      <svg class="nav-icon" viewBox="0 0 24 24">{{ module_icons.get(mid, '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>') | safe }}</svg>
+      <span>{{ modules[mid].label }}</span>
+      <span class="status-dot {% if modules[mid]['enabled'] %}on{% endif %}"></span>
     </a>
-
-    <a href="{{ url_for('module_view', module_id='armas') }}"
-       class="nav-item {% if request.endpoint == 'module_view' and module_id == 'armas' %}active{% endif %}">
-      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-      Detección de Armas
-      <span class="status-dot {% if modules['armas']['enabled'] %}on{% endif %}"></span>
-    </a>
-
-    <a href="{{ url_for('module_view', module_id='acciones') }}"
-       class="nav-item {% if request.endpoint == 'module_view' and module_id == 'acciones' %}active{% endif %}">
-      <svg class="nav-icon" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-      Detección de Acciones
-      <span class="status-dot {% if modules['acciones']['enabled'] %}on{% endif %}"></span>
-    </a>
-
-    <a href="{{ url_for('module_view', module_id='troncos') }}"
-       class="nav-item {% if request.endpoint == 'module_view' and module_id == 'troncos' %}active{% endif %}">
-      <svg class="nav-icon" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="12" y1="6" x2="12" y2="18"/><line x1="6" y1="10" x2="10" y2="10"/><line x1="14" y1="14" x2="18" y2="14"/></svg>
-      Conteo de Troncos
-      <span class="status-dot {% if modules['troncos']['enabled'] %}on{% endif %}"></span>
-    </a>
-
-    <a href="{{ url_for('module_view', module_id='pallets') }}"
-       class="nav-item {% if request.endpoint == 'module_view' and module_id == 'pallets' %}active{% endif %}">
-      <svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 12h18M12 3v18"/></svg>
-      Conteo de Pallets
-      <span class="status-dot {% if modules['pallets']['enabled'] %}on{% endif %}"></span>
-    </a>
-
-    <a href="{{ url_for('module_view', module_id='cajas') }}"
-       class="nav-item {% if request.endpoint == 'module_view' and module_id == 'cajas' %}active{% endif %}">
-      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-      Conteo de Cajas
-      <span class="status-dot {% if modules['cajas']['enabled'] %}on{% endif %}"></span>
-    </a>
-
-    <a href="{{ url_for('module_view', module_id='smoke') }}"
-       class="nav-item {% if request.endpoint == 'module_view' and module_id == 'smoke' %}active{% endif %}">
-      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      <span>Humo/Fuego</span>
-      <span class="status-dot {% if modules['smoke']['enabled'] %}on{% endif %}"></span>
-    </a>
+      {% endif %}
+    {% endfor %}
   </nav>
 
   <!-- Sistema — separado al fondo -->
@@ -141,6 +93,20 @@
   <header class="topbar">
     <h1 class="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
     <div class="topbar-right">
+      <div class="session-popup-container" id="session-popup-container">
+        <button class="session-history-btn" id="btn-session-history" title="Historial de sesiones">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span>Historial</span>
+          <span class="session-count-badge" id="session-count-badge">0</span>
+        </button>
+        <div class="session-dropdown" id="session-dropdown" hidden>
+          <div class="session-dropdown-header">
+            <span>Sesiones</span>
+            <button class="session-new-btn" id="btn-new-session">+ Nueva</button>
+          </div>
+          <div class="session-list" id="session-list"></div>
+        </div>
+      </div>
       <span class="online-badge">En línea</span>
     </div>
   </header>
