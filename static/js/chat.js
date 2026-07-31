@@ -1,25 +1,28 @@
 (function () {
   'use strict';
 
-  let currentSessionId = null;
-  let isLoading = false;
+  var currentSessionId = null;
+  var isLoading = false;
+  var cooldownUntil = 0;
 
-  const chatMessages = document.getElementById('chat-messages');
-  const chatWelcome = document.getElementById('chat-welcome');
-  const chatInput = document.getElementById('chat-input');
-  const chatSendBtn = document.getElementById('chat-send-btn');
-  const chatThinking = document.getElementById('chat-thinking');
-  const suggestions = document.getElementById('chat-suggestions');
-  const sessionDropdown = document.getElementById('session-dropdown');
-  const sessionList = document.getElementById('session-list');
-  const sessionCountBadge = document.getElementById('session-count-badge');
-  const btnSessionHistory = document.getElementById('btn-session-history');
-  const btnNewSession = document.getElementById('btn-new-session');
+  var chatMessages = document.getElementById('chat-messages');
+  var chatWelcome = document.getElementById('chat-welcome');
+  var chatInput = document.getElementById('chat-input');
+  var chatSendBtn = document.getElementById('chat-send-btn');
+  var suggestions = document.getElementById('chat-suggestions');
+  var sessionDropdown = document.getElementById('session-dropdown');
+  var sessionList = document.getElementById('session-list');
+  var sessionCountBadge = document.getElementById('session-count-badge');
+  var btnSessionHistory = document.getElementById('btn-session-history');
+  var btnNewSession = document.getElementById('btn-new-session');
+
+  var typingBubble = null;
+  var cooldownTimer = null;
 
   function autoResize() {
     chatInput.style.height = 'auto';
     chatInput.style.height = Math.min(chatInput.scrollHeight, 160) + 'px';
-    chatSendBtn.disabled = !chatInput.value.trim();
+    updateSendButton();
   }
   chatInput.addEventListener('input', autoResize);
   chatInput.addEventListener('keydown', function (e) {
@@ -28,6 +31,38 @@
       sendMessage();
     }
   });
+
+  function updateSendButton() {
+    var now = Date.now();
+    if (cooldownUntil > now) {
+      var secs = Math.ceil((cooldownUntil - now) / 1000);
+      chatSendBtn.disabled = true;
+      chatSendBtn.title = 'Espera ' + secs + 's';
+    } else if (isLoading) {
+      chatSendBtn.disabled = true;
+      chatSendBtn.title = '';
+    } else {
+      chatSendBtn.disabled = !chatInput.value.trim();
+      chatSendBtn.title = '';
+    }
+  }
+
+  function startCooldown(seconds) {
+    cooldownUntil = Date.now() + (seconds * 1000);
+    if (cooldownTimer) clearInterval(cooldownTimer);
+    cooldownTimer = setInterval(function () {
+      var now = Date.now();
+      if (now >= cooldownUntil) {
+        clearInterval(cooldownTimer);
+        cooldownTimer = null;
+        cooldownUntil = 0;
+        updateSendButton();
+        return;
+      }
+      updateSendButton();
+    }, 500);
+    updateSendButton();
+  }
 
   function renderMarkdown(text) {
     if (typeof marked !== 'undefined') {
@@ -39,8 +74,9 @@
   function addMessage(role, content) {
     chatWelcome.style.display = 'none';
 
+    var displayRole = role === 'model' ? 'assistant' : role;
     var div = document.createElement('div');
-    div.className = 'message ' + role;
+    div.className = 'message ' + displayRole;
 
     var avatar = document.createElement('div');
     avatar.className = 'message-avatar';
@@ -50,7 +86,7 @@
     var bubble = document.createElement('div');
     bubble.className = 'message-bubble';
 
-    if (role === 'assistant') {
+    if (displayRole === 'assistant') {
       bubble.innerHTML = renderMarkdown(content);
     } else {
       bubble.textContent = content;
@@ -61,9 +97,115 @@
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
 
+  function showTypingBubble() {
+    chatWelcome.style.display = 'none';
+
+    typingBubble = document.createElement('div');
+    typingBubble.className = 'message assistant typing';
+
+    var avatar = document.createElement('div');
+    avatar.className = 'message-avatar';
+    avatar.textContent = '\u2728';
+    typingBubble.appendChild(avatar);
+
+    var bubble = document.createElement('div');
+    bubble.className = 'message-bubble';
+
+    var dots = document.createElement('div');
+    dots.className = 'typing-dots';
+    for (var i = 0; i < 3; i++) {
+      var dot = document.createElement('span');
+      dot.className = 'typing-dot';
+      dots.appendChild(dot);
+    }
+    bubble.appendChild(dots);
+
+    var label = document.createElement('span');
+    label.className = 'typing-label';
+    label.textContent = 'Procesando';
+    bubble.appendChild(label);
+
+    typingBubble.appendChild(bubble);
+    chatMessages.appendChild(typingBubble);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function updateTypingLabel(text) {
+    if (typingBubble) {
+      var label = typingBubble.querySelector('.typing-label');
+      if (label) label.textContent = text;
+    }
+  }
+
+  function removeTypingBubble() {
+    if (typingBubble && typingBubble.parentNode) {
+      typingBubble.parentNode.removeChild(typingBubble);
+      typingBubble = null;
+    }
+  }
+
+  function typeMessage(content, callback) {
+    chatWelcome.style.display = 'none';
+
+    var div = document.createElement('div');
+    div.className = 'message assistant';
+
+    var avatar = document.createElement('div');
+    avatar.className = 'message-avatar';
+    avatar.textContent = '\u2728';
+    div.appendChild(avatar);
+
+    var bubble = document.createElement('div');
+    bubble.className = 'message-bubble';
+    bubble.innerHTML = '';
+    div.appendChild(bubble);
+
+    chatMessages.appendChild(div);
+
+    var fullHTML = renderMarkdown(content);
+    var tempDiv = document.createElement('div');
+    tempDiv.innerHTML = fullHTML;
+    var fullText = tempDiv.textContent || tempDiv.innerText || '';
+    var totalChars = fullText.length;
+
+    if (totalChars < 20) {
+      bubble.innerHTML = fullHTML;
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      if (callback) callback();
+      return;
+    }
+
+    var speed = Math.max(5, Math.min(20, Math.floor(2000 / totalChars)));
+    speed = Math.min(speed, 25);
+    var chunkSize = Math.max(1, Math.floor(totalChars / 60));
+
+    var pos = 0;
+    function typeChunk() {
+      if (pos >= totalChars) {
+        bubble.innerHTML = fullHTML;
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        if (callback) callback();
+        return;
+      }
+      pos = Math.min(pos + chunkSize, totalChars);
+      var currentText = fullText.slice(0, pos);
+      bubble.innerHTML = renderMarkdown(currentText);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      setTimeout(typeChunk, speed);
+    }
+    typeChunk();
+  }
+
   async function sendMessage() {
     var prompt = chatInput.value.trim();
     if (!prompt || isLoading) return;
+
+    var now = Date.now();
+    if (cooldownUntil > now) {
+      var secs = Math.ceil((cooldownUntil - now) / 1000);
+      addMessage('assistant', '\u23F1\uFE0F Debes esperar ' + secs + ' segundos antes de enviar otro mensaje. Gemini tiene un límite de peticiones por minuto.');
+      return;
+    }
 
     if (!currentSessionId) {
       try {
@@ -85,8 +227,18 @@
     addMessage('user', prompt);
 
     isLoading = true;
-    chatThinking.hidden = false;
     chatSendBtn.disabled = true;
+    showTypingBubble();
+    startCooldown(3);
+
+    var timedOut = false;
+    var timeoutId = setTimeout(function () {
+      timedOut = true;
+      removeTypingBubble();
+      addMessage('assistant', '\u23F1\uFE0F La solicitud está tomando más de lo esperado. Gemini puede estar procesando tu petición. Espera un momento antes de reintentar.');
+      isLoading = false;
+      updateSendButton();
+    }, 45000);
 
     try {
       var r = await fetch('/api/chat', {
@@ -94,22 +246,37 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: prompt, session_id: currentSessionId }),
       });
+      clearTimeout(timeoutId);
+
+      if (timedOut) return;
+
       var data = await r.json();
 
+      removeTypingBubble();
+
       if (!r.ok) {
-        addMessage('assistant', '\u26A0\uFE0F ' + (data.error || 'Error desconocido'));
+        if (r.status === 429 && data.retry_after) {
+          addMessage('assistant', '\u23F1\uFE0F ' + (data.error || 'Límite de peticiones excedido.'));
+          startCooldown(data.retry_after);
+        } else {
+          addMessage('assistant', '\u26A0\uFE0F ' + (data.error || 'Error desconocido'));
+        }
         return;
       }
 
-      addMessage('assistant', data.reply);
-      if (data.session_id) currentSessionId = data.session_id;
-      loadSessionList();
+      typeMessage(data.reply, function () {
+        if (data.session_id) currentSessionId = data.session_id;
+        loadSessionList();
+      });
     } catch (e) {
-      addMessage('assistant', '\u26A0\uFE0F Error de conexi\u00F3n con el servidor.');
+      clearTimeout(timeoutId);
+      if (!timedOut) {
+        removeTypingBubble();
+        addMessage('assistant', '\u26A0\uFE0F Error de conexi\u00F3n con el servidor.');
+      }
     } finally {
       isLoading = false;
-      chatThinking.hidden = true;
-      chatSendBtn.disabled = !chatInput.value.trim();
+      updateSendButton();
     }
   }
 

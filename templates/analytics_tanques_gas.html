@@ -580,205 +580,132 @@ async function exportPDF(mode) {
   btn.style.opacity = '0.6';
 
   try {
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pageW = 210;
-    const pageH = 297;
-    const margin = 12;
-
     const container = document.getElementById('dashboard-container');
 
-    // Title page or header
-    function addHeader(page, isFirst) {
-      page.setFontSize(16);
-      page.setFont('helvetica', 'bold');
-      page.text('Tanques de Gas — Dashboard Analítico', margin, margin + 8);
-      page.setFontSize(9);
-      page.setFont('helvetica', 'normal');
-      page.setTextColor(100);
-      const now = new Date();
-      const dateStr = now.toISOString().slice(0, 10) + ' ' + now.toTimeString().slice(0, 5);
-      page.text(`Generado: ${dateStr}  |  Rango: ${document.getElementById('filter-range').selectedOptions[0].text}`, margin, margin + 14);
-      page.setTextColor(0);
-    }
+    // Hide interactive elements temporarily
+    const hideEls = container.querySelectorAll('.tg-event-capture, .tg-pagination, .tg-btn-refresh, .tg-btn-pdf');
+    const chips = container.querySelectorAll('.tg-event-chip');
+    const pagers = container.querySelectorAll('.tg-page-btn, .tg-page-info');
+    const hidden = [];
+    hideEls.forEach(el => { if (el.style.display !== 'none') { hidden.push(el); el.style.display = 'none'; } });
+    const chipOrig = [];
+    chips.forEach(c => { chipOrig.push(c.style.pointerEvents); c.style.pointerEvents = 'none'; });
+    const pagerOrig = [];
+    pagers.forEach(p => { if (p.style.display !== 'none') { pagerOrig.push(p); p.style.display = 'none'; } });
 
-    if (mode === 'todo') {
-      // Page 1: KPIs
-      addHeader(pdf, true);
-      pdf.setFontSize(12);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Métricas Globales', margin, margin + 26);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(10);
-
-      const kpis = allData?.kpis || {};
-      const items = [
-        ['Total Entradas', kpis.totalEntradas],
-        ['Total Salidas', kpis.totalSalidas],
-        ['Ocupación Neta', kpis.ocupacionNeta],
-        ['Ratio E/S', kpis.ratioES],
-        ['Eventos Hoy', kpis.eventosHoy],
-        ['Alertas Humo', kpis.alertasHumo],
-        ['Promedio Diario', kpis.promedioDiario],
-        ['Pico Diario', kpis.picoDiario],
-        ['Total Eventos', kpis.totalEventos],
-        ['Total Acciones', kpis.totalAcciones],
-      ];
-      items.forEach(([label, value], i) => {
-        const col = i % 2;
-        const row = Math.floor(i / 2);
-        const x = margin + col * 90;
-        const y = margin + 36 + row * 8;
-        pdf.text(`${label}:`, x, y);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text(String(value ?? '—'), x + 55, y);
-        pdf.setFont('helvetica', 'normal');
-      });
-
-      // KPIs continued: sources table (simple)
-      const sources = allData?.sources || [];
-      if (sources.length > 0) {
-        let yPos = margin + 62;
-        pdf.setFontSize(11);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text('Detalle por Fuente', margin, yPos);
-        yPos += 6;
-
-        const headers = ['Fuente', 'Entradas', 'Salidas', 'Acciones', 'Humo', '%'];
-        const colWidths = [40, 22, 22, 22, 22, 22];
-        const startX = margin;
-
-        pdf.setFontSize(8);
-        pdf.setFont('helvetica', 'bold');
-        headers.forEach((h, i) => {
-          pdf.text(h, startX + colWidths.slice(0, i).reduce((a, b) => a + b, 0) + 2, yPos);
+    const { jsPDF } = window.jspdf;
+    let pdf;
+    try {
+      if (mode === 'todo') {
+        // Capture entire dashboard at its natural size
+        const canvas = await html2canvas(container, {
+          scale: 2.5,
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#F4F5F7',
+          width: container.scrollWidth,
+          height: container.scrollHeight,
+          windowWidth: container.scrollWidth,
+          windowHeight: container.scrollHeight,
         });
-        yPos += 1;
-        pdf.line(startX, yPos, startX + colWidths.reduce((a, b) => a + b, 0), yPos);
-        yPos += 3;
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        const totalW = canvas.width / 2.5;
+        const totalH = canvas.height / 2.5;
+        const mmW = totalW * 0.2646; // px to mm at ~96dpi
+        const mmH = totalH * 0.2646;
 
-        pdf.setFont('helvetica', 'normal');
-        sources.forEach(s => {
-          pdf.text(s.name, startX + 2, yPos);
-          pdf.text(String(s.entradas), startX + 42, yPos);
-          pdf.text(String(s.salidas), startX + 64, yPos);
-          pdf.text(String(s.acciones), startX + 86, yPos);
-          pdf.text(s.smoke ? 'Sí' : 'No', startX + 108, yPos);
-          pdf.text(s.contribucion + '%', startX + 130, yPos);
-          yPos += 5;
-          if (yPos > pageH - margin) {
-            pdf.addPage();
-            yPos = margin + 10;
-          }
-        });
-      }
+        // Create PDF with exact page size matching the captured content
+        pdf = new jsPDF({ orientation: mmW >= mmH ? 'l' : 'p', unit: 'mm', format: [mmW, mmH] });
+        pdf.addImage(imgData, 'JPEG', 0, 0, mmW, mmH);
+      } else {
+        pdf = new jsPDF('l', 'mm', 'a4');
+        const pageW = 297;
+        const pageH = 210;
+        const margin = 12;
+        const usableW = pageW - margin * 2;
+        const usableH = pageH - margin * 2;
 
-      // Page 2+: Capture charts as images
-      const chartIds = ['chart-pie-fuentes', 'chart-timeline', 'chart-bar-fuentes', 'chart-acciones', 'chart-polar'];
-      let chartPageCount = 0;
-      for (const cid of chartIds) {
-        const canvas = document.getElementById(cid);
-        if (!canvas) continue;
-        try {
-          const imgData = canvas.toDataURL('image/png');
-          if (chartPageCount > 0) pdf.addPage();
-          const imgW = pageW - margin * 2;
-          const imgH = (canvas.height / canvas.width) * imgW;
-          const yStart = margin + 10;
-          pdf.addImage(imgData, 'PNG', margin, yStart, imgW, Math.min(imgH, pageH - margin * 2 - 10));
-          chartPageCount++;
-        } catch (e) {
-          console.warn('Skipping chart', cid, e);
+        // Resumen: capture only KPI strip + source table via cloning
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'position:fixed;left:-9999px;top:0;width:1100px;z-index:-1';
+        wrap.id = 'pdf-export-wrap';
+        document.body.appendChild(wrap);
+
+        const exportEl = document.createElement('div');
+        exportEl.style.cssText = 'padding:16px;width:1060px;margin:0 auto;background:#F4F5F7';
+
+        // Header
+        const hdr = document.createElement('div');
+        hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#182A55;color:#fff;border-radius:10px;margin-bottom:16px';
+        const dt = new Date();
+        const ds = dt.toISOString().slice(0,10) + ' ' + dt.toTimeString().slice(0,5);
+        const rt = document.getElementById('filter-range').selectedOptions[0].text;
+        hdr.innerHTML = `<div><strong style="font-size:16px">Tanques de Gas · Resumen</strong></div><div style="font-size:11px;opacity:0.8">${ds} · Rango: ${rt}</div>`;
+        exportEl.appendChild(hdr);
+
+        // Clone KPI strip with chart images
+        function cloneForPDF(selector) {
+          const src = document.querySelector(selector);
+          if (!src) return null;
+          const cl = src.cloneNode(true);
+          cl.querySelectorAll('canvas').forEach(c => {
+            try {
+              const img = document.createElement('img');
+              img.src = c.toDataURL('image/png');
+              img.style.cssText = 'width:100%;height:auto;max-height:280px;object-fit:contain';
+              c.parentNode.replaceChild(img, c);
+            } catch(e) {}
+          });
+          return cl;
         }
-      }
 
-      // Events list (simple)
-      if (allData?.recentEvents?.length > 0) {
-        pdf.addPage();
-        addHeader(pdf, false);
-        pdf.setFontSize(11);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text('Eventos Recientes (últimos 50)', margin, margin + 24);
-        pdf.setFontSize(7);
-        pdf.setFont('helvetica', 'normal');
+        const kpiClone = cloneForPDF('#kpi-strip');
+        if (kpiClone) exportEl.appendChild(kpiClone);
 
-        let yPos = margin + 30;
-        const evHeaders = ['Fecha/Hora', 'Tipo', 'Detalle'];
-        const evColW = [50, 25, 80];
-        pdf.setFont('helvetica', 'bold');
-        evHeaders.forEach((h, i) => {
-          pdf.text(h, margin + evColW.slice(0, i).reduce((a, b) => a + b, 0) + 2, yPos);
+        const miniClone = cloneForPDF('.tg-section-card');
+        if (miniClone) exportEl.appendChild(miniClone);
+
+        const tableClone = cloneForPDF('.tg-table-container');
+        if (tableClone) {
+          tableClone.querySelectorAll('.tg-table-search').forEach(el => el.remove());
+          exportEl.appendChild(tableClone);
+        }
+
+        wrap.appendChild(exportEl);
+        await new Promise(r => setTimeout(r, 400));
+
+        const rCanvas = await html2canvas(exportEl, {
+          scale: 2.5, useCORS: true, logging: false, backgroundColor: '#F4F5F7',
+          width: exportEl.scrollWidth, height: exportEl.scrollHeight,
+          windowWidth: exportEl.scrollWidth, windowHeight: exportEl.scrollHeight,
         });
-        yPos += 1;
-        pdf.line(margin, yPos, margin + evColW.reduce((a, b) => a + b, 0), yPos);
-        yPos += 3;
-        pdf.setFont('helvetica', 'normal');
+        const rImg = rCanvas.toDataURL('image/jpeg', 0.95);
+        const rTotalW = rCanvas.width / 2.5;
+        const rTotalH = rCanvas.height / 2.5;
+        const rMmW = rTotalW * 0.2646;
+        const rMmH = rTotalH * 0.2646;
+        const rScaleX = usableW / rMmW;
+        let rRemH = rMmH * rScaleX;
+        let rOff = 0;
+        let rPage = 0;
+        while (rRemH > 0.5) {
+          if (rPage > 0) pdf.addPage();
+          const rPH = Math.min(usableH, rRemH);
+          const rSrcY = (rOff / 0.2646) / rScaleX;
+          const rSrcH = (rPH / usableW) * rTotalW;
+          pdf.addImage(rImg, 'JPEG', margin, margin, usableW, rPH, null, null, 0, 0, rTotalW, rSrcY, rTotalW, rSrcH);
+          rRemH -= rPH;
+          rOff += rPH;
+          rPage++;
+        }
 
-        const events = allData.recentEvents.slice(0, 50);
-        events.forEach(e => {
-          const text = e.label || e.event_type;
-          pdf.text(e.created_at || '', margin + 2, yPos);
-          pdf.text(e.event_type, margin + 52, yPos);
-          const displayText = text.length > 40 ? text.slice(0, 38) + '...' : text;
-          pdf.text(displayText, margin + 78, yPos);
-          yPos += 4;
-          if (yPos > pageH - margin) {
-            pdf.addPage();
-            yPos = margin + 10;
-          }
-        });
+        document.getElementById('pdf-export-wrap')?.remove();
       }
-
-    } else {
-      // Resumen ejecutivo — 1 page
-      addHeader(pdf, true);
-
-      // KPI table
-      const kpis = allData?.kpis || {};
-      const items = [
-        ['Entradas', kpis.totalEntradas, 'Salidas', kpis.totalSalidas],
-        ['Ocupación Neta', kpis.ocupacionNeta, 'Ratio E/S', kpis.ratioES],
-        ['Eventos Hoy', kpis.eventosHoy, 'Alertas Humo', kpis.alertasHumo],
-        ['Promedio Diario', kpis.promedioDiario, 'Pico Diario', kpis.picoDiario],
-        ['Total Eventos', kpis.totalEventos, 'Acciones', kpis.totalAcciones],
-      ];
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Indicadores Clave', margin, margin + 26);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(9);
-      items.forEach(([l1, v1, l2, v2], i) => {
-        const y = margin + 32 + i * 7;
-        pdf.text(`${l1}:  ${v1 ?? '—'}`, margin, y);
-        pdf.text(`${l2}:  ${v2 ?? '—'}`, margin + 90, y);
-      });
-
-      // Source summary
-      const sources = allData?.sources || [];
-      if (sources.length > 0) {
-        let y = margin + 72;
-        pdf.setFontSize(10);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text('Fuentes', margin, y);
-        y += 5;
-        pdf.setFontSize(8);
-        const cols = ['Fuente', 'Ent', 'Sal', 'Acc', '%'];
-        const cw = [40, 18, 18, 18, 18];
-        pdf.setFont('helvetica', 'bold');
-        cols.forEach((h, i) => pdf.text(h, margin + cw.slice(0, i).reduce((a, b) => a + b, 0) + 2, y));
-        y += 1;
-        pdf.line(margin, y, margin + cw.reduce((a, b) => a + b, 0), y);
-        y += 3;
-        pdf.setFont('helvetica', 'normal');
-        sources.forEach(s => {
-          pdf.text(s.name, margin + 2, y);
-          pdf.text(String(s.entradas), margin + 42, y);
-          pdf.text(String(s.salidas), margin + 60, y);
-          pdf.text(String(s.acciones), margin + 78, y);
-          pdf.text(s.contribucion + '%', margin + 96, y);
-          y += 4.5;
-        });
-      }
+    } finally {
+      // Restore hidden elements
+      hidden.forEach(el => el.style.display = '');
+      chips.forEach((c, i) => c.style.pointerEvents = chipOrig[i] || '');
+      pagerOrig.forEach(p => p.style.display = '');
     }
 
     pdf.save(`tanques_gas_dashboard_${new Date().toISOString().slice(0, 10)}.pdf`);
@@ -799,7 +726,7 @@ document.getElementById('btn-refresh').addEventListener('click', loadData);
 
 // ── Init ──
 async function init() {
-  // Populate source filter
+  // Populate source filter with real names
   try {
     const r = await fetch(`/api/analytics/${MODULE_ID}/summary?days=365`);
     if (r.ok) {
@@ -815,6 +742,17 @@ async function init() {
       }
     }
   } catch (e) {}
+  // Refresh source names in filter after data loads
+  const fixSourceNames = () => {
+    if (!allData?.sources) return;
+    const sel = document.getElementById('filter-source');
+    allData.sources.forEach(s => {
+      const opt = sel.querySelector(`option[value="${s.id}"]`);
+      if (opt) opt.textContent = s.name;
+    });
+  };
+  // Patch into existing loadData via periodic check
+  setInterval(fixSourceNames, 2000);
 
   // Set default dates
   const today = new Date();

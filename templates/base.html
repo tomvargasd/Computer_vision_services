@@ -60,17 +60,20 @@
 
     {% for mid in module_order %}
       {% if mid in modules %}
+        {% if access.access_type != 'limited' or mid in limited_modules %}
     <a href="{{ url_for('module_view', module_id=mid) }}"
        class="nav-item {% if request.endpoint == 'module_view' and module_id == mid %}active{% endif %}">
       <svg class="nav-icon" viewBox="0 0 24 24">{{ module_icons.get(mid, '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>') | safe }}</svg>
       <span>{{ modules[mid].label }}</span>
       <span class="status-dot {% if modules[mid]['enabled'] %}on{% endif %}"></span>
     </a>
+        {% endif %}
       {% endif %}
     {% endfor %}
   </nav>
 
   <!-- Sistema — separado al fondo -->
+  {% if access.access_type == 'full' or not access.authenticated %}
   <div class="sidebar-sistema">
     <div class="nav-section-label">Sistema</div>
     <a href="{{ url_for('settings_view') }}"
@@ -79,6 +82,7 @@
       Configuración
     </a>
   </div>
+  {% endif %}
 
   <div class="sidebar-footer">
     
@@ -119,5 +123,97 @@
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 <script src="{{ url_for('static', filename='js/evidence-modal.js') }}"></script>
 {% block scripts %}{% endblock %}
+
+{% if not access.authenticated %}
+<!-- ══ Access Overlay ═══════════════════════════════════════════════ -->
+<div class="access-overlay" id="access-overlay">
+  <div class="access-modal">
+    <div class="access-logo">
+      {% if settings.logo %}
+        <img src="{{ url_for('static', filename='uploads/' ~ settings.logo) }}" alt="Logo"/>
+      {% else %}
+        <span>◈</span>
+      {% endif %}
+    </div>
+    <h2>{{ settings.system_name }}</h2>
+    <p>Identifícate para acceder al sistema</p>
+    <form id="access-form" autocomplete="off">
+      <input type="email" id="access-email" placeholder="Correo electrónico" required autofocus/>
+      <input type="password" id="access-password" placeholder="Clave" required/>
+      <div class="access-location-status" id="access-location-status">Solicitando ubicación...</div>
+      <button type="submit" id="access-login-btn">Ingresar</button>
+      <div class="access-error" id="access-error"></div>
+    </form>
+  </div>
+</div>
+<script>
+(function() {
+  var overlay = document.getElementById('access-overlay');
+  var form = document.getElementById('access-form');
+  var emailInput = document.getElementById('access-email');
+  var passInput = document.getElementById('access-password');
+  var errorEl = document.getElementById('access-error');
+  var btn = document.getElementById('access-login-btn');
+  var locStatus = document.getElementById('access-location-status');
+  var locationData = {};
+
+  locStatus.className = 'access-location-status loading';
+
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(function(pos) {
+      locationData = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      locStatus.textContent = '✓ Ubicación obtenida';
+      locStatus.className = 'access-location-status ok';
+    }, function() {
+      locStatus.textContent = '⚠ No se pudo obtener ubicación (no obligatorio)';
+      locStatus.className = 'access-location-status err';
+    }, { timeout: 8000 });
+  } else {
+    locStatus.textContent = '⚠ Geolocalización no disponible';
+    locStatus.className = 'access-location-status err';
+  }
+
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    var email = emailInput.value.trim();
+    var pass = passInput.value.trim();
+    if (!email || !pass) {
+      errorEl.textContent = 'Completa todos los campos';
+      errorEl.className = 'access-error show';
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = 'Ingresando...';
+    errorEl.className = 'access-error';
+
+    fetch('/api/access/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, password: pass, location: locationData })
+    })
+    .then(function(r) { return r.json().then(function(d) { return { status: r.status, data: d }; }); })
+    .then(function(res) {
+      if (res.status === 200 && res.data.success) {
+        window.location.reload();
+      } else {
+        errorEl.textContent = res.data.error || 'Error al iniciar sesión';
+        errorEl.className = 'access-error show';
+        btn.disabled = false;
+        btn.textContent = 'Ingresar';
+      }
+    })
+    .catch(function() {
+      errorEl.textContent = 'Error de conexión';
+      errorEl.className = 'access-error show';
+      btn.disabled = false;
+      btn.textContent = 'Ingresar';
+    });
+  });
+
+  emailInput.focus();
+})();
+</script>
+{% endif %}
+
 </body>
 </html>

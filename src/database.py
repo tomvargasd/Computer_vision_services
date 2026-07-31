@@ -270,6 +270,45 @@ def init_db():
                 created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
                 FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
             );
+
+            -- Acceso: cuentas de usuario
+            CREATE TABLE IF NOT EXISTS access_accounts (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                email       TEXT    NOT NULL UNIQUE,
+                password    TEXT    NOT NULL,
+                access_type TEXT    NOT NULL CHECK(access_type IN ('full','limited')),
+                created_at  TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
+                active      INTEGER NOT NULL DEFAULT 1
+            );
+
+            -- Acceso: logs de inicio/cierre de sesión
+            CREATE TABLE IF NOT EXISTS access_logs (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                email        TEXT    NOT NULL,
+                action       TEXT    NOT NULL CHECK(action IN ('login','logout','expired','failed')),
+                ip_address   TEXT    NOT NULL DEFAULT '',
+                location_data TEXT   NOT NULL DEFAULT '{}',
+                user_agent   TEXT    NOT NULL DEFAULT '',
+                reason       TEXT    DEFAULT '',
+                created_at   TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+            );
+
+            -- Acceso: módulos permitidos para acceso limitado
+            CREATE TABLE IF NOT EXISTS access_limited_modules (
+                module_id TEXT PRIMARY KEY
+            );
+
+            -- Acceso: lista negra de IPs
+            CREATE TABLE IF NOT EXISTS access_ip_blacklist (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                ip_address  TEXT    NOT NULL UNIQUE,
+                reason      TEXT    DEFAULT '',
+                created_by  TEXT    DEFAULT '',
+                created_at  TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_access_logs_email ON access_logs(email);
+            CREATE INDEX IF NOT EXISTS idx_access_logs_created ON access_logs(created_at);
         """)
 
         # Migraciones v3.0 (no destructivas)
@@ -297,6 +336,12 @@ def init_db():
         conn.execute(
             "UPDATE module_functions SET enabled=1 WHERE module_id='armas' AND func_id='tipo_arma'"
         )
+
+        # Poblar módulos de detección en access_limited_modules por defecto
+        all_mod_ids = list(MODULES_META.keys())
+        for mid in all_mod_ids:
+            conn.execute("INSERT OR IGNORE INTO access_limited_modules(module_id) VALUES(?)", (mid,))
+
         conn.commit()
 
 
@@ -750,3 +795,167 @@ def get_chat_messages(session_id: str) -> list:
             (session_id,),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+# ── Acceso ──────────────────────────────────────────────────────────────────
+
+SECRET_KEY_SETTING = "_access_secret_key"
+
+def get_or_create_secret_key() -> str:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT value FROM settings WHERE key=?", (SECRET_KEY_SETTING,)
+        ).fetchone()
+        if row:
+            return row["value"]
+    import secrets
+    key = secrets.token_hex(32)
+    set_setting(SECRET_KEY_SETTING, key)
+    return key
+
+
+def add_account(email: str, password: str, access_type: str) -> dict:
+    with get_conn() as conn:
+        cur = conn.execute(
+            "INSERT INTO access_accounts(email, password, access_type) VALUES (?,?,?)",
+            (email.strip().lower(), password, access_type),
+        )
+        conn.commit()
+        row = conn.execute(
+            "SELECT id, email, access_type, created_at, active FROM access_accounts WHERE id=?",
+            (cur.lastrowid,),
+        ).fetchone()
+    return dict(row)
+
+
+def get_accounts() -> list:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, email, access_type, created_at, active FROM access_accounts ORDER BY created_at DESC"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_account_by_email(email: str) -> dict | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM access_accounts WHERE email=? AND active=1",
+            (email.strip().lower(),),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def get_account_by_id(account_id: int) -> dict | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT id, email, access_type, created_at, active FROM access_accounts WHERE id=?",
+            (account_id,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def delete_account(account_id: int) -> bool:
+    with get_conn() as conn:
+        cur = conn.execute("DELETE FROM access_accounts WHERE id=?", (account_id,))
+        conn.commit()
+    return cur.rowcount > 0
+
+
+def update_account_password(account_id: int, new_password: str) -> bool:
+    with get_conn() as conn:
+        cur = conn.execute(
+            "UPDATE access_accounts SET password=? WHERE id=?",
+            (new_password, account_id),
+        )
+        conn.commit()
+    return cur.rowcount > 0
+
+
+def add_access_log(email: str, action: str, ip_address: str = "",
+                   location_data: dict = None, user_agent: str = "",
+                   reason: str = "") -> int:
+    with get_conn() as conn:
+        cur = conn.execute(
+            "INSERT INTO access_logs(email, action, ip_address, location_data, user_agent, reason) VALUES (?,?,?,?,?,?)",
+            (email, action, ip_address, json.dumps(location_data or {}), user_agent, reason),
+        )
+        conn.commit()
+    return cur.lastrowid
+
+
+def get_access_logs(page: int = 1, per_page: int = 50, email_filter: str = None) -> dict:
+    with get_conn() as conn:
+        where = ""
+        params = []
+        if email_filter:
+            where = " WHERE email=? "
+            params.append(email_filter.strip().lower())
+        total_row = conn.execute(
+            f"SELECT COUNT(*) as cnt FROM access_logs{where}", params
+        ).fetchone()
+        total = total_row["cnt"] if total_row else 0
+        offset = (page - 1) * per_page
+        rows = conn.execute(
+            f"SELECT * FROM access_logs{where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            params + [per_page, offset],
+        ).fetchall()
+    return {
+        "logs": [dict(r) for r in rows],
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "pages": max(1, (total + per_page - 1) // per_page),
+    }
+
+
+def block_ip(ip_address: str, reason: str = "", created_by: str = "") -> dict | None:
+    with get_conn() as conn:
+        try:
+            cur = conn.execute(
+                "INSERT INTO access_ip_blacklist(ip_address, reason, created_by) VALUES (?,?,?)",
+                (ip_address, reason, created_by),
+            )
+            conn.commit()
+            row = conn.execute(
+                "SELECT * FROM access_ip_blacklist WHERE id=?", (cur.lastrowid,)
+            ).fetchone()
+            return dict(row) if row else None
+        except Exception:
+            return None
+
+
+def unblock_ip(entry_id: int) -> bool:
+    with get_conn() as conn:
+        cur = conn.execute("DELETE FROM access_ip_blacklist WHERE id=?", (entry_id,))
+        conn.commit()
+    return cur.rowcount > 0
+
+
+def get_blacklist() -> list:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM access_ip_blacklist ORDER BY created_at DESC"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def is_ip_blocked(ip_address: str) -> bool:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM access_ip_blacklist WHERE ip_address=?", (ip_address,)
+        ).fetchone()
+    return row is not None
+
+
+def get_limited_modules() -> list:
+    with get_conn() as conn:
+        rows = conn.execute("SELECT module_id FROM access_limited_modules").fetchall()
+    return [r["module_id"] for r in rows]
+
+
+def set_limited_modules(module_ids: list) -> None:
+    with get_conn() as conn:
+        conn.execute("DELETE FROM access_limited_modules")
+        for mid in module_ids:
+            conn.execute("INSERT INTO access_limited_modules(module_id) VALUES(?)", (mid,))
+        conn.commit()

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify, request, Response, stream_with_context
+from flask import Flask, render_template, jsonify, request, Response, stream_with_context, session, g
 from flask_cors import CORS
 from flask_compress import Compress
 import os
@@ -6,6 +6,7 @@ import uuid
 import time
 import json
 import random
+import secrets
 import requests
 import re
 from datetime import datetime, timedelta
@@ -27,6 +28,12 @@ from src.database import (
     create_chat_session, get_chat_sessions, get_chat_session,
     update_chat_session_title, touch_chat_session,
     delete_chat_session, add_chat_message, get_chat_messages,
+    # funciones de acceso
+    get_or_create_secret_key, add_account, get_accounts,
+    get_account_by_email, get_account_by_id, delete_account,
+    update_account_password, add_access_log, get_access_logs,
+    block_ip, unblock_ip, get_blacklist, is_ip_blocked,
+    get_limited_modules, set_limited_modules,
 )
 
 from src.modules.personas import PersonasManager
@@ -86,7 +93,7 @@ app = Flask(__name__, template_folder=os.path.join(BASE_DIR, "templates"),
 CORS(app)
 Compress(app)
 
-app.secret_key = os.urandom(32)
+app.secret_key = get_or_create_secret_key()
 app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -112,7 +119,60 @@ def allowed_model(filename):
 
 @app.context_processor
 def inject_globals():
-    return {"settings": get_settings(), "modules": get_modules_state()}
+    access_info = {
+        "authenticated": "email" in session,
+        "email": session.get("email", ""),
+        "access_type": session.get("access_type", ""),
+    }
+    return {
+        "settings": get_settings(),
+        "modules": get_modules_state(),
+        "access": access_info,
+        "limited_modules": get_limited_modules() if access_info.get("access_type") == "limited" else [],
+    }
+
+
+PUBLIC_PREFIXES = ("/static/", "/api/access/")
+
+@app.before_request
+def check_access():
+    path = request.path
+
+    for prefix in PUBLIC_PREFIXES:
+        if path.startswith(prefix):
+            return None
+
+    ip = request.remote_addr or ""
+    if ip and is_ip_blocked(ip):
+        return jsonify({"error": "Acceso denegado: IP bloqueada"}), 403
+
+    email = session.get("email")
+    expires_at = session.get("expires_at")
+    access_type = session.get("access_type")
+
+    g.access_authenticated = False
+    g.access_email = ""
+    g.access_type = ""
+
+    if email and expires_at:
+        try:
+            exp = datetime.fromisoformat(expires_at)
+            if datetime.now() < exp:
+                g.access_authenticated = True
+                g.access_email = email
+                g.access_type = access_type
+                return None
+            else:
+                add_access_log(email, "expired", ip,
+                               user_agent=request.headers.get("User-Agent", ""))
+                session.clear()
+        except Exception:
+            session.clear()
+
+    if path.startswith("/api/"):
+        return jsonify({"error": "No autenticado", "needs_login": True}), 401
+
+    return None
 
 
 # ─────────────────────────────────────────────
@@ -128,6 +188,8 @@ def analytics_view():
 @app.route("/analytics/<module_id>")
 def analytics_module_view(module_id):
     if module_id not in MODULES_META:
+        return render_template("404.html"), 404
+    if g.get("access_type") == "limited" and module_id not in get_limited_modules():
         return render_template("404.html"), 404
     tmpl = ANALYTICS_TEMPLATES.get(module_id)
     if not tmpl:
@@ -151,6 +213,8 @@ def index():
 @app.route("/module/<module_id>")
 def module_view(module_id):
     if module_id not in MODULES_META:
+        return render_template("404.html"), 404
+    if g.get("access_type") == "limited" and module_id not in get_limited_modules():
         return render_template("404.html"), 404
     modules    = get_modules_state()
     sources    = get_sources(module_id)
@@ -211,6 +275,8 @@ def live_view(module_id, source_id):
 
 @app.route("/api/modules/<module_id>/toggle", methods=["POST"])
 def api_toggle_module(module_id):
+    if g.get("access_type") == "limited":
+        return jsonify({"error": "No tienes permiso"}), 403
     if module_id not in MODULES_META:
         return jsonify({"error": "Módulo no encontrado"}), 404
     enabled = db_toggle_module(module_id)
@@ -237,6 +303,8 @@ def api_toggle_module(module_id):
 
 @app.route("/api/modules/<module_id>/functions/<func_id>/toggle", methods=["POST"])
 def api_toggle_function(module_id, func_id):
+    if g.get("access_type") == "limited":
+        return jsonify({"error": "No tienes permiso"}), 403
     if module_id not in MODULES_META:
         return jsonify({"error": "Módulo no encontrado"}), 404
     if func_id not in MODULES_META[module_id]["functions"]:
@@ -292,8 +360,12 @@ def api_status():
 
 @app.route("/settings")
 def settings_view():
+    if g.get("access_type") == "limited":
+        return render_template("404.html"), 404
     modules = get_modules_state()
-    return render_template("settings.html", modules=modules, settings=get_settings())
+    limited_modules = get_limited_modules()
+    return render_template("settings.html", modules=modules, settings=get_settings(),
+                           limited_modules=limited_modules)
 
 
 @app.route("/api/settings", methods=["GET", "POST"])
@@ -1328,6 +1400,8 @@ def tanques_gas_upload_smoke_model():
 
 @app.route("/api/sources", methods=["POST"])
 def api_add_source():
+    if g.get("access_type") == "limited":
+        return jsonify({"error": "No tienes permiso para agregar fuentes"}), 403
     data = request.get_json(silent=True) or {}
     module_id = data.get("module_id")
     name = data.get("name", "").strip()
@@ -1346,6 +1420,8 @@ def api_add_source():
 
 @app.route("/api/sources/<int:source_id>", methods=["PUT", "DELETE"])
 def api_source_crud(source_id):
+    if g.get("access_type") == "limited":
+        return jsonify({"error": "No tienes permiso para modificar fuentes"}), 403
     if request.method == "DELETE":
         src = get_source(source_id)
         if src:
@@ -1370,6 +1446,8 @@ def api_source_crud(source_id):
 
 @app.route("/api/sources/upload-video", methods=["POST"])
 def api_upload_video():
+    if g.get("access_type") == "limited":
+        return jsonify({"error": "No tienes permiso para subir videos"}), 403
     if "video" not in request.files:
         return jsonify({"error": "No se envió archivo"}), 400
     f = request.files["video"]
@@ -1679,6 +1757,8 @@ def api_tanques_gas_comprehensive():
 
 @app.route("/api/analytics/tanques_gas/seed", methods=["POST"])
 def api_tanques_gas_seed():
+    if g.get("access_type") == "limited":
+        return jsonify({"error": "No tienes permiso"}), 403
     sources = get_sources("tanques_gas")
     if not sources:
         return jsonify({"error": "No hay fuentes registradas. Registre al menos una fuente primero."}), 400
@@ -1867,6 +1947,8 @@ def api_tanques_gas_seed():
 
 @app.route("/api/analytics/tanques_gas/clear", methods=["POST"])
 def api_tanques_gas_clear():
+    if g.get("access_type") == "limited":
+        return jsonify({"error": "No tienes permiso"}), 403
     from src.database import get_conn
     with get_conn() as conn:
         conn.execute("DELETE FROM module_events WHERE module_id='tanques_gas'")
@@ -1979,12 +2061,32 @@ def _fetch_module_data(module_id: str, days: int) -> dict:
         ],
     }
 
-def _call_gemini(api_key: str, system_prompt: str, user_prompt: str) -> str:
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+import time as time_module
+
+_gemini_last_call = 0.0
+
+def _call_gemini(api_key: str, system_prompt: str, user_prompt: str, history: list = None) -> str:
+    global _gemini_last_call
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={api_key}"
+
+    contents = []
+    if history:
+        for msg in history:
+            role = "model" if msg["role"] == "model" else "user"
+            contents.append({
+                "role": role,
+                "parts": [{"text": msg["content"]}]
+            })
+    contents.append({
+        "role": "user",
+        "parts": [{"text": user_prompt}]
+    })
+
     payload = {
-        "contents": [
-            {"role": "user", "parts": [{"text": system_prompt + "\n\n---\n\n" + user_prompt}]}
-        ],
+        "system_instruction": {
+            "parts": [{"text": system_prompt}]
+        },
+        "contents": contents,
         "generationConfig": {
             "temperature": 0.3,
             "topK": 40,
@@ -1995,27 +2097,55 @@ def _call_gemini(api_key: str, system_prompt: str, user_prompt: str) -> str:
             {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"}
         ],
     }
-    try:
-        r = requests.post(url, json=payload, timeout=60)
-        r.raise_for_status()
-        data = r.json()
-        candidates = data.get("candidates", [])
-        if not candidates:
-            return "Error: No se obtuvo respuesta del modelo."
-        parts = candidates[0].get("content", {}).get("parts", [])
-        if not parts:
-            return "Error: Respuesta vacía del modelo."
-        return parts[0].get("text", "Error: Sin texto en la respuesta.")
-    except requests.exceptions.Timeout:
-        return "Error: La solicitud a Gemini tardó demasiado. Intenta con un prompt más simple."
-    except requests.exceptions.HTTPError as e:
-        if r.status_code == 403:
-            return "Error: La API Key de Gemini no es válida o no tiene acceso a Gemini 2.0 Flash. Verifica en https://aistudio.google.com"
-        if r.status_code == 429:
-            return "Error: Límite de peticiones excedido. Espera un momento y vuelve a intentar."
-        return f"Error HTTP {r.status_code} al contactar Gemini."
-    except Exception as e:
-        return f"Error de conexión con Gemini: {str(e)}"
+
+    # Global throttle: max 1 request a Gemini cada 3 segundos
+    now = time_module.time()
+    since_last = now - _gemini_last_call
+    if since_last < 3 and _gemini_last_call > 0:
+        time_module.sleep(3 - since_last)
+    _gemini_last_call = time_module.time()
+
+    max_retries = 3
+    last_error = ""
+
+    for attempt in range(max_retries):
+        backoff = {1: 10, 2: 30}.get(attempt, 0)
+        try:
+            if attempt > 0:
+                time_module.sleep(backoff)
+
+            r = requests.post(url, json=payload, timeout=120)
+            r.raise_for_status()
+            data = r.json()
+            candidates = data.get("candidates", [])
+            if not candidates:
+                return "No se obtuvo respuesta del modelo. Intenta reformular tu pregunta."
+            parts = candidates[0].get("content", {}).get("parts", [])
+            if not parts:
+                return "Respuesta vacía del modelo. Intenta de nuevo."
+            return parts[0].get("text", "Error: Sin texto en la respuesta.")
+
+        except requests.exceptions.Timeout:
+            last_error = "La solicitud a Gemini tardó demasiado. Intenta con un prompt más simple."
+        except requests.exceptions.HTTPError as e:
+            status = r.status_code
+            try:
+                error_body = r.text[:500]
+            except Exception:
+                error_body = "(no se pudo leer)"
+            if status == 403:
+                return "La API Key de Gemini no es válida o no tiene acceso al modelo. Verifica en https://aistudio.google.com"
+            if status == 429:
+                last_error = f"Gemini 429: {error_body}"
+                if attempt < max_retries - 1:
+                    continue
+                last_error = "Límite de peticiones de Gemini excedido tras reintentos. Revisa tu plan en https://aistudio.google.com"
+            else:
+                last_error = f"Error HTTP {status} de Gemini: {error_body}"
+        except Exception as e:
+            last_error = f"Error de conexión con Gemini: {str(e)}"
+
+    return last_error or "Error al comunicarse con Gemini. Verifica tu conexión e intenta de nuevo."
 
 def _build_system_prompt(detected_modules: list, module_data: dict) -> str:
     lines = [
@@ -2064,61 +2194,81 @@ def _build_system_prompt(detected_modules: list, module_data: dict) -> str:
     return "\n".join(lines)
 
 
+_chat_rate_limit = {}  # ip -> last_request_time
+
 @app.route("/api/chat", methods=["POST"])
 def api_chat():
-    data = request.get_json(silent=True) or {}
-    prompt = (data.get("prompt") or "").strip()
-    session_id = data.get("session_id") or ""
+    try:
+        data = request.get_json(silent=True) or {}
+        prompt = (data.get("prompt") or "").strip()
+        session_id = data.get("session_id") or ""
 
-    if not prompt:
-        return jsonify({"error": "El prompt no puede estar vacío"}), 400
+        if not prompt:
+            return jsonify({"error": "El prompt no puede estar vacío"}), 400
 
-    settings = get_settings()
-    api_key = settings.get("gemini_api_key", "").strip()
-    if not api_key:
-        return jsonify({"error": "No hay API Key de Gemini configurada. Ve a Configuración > General para agregarla."}), 400
+        # Rate limit: 1 request cada 2 segundos (evitar doble-click accidental)
+        client_ip = request.remote_addr or "unknown"
+        now = time_module.time()
+        last = _chat_rate_limit.get(client_ip, 0)
+        elapsed = now - last
+        if elapsed < 2 and last > 0:
+            wait_for = int(2 - elapsed) + 1
+            return jsonify({
+                "error": f"Debes esperar {wait_for} segundos antes de enviar otro mensaje.",
+                "retry_after": wait_for,
+            }), 429
+        _chat_rate_limit[client_ip] = now
 
-    # Crear o reusar sesión
-    if not session_id:
-        session_id = create_chat_session(prompt[:60])
-    else:
-        session = get_chat_session(session_id)
-        if not session:
+        settings = get_settings()
+        api_key = settings.get("gemini_api_key", "").strip()
+        if not api_key:
+            return jsonify({"error": "No hay API Key de Gemini configurada. Ve a Configuración > General para agregarla."}), 400
+
+        # Crear o reusar sesión
+        existing_messages = []
+        if not session_id:
             session_id = create_chat_session(prompt[:60])
         else:
-            touch_chat_session(session_id)
-        # Auto-titular si es mensaje inicial
-        msg_count = len(get_chat_messages(session_id))
-        if msg_count == 0:
-            update_chat_session_title(session_id, prompt[:60])
+            session = get_chat_session(session_id)
+            if not session:
+                session_id = create_chat_session(prompt[:60])
+            else:
+                touch_chat_session(session_id)
+                existing_messages = get_chat_messages(session_id)
+                if len(existing_messages) == 0:
+                    update_chat_session_title(session_id, prompt[:60])
 
-    # Guardar mensaje del usuario
-    add_chat_message(session_id, "user", prompt)
+        # Guardar mensaje del usuario
+        add_chat_message(session_id, "user", prompt)
 
-    # Detectar módulos y fetch data
-    detected = _detect_modules(prompt)
-    days = _extract_days(prompt)
+        # Detectar módulos y fetch data
+        detected = _detect_modules(prompt)
+        days = _extract_days(prompt)
 
-    module_data = {}
-    for mod_id in detected:
-        try:
-            module_data[mod_id] = _fetch_module_data(mod_id, days)
-        except Exception as e:
-            module_data[mod_id] = {"error": str(e)}
+        module_data = {}
+        for mod_id in detected:
+            try:
+                module_data[mod_id] = _fetch_module_data(mod_id, days)
+            except Exception as e:
+                module_data[mod_id] = {"error": str(e)}
 
-    # Construir prompts para Gemini
-    system_prompt = _build_system_prompt(detected, module_data)
+        # Construir prompts para Gemini
+        system_prompt = _build_system_prompt(detected, module_data)
 
-    # Llamar a Gemini
-    reply = _call_gemini(api_key, system_prompt, prompt)
+        # Llamar a Gemini con historial multi-turno
+        reply = _call_gemini(api_key, system_prompt, prompt, existing_messages)
 
-    # Guardar respuesta
-    add_chat_message(session_id, "model", reply)
+        # Guardar respuesta
+        add_chat_message(session_id, "model", reply)
 
-    return jsonify({
-        "reply": reply,
-        "session_id": session_id,
-    })
+        return jsonify({
+            "reply": reply,
+            "session_id": session_id,
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Error interno: {type(e).__name__}: {str(e)}"}), 500
 
 
 @app.route("/api/chat/sessions", methods=["GET"])
@@ -2185,3 +2335,167 @@ def api_evidence(module_id, event_id):
         "capture_url": capture_url,
         "extra_urls": extra_paths,
     })
+
+
+# ─────────────────────────────────────────────
+# Acceso — Login / Logout
+# ─────────────────────────────────────────────
+
+@app.route("/api/access/login", methods=["POST"])
+def api_access_login():
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+    location = data.get("location", {})
+    ip = request.remote_addr or ""
+    ua = request.headers.get("User-Agent", "")
+
+    if not email or not password:
+        return jsonify({"error": "Correo y clave requeridos"}), 400
+
+    account = get_account_by_email(email)
+    if not account or account["password"] != password:
+        add_access_log(email, "failed", ip, location, ua, "Credenciales inválidas")
+        return jsonify({"error": "Credenciales inválidas"}), 401
+
+    if not account.get("active", 1):
+        return jsonify({"error": "Cuenta desactivada"}), 403
+
+    access_type = account["access_type"]
+    hours = 24 if access_type == "full" else 1
+    expires_at = (datetime.now() + timedelta(hours=hours)).isoformat()
+
+    session["email"] = email
+    session["access_type"] = access_type
+    session["expires_at"] = expires_at
+    session["ip_address"] = ip
+    session["location"] = location
+
+    add_access_log(email, "login", ip, location, ua)
+
+    return jsonify({
+        "success": True,
+        "email": email,
+        "access_type": access_type,
+        "expires_at": expires_at,
+    })
+
+
+@app.route("/api/access/logout", methods=["POST"])
+def api_access_logout():
+    email = session.get("email", "")
+    ip = request.remote_addr or ""
+    ua = request.headers.get("User-Agent", "")
+    if email:
+        add_access_log(email, "logout", ip, user_agent=ua)
+    session.clear()
+    return jsonify({"success": True})
+
+
+@app.route("/api/access/check")
+def api_access_check():
+    return jsonify({
+        "authenticated": g.get("access_authenticated", False),
+        "email": g.get("access_email", ""),
+        "access_type": g.get("access_type", ""),
+    })
+
+
+# ─────────────────────────────────────────────
+# Acceso — Accounts CRUD
+# ─────────────────────────────────────────────
+
+@app.route("/api/access/accounts", methods=["GET", "POST"])
+def api_access_accounts():
+    if request.method == "POST":
+        data = request.get_json(silent=True) or {}
+        email = (data.get("email") or "").strip().lower()
+        password = data.get("password") or ""
+        access_type = data.get("access_type", "limited")
+        if not email or not password:
+            return jsonify({"error": "Correo y clave requeridos"}), 400
+        if access_type not in ("full", "limited"):
+            return jsonify({"error": "Tipo debe ser full o limited"}), 400
+        try:
+            account = add_account(email, password, access_type)
+            return jsonify({"account": account, "password": password}), 201
+        except Exception:
+            return jsonify({"error": "El correo ya está registrado"}), 409
+    accounts = get_accounts()
+    return jsonify({"accounts": accounts})
+
+
+@app.route("/api/access/accounts/<int:account_id>", methods=["DELETE"])
+def api_access_delete_account(account_id):
+    if delete_account(account_id):
+        return jsonify({"deleted": True})
+    return jsonify({"error": "Cuenta no encontrada"}), 404
+
+
+@app.route("/api/access/accounts/<int:account_id>/reset-password", methods=["POST"])
+def api_access_reset_password(account_id):
+    new_password = secrets.token_hex(6)
+    if update_account_password(account_id, new_password):
+        return jsonify({"password": new_password})
+    return jsonify({"error": "Cuenta no encontrada"}), 404
+
+
+@app.route("/api/access/accounts/by-email/<email>", methods=["GET"])
+def api_access_account_by_email(email):
+    account = get_account_by_email(email.strip().lower())
+    if account:
+        return jsonify({"exists": True, "access_type": account["access_type"]})
+    return jsonify({"exists": False})
+
+
+# ─────────────────────────────────────────────
+# Acceso — Logs
+# ─────────────────────────────────────────────
+
+@app.route("/api/access/logs")
+def api_access_logs():
+    page = request.args.get("page", 1, type=int)
+    email_filter = request.args.get("email", None)
+    result = get_access_logs(page=page, email_filter=email_filter)
+    return jsonify(result)
+
+
+# ─────────────────────────────────────────────
+# Acceso — IP Blacklist
+# ─────────────────────────────────────────────
+
+@app.route("/api/access/blacklist", methods=["GET", "POST"])
+def api_access_blacklist():
+    if request.method == "POST":
+        data = request.get_json(silent=True) or {}
+        ip = (data.get("ip") or "").strip()
+        reason = data.get("reason", "")
+        if not ip:
+            return jsonify({"error": "IP requerida"}), 400
+        entry = block_ip(ip, reason, session.get("email", ""))
+        if entry:
+            return jsonify({"entry": entry}), 201
+        return jsonify({"error": "La IP ya está bloqueada"}), 409
+    return jsonify({"entries": get_blacklist()})
+
+
+@app.route("/api/access/blacklist/<int:entry_id>", methods=["DELETE"])
+def api_access_unblock(entry_id):
+    if unblock_ip(entry_id):
+        return jsonify({"deleted": True})
+    return jsonify({"error": "Entrada no encontrada"}), 404
+
+
+# ─────────────────────────────────────────────
+# Acceso — Limited modules permissions
+# ─────────────────────────────────────────────
+
+@app.route("/api/access/limited-modules", methods=["GET", "POST"])
+def api_access_limited_modules():
+    if request.method == "POST":
+        data = request.get_json(silent=True) or {}
+        modules = data.get("modules", [])
+        valid = [m for m in modules if m in MODULES_META]
+        set_limited_modules(valid)
+        return jsonify({"modules": valid})
+    return jsonify({"modules": get_limited_modules()})

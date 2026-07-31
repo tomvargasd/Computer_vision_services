@@ -2532,22 +2532,39 @@ input:disabled + .slider { opacity: .4; cursor: not-allowed; }
 }
 .chat-thinking[hidden] { display: none; }
 
-.thinking-dots {
+/* ── Typing bubble in chat ─────────────── */
+.message.typing .message-bubble {
   display: flex;
-  gap: 4px;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px;
+  min-width: 100px;
 }
-.thinking-dot {
-  width: 8px; height: 8px;
+
+.typing-dots {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.typing-dot {
+  width: 10px; height: 10px;
   border-radius: 50%;
   background: var(--muted);
-  animation: think-bounce 1.4s ease-in-out infinite;
+  animation: typing-bounce 1.4s ease-in-out infinite;
 }
-.thinking-dot:nth-child(2) { animation-delay: 0.2s; }
-.thinking-dot:nth-child(3) { animation-delay: 0.4s; }
+.typing-dot:nth-child(1) { animation-delay: 0s; }
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
 
-@keyframes think-bounce {
-  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
-  40% { transform: scale(1); opacity: 1; }
+@keyframes typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); background: var(--border); }
+  30% { transform: translateY(-6px); background: var(--accent); }
+}
+
+.typing-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-left: 4px;
 }
 
 /* ══ SORTABLE MODULES (settings) ═══════════ */
@@ -2602,3 +2619,197 @@ input:disabled + .slider { opacity: .4; cursor: not-allowed; }
 .tg-source-badge.s3 { background: rgba(245,158,11,0.1); color: #D97706; }
 .tg-source-badge.s4 { background: rgba(139,92,246,0.1); color: #7C3AED; }
 .tg-source-badge.s5 { background: rgba(236,72,153,0.1); color: #DB2777; }
+
+/* ══ Access Overlay (login) ══════════════════ */
+.access-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(10,18,43,0.92);
+  backdrop-filter: blur(8px);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+.access-modal {
+  background: #fff; border-radius: 16px; padding: 40px 36px;
+  width: 380px; max-width: 92vw;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  text-align: center;
+}
+.access-modal .access-logo {
+  width: 64px; height: 64px; margin: 0 auto 12px;
+  border-radius: 16px; background: #182A55;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; color: #FFDE00;
+}
+.access-modal .access-logo img {
+  width: 100%; height: 100%; object-fit: contain; border-radius: 16px;
+}
+.access-modal h2 {
+  margin: 0 0 4px; font-size: 1.2rem; font-weight: 700; color: #182A55;
+}
+.access-modal p {
+  margin: 0 0 24px; font-size: 0.82rem; color: #9D9FA2;
+}
+.access-modal input[type="email"],
+.access-modal input[type="password"] {
+  width: 100%; padding: 12px 14px; margin-bottom: 12px;
+  border: 1.5px solid #E0E0E0; border-radius: 10px;
+  font-size: 0.9rem; outline: none; transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+.access-modal input:focus { border-color: #182A55; }
+.access-modal button[type="submit"] {
+  width: 100%; padding: 12px; margin-top: 8px;
+  background: #182A55; color: #fff; border: none; border-radius: 10px;
+  font-size: 0.95rem; font-weight: 600; cursor: pointer;
+  transition: background 0.2s;
+}
+.access-modal button[type="submit"]:hover { background: #243b73; }
+.access-modal button[type="submit"]:disabled { opacity: 0.5; cursor: not-allowed; }
+.access-error {
+  margin-top: 12px; padding: 8px 12px; border-radius: 8px;
+  background: #FEE2E2; color: #DC2626; font-size: 0.8rem; display: none;
+}
+.access-error.show { display: block; }
+.access-location-status {
+  font-size: 0.75rem; color: #9D9FA2; margin-bottom: 4px; min-height: 18px;
+}
+.access-location-status.loading { color: #2563EB; }
+.access-location-status.ok { color: #16A34A; }
+.access-location-status.err { color: #DC2626; }
+
+/* ══ Access UI: pills / chips ════════════════ */
+.access-pill-list {
+  display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 0 0 12px;
+}
+.access-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 20px;
+  font-size: 0.8rem; font-weight: 500;
+  background: #EEF0F4; color: #182A55;
+}
+.access-pill .pill-remove {
+  cursor: pointer; width: 16px; height: 16px; border-radius: 50%;
+  background: #D1D5DB; color: #fff; display: inline-flex;
+  align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; line-height: 1;
+  transition: background 0.15s; border: none; padding: 0;
+}
+.access-pill .pill-remove:hover { background: #EF4444; }
+
+/* ══ Access tables ═══════════════════════════ */
+.access-table-wrap {
+  overflow-x: auto; margin-top: 8px;
+}
+.access-table {
+  width: 100%; border-collapse: collapse; font-size: 0.82rem;
+}
+.access-table th {
+  text-align: left; padding: 10px 12px; font-weight: 600;
+  color: #182A55; background: #F5F6FA; border-bottom: 2px solid #E8E8EC;
+  white-space: nowrap;
+}
+.access-table td {
+  padding: 10px 12px; border-bottom: 1px solid #E8E8EC; color: #333;
+}
+.access-table tr:hover td { background: #F9FAFB; }
+.access-tag {
+  display: inline-block; padding: 2px 10px; border-radius: 10px;
+  font-size: 0.7rem; font-weight: 600;
+}
+.access-tag.full { background: #DCFCE7; color: #16A34A; }
+.access-tag.limited { background: #FEF9C3; color: #CA8A04; }
+
+/* ══ Access section blocks ═══════════════════ */
+.access-section {
+  margin-bottom: 28px;
+}
+.access-section-title {
+  font-size: 0.95rem; font-weight: 700; color: #182A55;
+  margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+}
+.access-add-form {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  margin-bottom: 12px;
+}
+.access-add-form input[type="email"],
+.access-add-form input[type="text"] {
+  padding: 8px 12px; border: 1.5px solid #E0E0E0; border-radius: 8px;
+  font-size: 0.82rem; outline: none; min-width: 200px; flex: 1;
+}
+.access-add-form input[type="email"]:focus,
+.access-add-form input[type="text"]:focus { border-color: #182A55; }
+.access-add-form .btn-add {
+  padding: 8px 16px; background: #182A55; color: #fff; border: none;
+  border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+  white-space: nowrap;
+}
+.access-add-form .btn-add:hover { background: #243b73; }
+.access-add-form .btn-gen {
+  padding: 8px 14px; background: #F5F6FA; color: #182A55; border: 1.5px solid #E0E0E0;
+  border-radius: 8px; font-size: 0.78rem; font-weight: 500; cursor: pointer;
+  white-space: nowrap;
+}
+.access-add-form .btn-gen:hover { background: #EEF0F4; }
+.access-add-form select {
+  padding: 8px 12px; border: 1.5px solid #E0E0E0; border-radius: 8px;
+  font-size: 0.82rem; outline: none; background: #fff;
+}
+.access-btn-sm {
+  padding: 5px 12px; border-radius: 6px; font-size: 0.72rem; font-weight: 600;
+  border: none; cursor: pointer; transition: background 0.15s;
+}
+.access-btn-sm.danger { background: #FEE2E2; color: #DC2626; }
+.access-btn-sm.danger:hover { background: #FECACA; }
+.access-btn-sm.warning { background: #FEF3C7; color: #D97706; }
+.access-btn-sm.warning:hover { background: #FDE68A; }
+.access-password-reveal {
+  background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px;
+  padding: 12px 16px; margin: 8px 0; font-size: 0.85rem;
+  color: #16A34A; font-weight: 600; display: none; word-break: break-all;
+}
+.access-password-reveal.show { display: block; }
+.access-password-reveal .pw-value {
+  font-family: monospace; font-size: 1.1rem; color: #182A55;
+  background: #fff; padding: 4px 8px; border-radius: 4px;
+  display: inline-block; margin-top: 4px;
+}
+
+/* ══ Access pagination ═══════════════════════ */
+.access-pagination {
+  display: flex; align-items: center; gap: 8px; margin-top: 12px;
+  font-size: 0.8rem;
+}
+.access-pagination button {
+  padding: 6px 14px; border: 1px solid #E0E0E0; border-radius: 6px;
+  background: #fff; cursor: pointer; font-size: 0.8rem;
+}
+.access-pagination button:hover { background: #F5F6FA; }
+.access-pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+.access-pagination .page-info { color: #9D9FA2; }
+
+/* ══ Module permissions checkboxes ═══════════ */
+.access-mod-perms {
+  display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0;
+}
+.access-mod-perms label {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 8px;
+  background: #F5F6FA; font-size: 0.8rem; font-weight: 500;
+  cursor: pointer; transition: background 0.15s;
+  color: #182A55;
+}
+.access-mod-perms label:hover { background: #EEF0F4; }
+.access-mod-perms input[type="checkbox"] {
+  width: 15px; height: 15px; accent-color: #182A55;
+}
+.access-mod-perms input[type="checkbox"]:checked + span { font-weight: 700; }
+
+/* ══ Blocked IP badge ════════════════════════ */
+.ip-blocked-badge {
+  display: inline-block; padding: 2px 10px; border-radius: 10px;
+  font-size: 0.7rem; font-weight: 600; background: #FEE2E2; color: #DC2626;
+}
+.ip-clean-badge {
+  display: inline-block; padding: 2px 10px; border-radius: 10px;
+  font-size: 0.7rem; font-weight: 600; background: #DCFCE7; color: #16A34A;
+}
