@@ -164,7 +164,7 @@ class ArmasPipeline(BasePersistPipeline):
         h, w = 480, 640
         frame = np.zeros((h, w, 3), dtype=np.uint8)
         cv2.putText(
-            frame, "ERROR DE FUENTE", (int(w * 0.22), h // 2 - 30),
+            frame, "SOURCE ERROR", (int(w * 0.22), h // 2 - 30),
             cv2.FONT_HERSHEY_SIMPLEX, 0.9, (85, 42, 24), 2, cv2.LINE_AA,
         )
         max_chars = 55
@@ -175,7 +175,7 @@ class ArmasPipeline(BasePersistPipeline):
                 cv2.FONT_HERSHEY_SIMPLEX, 0.55, (200, 200, 200), 1, cv2.LINE_AA,
             )
         cv2.putText(
-            frame, "Verifica la ruta o permisos de la fuente", (20, h - 28),
+            frame, "Check the source path or permissions", (20, h - 28),
             cv2.FONT_HERSHEY_SIMPLEX, 0.48, (120, 120, 120), 1, cv2.LINE_AA,
         )
         return frame
@@ -352,7 +352,7 @@ class ArmasPipeline(BasePersistPipeline):
                                 self._try_capture(frame, atid, apx1, apy1, apx2, apy2)
                         caps = self._captures.get(armed_persons[0][0], []) if armed_persons else []
                         insert_module_event(self._module_id, self._source_id,
-                                            "weapon_alert", "Alerta de arma detectada",
+                                            "weapon_alert", "Weapon alert detected",
                                             capture_path=caps[-1] if caps else None)
                     self._round_results = []
 
@@ -364,7 +364,7 @@ class ArmasPipeline(BasePersistPipeline):
             for (wx1, wy1, wx2, wy2, wtype, wconf, wid) in weapon_boxes:
                 color = (0, 255, 255) if wtype == "arma_fuego" else (0, 0, 220)
                 cv2.rectangle(annotated, (wx1, wy1), (wx2, wy2), color, 2)
-                type_label = "Arma de Fuego" if wtype == "arma_fuego" else "Arma Blanca"
+                type_label = "Firearm" if wtype == "arma_fuego" else "Bladed weapon"
                 ty = wy1 - 8 if wy1 > 20 else wy2 + 18
                 cv2.putText(annotated, f"{type_label}  {wconf:.0%}",
                             (wx1, ty), cv2.FONT_HERSHEY_SIMPLEX, 0.50, color, 2, cv2.LINE_AA)
@@ -374,7 +374,7 @@ class ArmasPipeline(BasePersistPipeline):
                     self._capture_bbox(frame, virtual_id, wx1, wy1, wx2, wy2)
                     caps = self._captures.get(virtual_id, [])
                     insert_module_event(self._module_id, self._source_id,
-                                        "weapon_capture", f"Captura de arma ({wtype})",
+                                        "weapon_capture", f"Weapon capture ({wtype})",
                                         capture_path=caps[-1] if caps else None)
 
             # Persona armada — ID estable de la persona
@@ -382,20 +382,20 @@ class ArmasPipeline(BasePersistPipeline):
                 color = (85, 42, 24)
                 cv2.rectangle(annotated, (px1, py1), (px2, py2), color, 2)
                 ty = py1 - 8 if py1 > 20 else py2 + 18
-                cv2.putText(annotated, f"ID[{tid}] - conf. {int(pconf * 100)}%  Portador",
+                cv2.putText(annotated, f"ID[{tid}] - conf. {int(pconf * 100)}%  Carrier",
                             (px1, ty), cv2.FONT_HERSHEY_SIMPLEX, 0.50, color, 2, cv2.LINE_AA)
 
                 if self.func_state.get("captura_rostro"):
                     self._try_capture(frame, tid, px1, py1, px2, py2)
                     caps = self._captures.get(tid, [])
                     insert_module_event(self._module_id, self._source_id,
-                                        "person_capture", f"Portador ID {tid}",
+                                        "person_capture", f"Carrier ID {tid}",
                                         capture_path=caps[-1] if caps else None)
 
         # ── HUD ──────────────────────────────────────────────────────────
         cv2.putText(
             annotated,
-            f"Armas: {self.total_weapons}  Blancas: {self.total_blanca}  Fuego: {self.total_fuego}  Capturas: {self.capture_count}",
+            f"Weapons: {self.total_weapons}  Bladed: {self.total_blanca}  Firearms: {self.total_fuego}  Captures: {self.capture_count}",
             (12, h - 14),
             cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2, cv2.LINE_AA,
         )

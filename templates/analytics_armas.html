@@ -1,29 +1,29 @@
 {% extends "base.html" %}
-{% block title %}Analytics · Armas{% endblock %}
+{% block title %}Analytics · Weapons{% endblock %}
 {% block page_title %}Analytics · {{ module.label }}{% endblock %}
 {% block content %}
 <div class="analytics-dashboard">
   <div class="analytics-kpi-row">
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Alertas totales</span><span class="analytics-kpi-value" id="kpi-total_weapons">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M14.5 2L10 6.5l3 3L6.5 16l-3-3L2 14.5 7.5 20l2-2-3-3 6.5-6.5 3 3L22 6.5z"/></svg> Armas blancas</span><span class="analytics-kpi-value" id="kpi-total_blanca">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M12 2L9.5 6.5 12 10 9.5 13.5 12 17l-2.5 3.5"/><path d="M12 2l2.5 4.5L12 10l2.5 3.5L12 17l2.5 3.5"/></svg> Armas de fuego</span><span class="analytics-kpi-value" id="kpi-total_fuego">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Hoy</span><span class="analytics-kpi-value" id="kpi-today">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg> Capturas rostro</span><span class="analytics-kpi-value" id="kpi-capture_count">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Total alerts</span><span class="analytics-kpi-value" id="kpi-total_weapons">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M14.5 2L10 6.5l3 3L6.5 16l-3-3L2 14.5 7.5 20l2-2-3-3 6.5-6.5 3 3L22 6.5z"/></svg> Bladed weapons</span><span class="analytics-kpi-value" id="kpi-total_blanca">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M12 2L9.5 6.5 12 10 9.5 13.5 12 17l-2.5 3.5"/><path d="M12 2l2.5 4.5L12 10l2.5 3.5L12 17l2.5 3.5"/></svg> Firearms</span><span class="analytics-kpi-value" id="kpi-total_fuego">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Today</span><span class="analytics-kpi-value" id="kpi-today">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg> Face captures</span><span class="analytics-kpi-value" id="kpi-capture_count">—</span></div>
   </div>
 
   <div class="analytics-chart-row">
     <div class="analytics-chart-card">
-      <h4>Timeline: Alertas de armas</h4>
+      <h4>Timeline: Weapon alerts</h4>
       <canvas id="chart-armas-timeline"></canvas>
     </div>
     <div class="analytics-chart-card">
-      <h4>Por fuente</h4>
+      <h4>By source</h4>
       <div id="per-source-table" class="analytics-per-source"></div>
     </div>
   </div>
 
   <div class="analytics-events">
-    <h4>Últimas alertas</h4>
+    <h4>Recent alerts</h4>
     <div id="events-list" class="analytics-events-list"></div>
   </div>
 </div>
@@ -70,15 +70,15 @@ async function loadKPIs() {
 
   const psEl = document.getElementById('per-source-table');
   if (sources.length > 0) {
-    psEl.innerHTML = '<table class="ps-table"><tr><th>Fuente</th><th>Blanca</th><th>Fuego</th><th>Capturas</th><th>Total</th></tr>' +
+    psEl.innerHTML = '<table class="ps-table"><tr><th>Source</th><th>Blade</th><th>Fire</th><th>Captures</th><th>Total</th></tr>' +
       sources.map(sid => {
         const c = counters[sid];
         const b = c?.total_blanca ?? 0, f = c?.total_fuego ?? 0, cap = c?.capture_count ?? 0;
         const t = b + f + cap;
-        return `<tr><td>Fuente ${sid}</td><td>${b || '—'}</td><td>${f || '—'}</td><td>${cap || '—'}</td><td>${t || '—'}</td></tr>`;
+        return `<tr><td>Source ${sid}</td><td>${b || '—'}</td><td>${f || '—'}</td><td>${cap || '—'}</td><td>${t || '—'}</td></tr>`;
       }).join('') + '</table>';
   } else {
-    psEl.innerHTML = '<p class="text-muted">Sin datos de fuentes</p>';
+    psEl.innerHTML = '<p class="text-muted">No source data</p>';
   }
 }
 
@@ -98,9 +98,9 @@ async function loadTimeline() {
   });
   const labels = Object.keys(dayMap).sort();
   const datasets = [
-    { label: 'Blanca', data: labels.map(l => typeDayMap['blanca']?.[l] || 0), backgroundColor: '#F97316' },
-    { label: 'Fuego', data: labels.map(l => typeDayMap['fuego']?.[l] || 0), backgroundColor: '#EF4444' },
-    { label: 'Persona', data: labels.map(l => typeDayMap['weapon_detected']?.[l] || 0), backgroundColor: '#3B82F6' },
+    { label: 'Blade', data: labels.map(l => typeDayMap['blanca']?.[l] || 0), backgroundColor: '#F97316' },
+    { label: 'Fire', data: labels.map(l => typeDayMap['fuego']?.[l] || 0), backgroundColor: '#EF4444' },
+    { label: 'Person', data: labels.map(l => typeDayMap['weapon_detected']?.[l] || 0), backgroundColor: '#3B82F6' },
   ];
   if (timelineChart) timelineChart.destroy();
   timelineChart = new Chart(ctx, {

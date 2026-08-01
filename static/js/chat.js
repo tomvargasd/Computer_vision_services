@@ -37,7 +37,7 @@
     if (cooldownUntil > now) {
       var secs = Math.ceil((cooldownUntil - now) / 1000);
       chatSendBtn.disabled = true;
-      chatSendBtn.title = 'Espera ' + secs + 's';
+      chatSendBtn.title = 'Wait ' + secs + 's';
     } else if (isLoading) {
       chatSendBtn.disabled = true;
       chatSendBtn.title = '';
@@ -122,7 +122,7 @@
 
     var label = document.createElement('span');
     label.className = 'typing-label';
-    label.textContent = 'Procesando';
+    label.textContent = 'Processing';
     bubble.appendChild(label);
 
     typingBubble.appendChild(bubble);
@@ -203,7 +203,7 @@
     var now = Date.now();
     if (cooldownUntil > now) {
       var secs = Math.ceil((cooldownUntil - now) / 1000);
-      addMessage('assistant', '\u23F1\uFE0F Debes esperar ' + secs + ' segundos antes de enviar otro mensaje. Gemini tiene un límite de peticiones por minuto.');
+      addMessage('assistant', '\u23F1\uFE0F You must wait ' + secs + ' seconds before sending another message. Gemini has a per-minute request limit.');
       return;
     }
 
@@ -235,7 +235,7 @@
     var timeoutId = setTimeout(function () {
       timedOut = true;
       removeTypingBubble();
-      addMessage('assistant', '\u23F1\uFE0F La solicitud está tomando más de lo esperado. Gemini puede estar procesando tu petición. Espera un momento antes de reintentar.');
+      addMessage('assistant', '\u23F1\uFE0F The request is taking longer than expected. Gemini may be processing your request. Wait a moment before trying again.');
       isLoading = false;
       updateSendButton();
     }, 45000);
@@ -256,10 +256,10 @@
 
       if (!r.ok) {
         if (r.status === 429 && data.retry_after) {
-          addMessage('assistant', '\u23F1\uFE0F ' + (data.error || 'Límite de peticiones excedido.'));
+          addMessage('assistant', '\u23F1\uFE0F ' + (data.error || 'Request limit exceeded.'));
           startCooldown(data.retry_after);
         } else {
-          addMessage('assistant', '\u26A0\uFE0F ' + (data.error || 'Error desconocido'));
+          addMessage('assistant', '\u26A0\uFE0F ' + (data.error || 'Unknown error'));
         }
         return;
       }
@@ -272,7 +272,7 @@
       clearTimeout(timeoutId);
       if (!timedOut) {
         removeTypingBubble();
-        addMessage('assistant', '\u26A0\uFE0F Error de conexi\u00F3n con el servidor.');
+        addMessage('assistant', '\u26A0\uFE0F Server connection error.');
       }
     } finally {
       isLoading = false;
@@ -301,7 +301,7 @@
       sessionCountBadge.textContent = sessions.length;
 
       if (sessions.length === 0) {
-        sessionList.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:0.78rem">No hay sesiones a\u00FAn</div>';
+        sessionList.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:0.78rem">No sessions yet</div>';
         return;
       }
 
@@ -312,10 +312,10 @@
         return '<div class="session-item' + active + '" data-session-id="' + s.id + '">' +
           '<div class="session-item-icon">\uD83D\uDCAC</div>' +
           '<div class="session-item-body">' +
-          '<div class="session-item-title">' + escapeHtml(s.title || 'Nueva sesi\u00F3n') + '</div>' +
+          '<div class="session-item-title">' + escapeHtml(s.title || 'New session') + '</div>' +
           '<div class="session-item-date">' + dateStr + '</div>' +
           '</div>' +
-          '<button class="session-item-delete" data-session-id="' + s.id + '" title="Eliminar sesi\u00F3n">\u2715</button>' +
+          '<button class="session-item-delete" data-session-id="' + s.id + '" title="Delete session">\u2715</button>' +
           '</div>';
       }).join('');
 

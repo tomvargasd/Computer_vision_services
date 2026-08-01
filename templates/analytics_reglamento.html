@@ -1,30 +1,30 @@
 {% extends "base.html" %}
-{% block title %}Analytics · Reglamento{% endblock %}
+{% block title %}Analytics · Regulations{% endblock %}
 {% block page_title %}Analytics · {{ module.label }}{% endblock %}
 {% block content %}
 <div class="analytics-dashboard">
   <div class="analytics-kpi-row">
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 11 12 14 15 9"/></svg> Con botas</span><span class="analytics-kpi-value" id="kpi-con-botas">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> Sin botas</span><span class="analytics-kpi-value" id="kpi-sin-botas">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 11 12 14 15 9"/></svg> Cumplimientos</span><span class="analytics-kpi-value" id="kpi-cumplimientos">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> Incumplimientos</span><span class="analytics-kpi-value" id="kpi-incumplimientos">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Hoy</span><span class="analytics-kpi-value" id="kpi-today">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Fuentes activas</span><span class="analytics-kpi-value" id="kpi-sources">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 11 12 14 15 9"/></svg> With boots</span><span class="analytics-kpi-value" id="kpi-con-botas">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> Without boots</span><span class="analytics-kpi-value" id="kpi-sin-botas">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 11 12 14 15 9"/></svg> Compliances</span><span class="analytics-kpi-value" id="kpi-cumplimientos">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> Violations</span><span class="analytics-kpi-value" id="kpi-incumplimientos">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Today</span><span class="analytics-kpi-value" id="kpi-today">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Active sources</span><span class="analytics-kpi-value" id="kpi-sources">—</span></div>
   </div>
 
   <div class="analytics-chart-row">
     <div class="analytics-chart-card">
-      <h4>Timeline de detecciones</h4>
+      <h4>Detection timeline</h4>
       <canvas id="chart-timeline"></canvas>
     </div>
     <div class="analytics-chart-card">
-      <h4>Por fuente</h4>
+      <h4>By source</h4>
       <div id="per-source-table" class="analytics-per-source"></div>
     </div>
   </div>
 
   <div class="analytics-events">
-    <h4>Detecciones recientes</h4>
+    <h4>Recent detections</h4>
     <div id="events-list" class="analytics-events-list"></div>
   </div>
 </div>
@@ -43,7 +43,7 @@ async function loadKPIs() {
   const d = await r.json();
   const counters = d.counters || {};
   const sources = Object.keys(counters);
-  setText('kpi-sources', sources.length > 0 ? sources.length + (d.active ? ' activas' : '') : '—');
+  setText('kpi-sources', sources.length > 0 ? sources.length + (d.active ? ' active' : '') : '—');
 
   let totalConBotas = 0, totalSinBotas = 0, totalCumplimientos = 0, totalIncumplimientos = 0, todayVal = 0;
   const todayStr = new Date().toISOString().slice(0,10);
@@ -67,13 +67,13 @@ async function loadKPIs() {
 
   const psEl = document.getElementById('per-source-table');
   if (sources.length > 0) {
-    psEl.innerHTML = '<table class="ps-table"><tr><th>Fuente</th><th>Con botas</th><th>Sin botas</th><th>Cumplimientos</th><th>Incumplimientos</th></tr>' +
+    psEl.innerHTML = '<table class="ps-table"><tr><th>Source</th><th>With boots</th><th>Without boots</th><th>Compliances</th><th>Violations</th></tr>' +
       sources.map(sid => {
         const c = counters[sid] || {};
-        return `<tr><td>Fuente ${sid}</td><td>${c.con_botas ?? 0}</td><td>${c.sin_botas ?? 0}</td><td>${c.cumplimientos ?? 0}</td><td>${c.incumplimientos ?? 0}</td></tr>`;
+        return `<tr><td>Source ${sid}</td><td>${c.con_botas ?? 0}</td><td>${c.sin_botas ?? 0}</td><td>${c.cumplimientos ?? 0}</td><td>${c.incumplimientos ?? 0}</td></tr>`;
       }).join('') + '</table>';
   } else {
-    psEl.innerHTML = '<p class="text-muted">Sin datos de fuentes</p>';
+    psEl.innerHTML = '<p class="text-muted">No source data</p>';
   }
 }
 
@@ -98,8 +98,8 @@ async function loadTimeline() {
     data: {
       labels,
       datasets: [
-        { label: 'Cumplió', data: cumplioData, backgroundColor: '#22C55E' },
-        { label: 'Incumplió', data: incumplioData, backgroundColor: '#EF4444' },
+        { label: 'Complied', data: cumplioData, backgroundColor: '#22C55E' },
+        { label: 'Violated', data: incumplioData, backgroundColor: '#EF4444' },
       ]
     },
     options: {

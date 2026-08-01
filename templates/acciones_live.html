@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ source.name }} · CVVision Live — Acciones</title>
+  <title>{{ source.name }} · CVVision Live — Actions</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -216,7 +216,7 @@
 <header class="lv-topbar">
   <a class="lv-back" href="/module/acciones">
     <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-    Volver
+    Back
   </a>
   <div class="lv-sep"></div>
   <span class="lv-source-name">{{ source.name }}</span>
@@ -224,18 +224,18 @@
 
   <div class="lv-status">
     <span class="lv-dot on" id="lv-dot"></span>
-    <span id="lv-status-txt">Iniciando…</span>
+    <span id="lv-status-txt">Starting…</span>
   </div>
 
   <span style="font-size:0.72rem;color:#7a90a8;margin-left:4px" id="lv-fps">— fps</span>
 
   <button class="lv-btn-teach" id="btn-teach">
     <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-    Enseñar
+    Teach action
   </button>
   <button class="lv-btn-stop" id="btn-stop">
     <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/></svg>
-    Detener
+    Stop
   </button>
 </header>
 
@@ -246,7 +246,7 @@
   <div class="lv-feed">
     <div class="lv-feed-placeholder" id="feed-placeholder">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0 1 12 0v2"/></svg>
-      <p id="feed-placeholder-msg">Conectando con la fuente…</p>
+      <p id="feed-placeholder-msg">Connecting to source…</p>
       <span>{{ source.path }}</span>
     </div>
     <img class="lv-feed-img" id="lv-feed-img" src="" alt="Live feed" style="display:none">
@@ -261,10 +261,10 @@
     <div class="lv-section" style="height:600px;overflow-y:auto">
       <div class="lv-section-title">
         <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-        Capturas por persona
+        Captures by person
       </div>
       <div id="cap-gallery">
-        <span class="cap-empty">Esperando alerta…</span>
+        <span class="cap-empty">Waiting for alert…</span>
       </div>
     </div>
 
@@ -272,32 +272,32 @@
     <div class="lv-section">
       <div class="lv-section-title">
         <svg viewBox="0 0 24 24" style="stroke:#ef4444"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        Alertas activas
+        Active alerts
       </div>
       <div class="alert-grid">
         <div class="alert-row">
           <span class="alert-dot" style="background:#eb2828"></span>
-          <span class="alert-name" style="color:#f87171">Violencia</span>
+          <span class="alert-name" style="color:#f87171">Violence</span>
           <span class="alert-cnt" id="cnt-violencia" style="color:#f87171">0</span>
         </div>
         <div class="alert-row">
           <span class="alert-dot" style="background:#ff6e1a"></span>
-          <span class="alert-name" style="color:#fb923c">Robo / amenaza</span>
+          <span class="alert-name" style="color:#fb923c">Theft / threat</span>
           <span class="alert-cnt" id="cnt-robo" style="color:#fb923c">0</span>
         </div>
         <div class="alert-row">
           <span class="alert-dot" style="background:#ffe600"></span>
-          <span class="alert-name" style="color:#ffe600">Sospechoso</span>
+          <span class="alert-name" style="color:#ffe600">Suspicious</span>
           <span class="alert-cnt" id="cnt-sospechoso" style="color:#ffe600">0</span>
         </div>
         <div class="alert-row">
           <span class="alert-dot" style="background:#cc00ff"></span>
-          <span class="alert-name" style="color:#cc00ff">Uso de celular</span>
+          <span class="alert-name" style="color:#cc00ff">Cell phone use</span>
           <span class="alert-cnt" id="cnt-celular" style="color:#cc00ff">0</span>
         </div>
         <div class="alert-row">
           <span class="alert-dot" style="background:#800080"></span>
-          <span class="alert-name" style="color:#800080">Caída</span>
+          <span class="alert-name" style="color:#800080">Fall</span>
           <span class="alert-cnt" id="cnt-caida" style="color:#800080">0</span>
         </div>
       </div>
@@ -307,12 +307,12 @@
     <div class="lv-section">
       <div class="lv-section-title">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        Funciones
+        Functions
       </div>
       <div class="lv-func-row">
         <div class="lv-func-info">
-          <span class="lv-func-lbl">Detección de acciones</span>
-          <span class="lv-func-sub">Dibuja esqueleto de pose sobre cada persona</span>
+          <span class="lv-func-lbl">Action detection</span>
+          <span class="lv-func-sub">Draws pose skeleton over each person</span>
         </div>
         <label class="toggle">
           <input type="checkbox" class="toggle-func-live"
@@ -323,8 +323,8 @@
       </div>
       <div class="lv-func-row">
         <div class="lv-func-info">
-          <span class="lv-func-lbl" style="color:#f87171">Alertas de violencia</span>
-          <span class="lv-func-sub">Golpes, patadas y agresión física</span>
+          <span class="lv-func-lbl" style="color:#f87171">Violence alerts</span>
+          <span class="lv-func-sub">Punches, kicks and physical aggression</span>
         </div>
         <label class="toggle">
           <input type="checkbox" class="toggle-func-live"
@@ -335,8 +335,8 @@
       </div>
       <div class="lv-func-row">
         <div class="lv-func-info">
-          <span class="lv-func-lbl" style="color:#fb923c">Alertas de robo / amenaza</span>
-          <span class="lv-func-sub">Brazo apuntando y posturas de amenaza</span>
+          <span class="lv-func-lbl" style="color:#fb923c">Theft / threat alerts</span>
+          <span class="lv-func-sub">Pointing arm and threatening postures</span>
         </div>
         <label class="toggle">
           <input type="checkbox" class="toggle-func-live"
@@ -347,7 +347,7 @@
       </div>
       <div class="lv-func-row">
         <div class="lv-func-info">
-          <span class="lv-func-lbl" style="color:#4ade80">Actividad sospechosa</span>
+          <span class="lv-func-lbl" style="color:#4ade80">Suspicious activity</span>
           <span class="lv-func-sub">Agachado, rastreo y movimientos furtivos</span>
         </div>
         <label class="toggle">
@@ -359,8 +359,8 @@
       </div>
       <div class="lv-func-row">
         <div class="lv-func-info">
-          <span class="lv-func-lbl" style="color:#cc00ff">Uso de celular</span>
-          <span class="lv-func-sub">Llamando o texteando con teléfono</span>
+          <span class="lv-func-lbl" style="color:#cc00ff">Cell phone use</span>
+          <span class="lv-func-sub">Calling or texting with phone</span>
         </div>
         <label class="toggle">
           <input type="checkbox" class="toggle-func-live"
@@ -371,8 +371,8 @@
       </div>
       <div class="lv-func-row">
         <div class="lv-func-info">
-          <span class="lv-func-lbl" style="color:#800080">Detección de caídas</span>
-          <span class="lv-func-sub">Parciales (tropiezo/arrodillado) y completas</span>
+          <span class="lv-func-lbl" style="color:#800080">Fall detection</span>
+          <span class="lv-func-sub">Partial (trip/kneeling) and full falls</span>
         </div>
         <label class="toggle">
           <input type="checkbox" class="toggle-func-live"
@@ -386,10 +386,10 @@
     <div class="lv-section" style="flex:1;overflow-y:auto">
       <div class="lv-section-title">
         <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-        Capturas por persona
+        Captures by person
       </div>
       <div id="cap-gallery">
-        <span class="cap-empty">Esperando alerta…</span>
+        <span class="cap-empty">Waiting for alert…</span>
       </div>
     </div>
     <!-- ── Info footer ─────────────────────────────────────── -->
@@ -402,18 +402,18 @@
 
 <!-- Lightbox -->
 <div class="lb-overlay" id="lb-overlay" onclick="closeLb()">
-  <img id="lb-img" src="" alt="Captura">
+  <img id="lb-img" src="" alt="Capture">
 </div>
 
 <!-- ── Teach modal ── -->
 <div class="teach-overlay" id="teach-overlay">
   <div class="teach-modal">
     <div class="teach-header">
-      <h2>Enseñar al sistema</h2>
+      <h2>Teach the system</h2>
       <button class="teach-close" id="teach-close">&times;</button>
     </div>
     <div class="teach-body" id="teach-body">
-      <div class="teach-empty" id="teach-empty">Cargando personas en escena…</div>
+      <div class="teach-empty" id="teach-empty">Loading people in scene…</div>
     </div>
   </div>
 </div>
@@ -429,10 +429,10 @@ let fpsTimer   = null;
 
 // ── Iniciar pipeline ──────────────────────────────────────────────────────
 (async () => {
-  document.getElementById("feed-placeholder-msg").textContent = "Iniciando pipeline…";
+  document.getElementById("feed-placeholder-msg").textContent = "Starting pipeline…";
   const r = await fetch(`/api/acciones/sources/${SOURCE_ID}/start`, { method: "POST" });
   if (r.ok) {
-    document.getElementById("feed-placeholder-msg").textContent = "Cargando modelo de pose…";
+    document.getElementById("feed-placeholder-msg").textContent = "Loading pose model…";
     startStream();
     poll = setInterval(fetchStats, 1500);
     fpsTimer = setInterval(() => {
@@ -440,7 +440,7 @@ let fpsTimer   = null;
       frameCount = 0;
     }, 1000);
   } else {
-    document.getElementById("feed-placeholder-msg").textContent = "Error al iniciar el pipeline";
+    document.getElementById("feed-placeholder-msg").textContent = "Error starting the pipeline";
     document.getElementById("lv-dot").classList.remove("on");
     document.getElementById("lv-status-txt").textContent = "Error";
   }
@@ -451,15 +451,15 @@ function startStream() {
   img.onload = () => {
     document.getElementById("feed-placeholder").style.display = "none";
     img.style.display = "block";
-    document.getElementById("lv-status-txt").textContent = "En línea";
+    document.getElementById("lv-status-txt").textContent = "Online";
     frameCount++;
   };
   img.onerror = () => {
     document.getElementById("feed-placeholder").style.display = "flex";
-    document.getElementById("feed-placeholder-msg").textContent = "Error de conexión";
+    document.getElementById("feed-placeholder-msg").textContent = "Connection error";
     img.style.display = "none";
     document.getElementById("lv-dot").classList.remove("on");
-    document.getElementById("lv-status-txt").textContent = "Sin señal";
+    document.getElementById("lv-status-txt").textContent = "No signal";
   };
   img.src = `/api/acciones/stream/${SOURCE_ID}`;
 }
@@ -478,7 +478,7 @@ async function fetchStats() {
     renderGallery(d.captures || {});
     const now = new Date();
     document.getElementById("lv-ts").textContent =
-      now.toLocaleTimeString("es-MX", {hour:"2-digit",minute:"2-digit",second:"2-digit"});
+      now.toLocaleTimeString("en-US", {hour:"2-digit",minute:"2-digit",second:"2-digit"});
   } catch (_) {}
 }
 
@@ -499,15 +499,15 @@ function renderGallery(captures) {
 
     const block = document.createElement("div");
     block.className = "cap-person";
-    let html = `<div class="cap-tid-lbl">Persona #${tid}</div>`;
+    let html = `<div class="cap-tid-lbl">Person #${tid}</div>`;
     if (face.length) {
-      html += `<div class="cap-sub-lbl">Rostro (${face.length}/3)</div><div class="cap-thumb-row">`;
+      html += `<div class="cap-sub-lbl">Face (${face.length}/3)</div><div class="cap-thumb-row">`;
       for (const url of face)
         html += `<img class="cap-thumb" src="${url}" loading="lazy" onclick="openLb('${url}')">`;
       html += "</div>";
     }
     if (body.length) {
-      html += `<div class="cap-sub-lbl">Cuerpo (${body.length}/3)</div><div class="cap-thumb-row">`;
+      html += `<div class="cap-sub-lbl">Body (${body.length}/3)</div><div class="cap-thumb-row">`;
       for (const url of body)
         html += `<img class="cap-thumb" src="${url}" loading="lazy" onclick="openLb('${url}')">`;
       html += "</div>";
@@ -537,11 +537,11 @@ document.querySelectorAll(".toggle-func-live").forEach(input => {
 
 // ── Enseñar ───────────────────────────────────────────────────────────────
 const ACTION_LABELS = {
-  violencia: "Violencia / agresión",
-  robo: "Robo / amenaza",
-  sospechoso: "Actividad sospechosa",
-  celular: "Uso de celular",
-  caida: "Caída",
+  violencia: "Violence / aggression",
+  robo: "Theft / threat",
+  sospechoso: "Suspicious activity",
+  celular: "Cell phone use",
+  caida: "Fall",
 };
 document.getElementById("btn-teach").addEventListener("click", () => {
   document.getElementById("teach-overlay").classList.add("open");
@@ -571,7 +571,7 @@ function renderTeach(data) {
   const tids = Object.keys(data);
   if (!tids.length) {
     container.innerHTML =
-      '<div class="teach-empty">No hay personas en escena con datos suficientes.</div>';
+      '<div class="teach-empty">No people in scene with enough data.</div>';
     return;
   }
   let html = "";
@@ -584,7 +584,7 @@ function renderTeach(data) {
     const scoreStr = Object.entries(scores)
       .filter(([, v]) => v > 0)
       .map(([k, v]) => `${ACTION_LABELS[k] || k} ${(v * 100).toFixed(0)}%`)
-      .join(", ") || "sin alertas";
+      .join(", ") || "no alerts";
 
     const caps = p.captures || {};
     const imgs = [];
@@ -594,20 +594,20 @@ function renderTeach(data) {
       imgs.push(`<img src="${url}" loading="lazy">`);
 
     html += `<div class="teach-person">
-      <div class="teach-person-imgs">${imgs.length ? imgs.join("") : '<span style="font-size:0.68rem;color:#9D9FA2;width:56px;text-align:center">sin captura</span>'}</div>
+      <div class="teach-person-imgs">${imgs.length ? imgs.join("") : '<span style="font-size:0.68rem;color:#9D9FA2;width:56px;text-align:center">no capture</span>'}</div>
       <div class="teach-person-info">
-        <div class="teach-person-tid">Persona #${tid}</div>
+        <div class="teach-person-tid">Person #${tid}</div>
         <div class="teach-person-scores">${scoreStr}</div>
         <div class="teach-person-actions">
           <select class="teach-action-select" data-tid="${tid}">
-            <option value="">— etiquetar como —</option>
-            <option value="celular">Uso de celular</option>
-            <option value="violencia">Violencia</option>
-            <option value="robo">Robo / amenaza</option>
-            <option value="sospechoso">Actividad sospechosa</option>
-            <option value="caida">Caída</option>
+            <option value="">— label as —</option>
+            <option value="celular">Cell phone use</option>
+            <option value="violencia">Violence</option>
+            <option value="robo">Theft / threat</option>
+            <option value="sospechoso">Suspicious activity</option>
+            <option value="caida">Fall</option>
           </select>
-          <button class="teach-btn-save" data-tid="${tid}" disabled>Guardar</button>
+          <button class="teach-btn-save" data-tid="${tid}" disabled>Save</button>
         </div>
       </div>
     </div>`;
@@ -630,7 +630,7 @@ function renderTeach(data) {
       const action = sel.value;
       if (!action) return;
       btn.disabled = true;
-      btn.textContent = "Guardando…";
+      btn.textContent = "Saving…";
       try {
         const r = await fetch(`/api/acciones/sources/${SOURCE_ID}/teach/save`, {
           method: "POST",
@@ -639,18 +639,18 @@ function renderTeach(data) {
         });
         const d = await r.json();
         if (d.ok) {
-          showToast(`Persona #${tid} guardada como "${ACTION_LABELS[action]}"`);
-          btn.textContent = "✓ Guardado";
+          showToast(`Person #${tid} saved as "${ACTION_LABELS[action]}"`);
+          btn.textContent = "✓ Saved";
           sel.disabled = true;
         } else {
           btn.disabled = false;
-          btn.textContent = "Guardar";
-          showToast("Error al guardar");
+          btn.textContent = "Save";
+          showToast("Error saving");
         }
       } catch (_) {
         btn.disabled = false;
-        btn.textContent = "Guardar";
-        showToast("Error de red");
+        btn.textContent = "Save";
+        showToast("Network error");
       }
     });
   });
@@ -672,9 +672,9 @@ document.getElementById("btn-stop").addEventListener("click", async () => {
   document.getElementById("lv-feed-img").src = "";
   document.getElementById("lv-feed-img").style.display = "none";
   document.getElementById("feed-placeholder").style.display = "flex";
-  document.getElementById("feed-placeholder-msg").textContent = "Análisis detenido";
+  document.getElementById("feed-placeholder-msg").textContent = "Analysis stopped";
   document.getElementById("lv-dot").classList.remove("on");
-  document.getElementById("lv-status-txt").textContent = "Detenido";
+  document.getElementById("lv-status-txt").textContent = "Stopped";
   document.getElementById("lv-fps").textContent = "— fps";
 });
 

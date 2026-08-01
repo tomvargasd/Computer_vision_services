@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -164,22 +164,22 @@
 <header class="lv-topbar">
   <a class="lv-back" href="/module/carga_descarga">
     <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-    Volver
+    Back
   </a>
   <div class="lv-sep"></div>
   <span class="lv-source-name">{{ source.name }}</span>
   <span class="lv-badge {{ source.type }}">{{ source.type }}</span>
   <div class="lv-status">
     <span class="lv-dot on" id="lv-dot"></span>
-    <span id="lv-status-txt">Iniciando…</span>
+    <span id="lv-status-txt">Starting…</span>
   </div>
   <button class="lv-btn-reset" id="btn-reset">
     <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-    Reiniciar conteos
+    Reset counts
   </button>
   <button class="lv-btn-stop" id="btn-stop">
     <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/></svg>
-    Detener
+    Stop
   </button>
 </header>
 
@@ -187,7 +187,7 @@
   <div class="lv-feed">
     <div class="lv-feed-placeholder" id="feed-placeholder">
       <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-      <p id="feed-placeholder-msg">Conectando con la fuente…</p>
+      <p id="feed-placeholder-msg">Connecting to source…</p>
       <span>{{ source.path }}</span>
     </div>
     <img class="lv-feed-img" id="lv-feed-img" src="" alt="Live feed" style="display:none">
@@ -196,7 +196,7 @@
 
   <div class="lv-panel" id="lv-panel">
     <div class="lv-tabs">
-      <div class="lv-tab active" data-tab="live">En Vivo</div>
+      <div class="lv-tab active" data-tab="live">Live</div>
       <div class="lv-tab" data-tab="analytics">Analytics</div>
     </div>
 
@@ -204,21 +204,21 @@
       <div class="lv-section">
         <div class="lv-section-title">
           <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3 8 12 13 21 8"/></svg>
-          Carga y Descarga
+          Load and Unload
         </div>
         <div class="lv-inout">
           <div class="lv-inout-card in">
             <div class="lv-inout-val" id="cnt-in">0</div>
-            <div class="lv-inout-lbl">Entrada</div>
+            <div class="lv-inout-lbl">Entry</div>
           </div>
           <div class="lv-inout-card out">
             <div class="lv-inout-val" id="cnt-out">0</div>
-            <div class="lv-inout-lbl">Salida</div>
+            <div class="lv-inout-lbl">Exit</div>
           </div>
         </div>
         <div class="lv-line-config">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-            <span style="font-size:0.78rem;font-weight:600;color:#182A55;">Invertir Entrada/Salida</span>
+            <span style="font-size:0.78rem;font-weight:600;color:#182A55;">Swap Entry/Exit</span>
             <label class="toggle" style="margin:0;">
               <input type="checkbox" id="invert-toggle">
               <span class="slider"></span>
@@ -226,10 +226,10 @@
           </div>
         </div>
         <select class="lv-model-select" id="model-select">
-          <option value="">Cargando modelos…</option>
+          <option value="">Loading models…</option>
         </select>
         <div class="lv-line-config">
-          <div class="lv-line-lbl">Línea de conteo</div>
+          <div class="lv-line-lbl">Counting line</div>
           <div class="lv-switch-row">
             <span>Horizontal</span>
             <label class="lv-switch">
@@ -254,12 +254,12 @@
           Analytics
         </div>
         <div style="margin-bottom:10px">
-          <label style="font-size:0.65rem;color:#9D9FA2;text-transform:uppercase;letter-spacing:.06em;">Días</label>
+          <label style="font-size:0.65rem;color:#9D9FA2;text-transform:uppercase;letter-spacing:.06em;">Days</label>
           <select id="analytics-days" style="margin-left:8px;font-size:0.75rem;padding:3px 8px;border:1px solid #D8DCE3;border-radius:5px;">
-            <option value="1">Hoy</option>
-            <option value="7" selected>7 días</option>
-            <option value="30">30 días</option>
-            <option value="90">90 días</option>
+            <option value="1">Today</option>
+            <option value="7" selected>7 days</option>
+            <option value="30">30 days</option>
+            <option value="90">90 days</option>
           </select>
         </div>
         <div class="lv-chart-row">
@@ -274,7 +274,7 @@
     </div>
 
     <div class="lv-info-row">
-      <span>Fuente #<span class="lv-info-id">{{ source.id }}</span></span>
+      <span>Source #<span class="lv-info-id">{{ source.id }}</span></span>
       <span id="lv-fps">— fps</span>
     </div>
   </div>
@@ -290,19 +290,19 @@ let chartTrend = null;
 let models = [];
 
 (async () => {
-  document.getElementById("feed-placeholder-msg").textContent = "Iniciando pipeline…";
+  document.getElementById("feed-placeholder-msg").textContent = "Starting pipeline…";
   const r = await fetch(`/api/carga_descarga/sources/${SOURCE_ID}/start`, { method: "POST" });
   if (r.ok) {
-    document.getElementById("feed-placeholder-msg").textContent = "Cargando modelo de IA…";
-    document.getElementById("lv-status-txt").textContent = "Cargando…";
+    document.getElementById("feed-placeholder-msg").textContent = "Loading AI model…";
+    document.getElementById("lv-status-txt").textContent = "Loading…";
     const img = document.getElementById("lv-feed-img");
     img.onload = () => {
       img.style.display = "block";
       document.getElementById("feed-placeholder").style.display = "none";
-      document.getElementById("lv-status-txt").textContent = "En vivo";
+      document.getElementById("lv-status-txt").textContent = "Live";
     };
     img.onerror = () => {
-      document.getElementById("feed-placeholder-msg").textContent = "Error al conectar con la fuente";
+      document.getElementById("feed-placeholder-msg").textContent = "Error connecting to source";
       document.getElementById("lv-dot").classList.remove("on");
       document.getElementById("lv-status-txt").textContent = "Error";
     };
@@ -311,8 +311,8 @@ let models = [];
     startFpsCounter();
     loadModels();
   } else {
-    document.getElementById("feed-placeholder-msg").textContent = "Error al iniciar el análisis";
-    document.getElementById("lv-status-txt").textContent = "Error al iniciar";
+    document.getElementById("feed-placeholder-msg").textContent = "Error starting analysis";
+    document.getElementById("lv-status-txt").textContent = "Error starting";
     document.getElementById("lv-dot").classList.remove("on");
   }
 })();
@@ -332,11 +332,11 @@ function startPoll() {
     const inLbl = document.querySelector(".lv-inout-card.in .lv-inout-lbl");
     const outLbl = document.querySelector(".lv-inout-card.out .lv-inout-lbl");
     if (inLbl && outLbl) {
-      inLbl.textContent = d.inverted ? "Salida" : "Entrada";
-      outLbl.textContent = d.inverted ? "Entrada" : "Salida";
+      inLbl.textContent = d.inverted ? "Exit" : "Entry";
+      outLbl.textContent = d.inverted ? "Entry" : "Exit";
     }
     document.getElementById("lv-ts").textContent =
-      new Date().toLocaleTimeString("es-MX", { hour12: false });
+      new Date().toLocaleTimeString("en-US", { hour12: false });
     if (document.getElementById("tab-analytics").style.display !== "none") {
       fetchAnalytics();
     }
@@ -441,7 +441,7 @@ function renderAnalytics(data) {
   chartDist = new Chart(ctxDist, {
     type: "doughnut",
     data: {
-      labels: ["Carga (IN)", "Descarga (OUT)"],
+      labels: ["Load (IN)", "Unload (OUT)"],
       datasets: [{
         data: [entradas, salidas],
         backgroundColor: ["#22C55E", "#EF4444"],
@@ -464,9 +464,9 @@ function renderAnalytics(data) {
       data: {
         labels: daily.map(d => d.day.slice(5)),
         datasets: [
-          { label: "Carga", data: daily.map(d => parseInt(d.entradas) || 0),
+          { label: "Load", data: daily.map(d => parseInt(d.entradas) || 0),
             backgroundColor: "#22C55E", borderRadius: 3 },
-          { label: "Descarga", data: daily.map(d => parseInt(d.salidas) || 0),
+          { label: "Unload", data: daily.map(d => parseInt(d.salidas) || 0),
             backgroundColor: "#EF4444", borderRadius: 3 },
         ],
       },
@@ -474,7 +474,7 @@ function renderAnalytics(data) {
         responsive: true, maintainAspectRatio: true,
         plugins: {
           legend: { position: "top", labels: { boxWidth: 10, padding: 8, font: { size: 9 } } },
-          title: { display: true, text: "Tendencia diaria", font: { size: 10 }, color: "#9D9FA2" },
+          title: { display: true, text: "Daily trend", font: { size: 10 }, color: "#9D9FA2" },
         },
         scales: {
           x: { grid: { display: false }, ticks: { font: { size: 8 } } },

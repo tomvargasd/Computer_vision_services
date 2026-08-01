@@ -10,7 +10,7 @@ async function pollActivePipelines() {
     const statusEl = document.getElementById(`status-${modId}`);
     if (kpiEl) {
       const srcCount = mod.sources || 0;
-      kpiEl.textContent = `${srcCount} fuentes`;
+      kpiEl.textContent = `${srcCount} sources`;
     }
     if (statusEl) {
       const dot = statusEl.querySelector('.status-dot');

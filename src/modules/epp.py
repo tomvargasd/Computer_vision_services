@@ -122,12 +122,12 @@ class EppPipeline(BasePersistPipeline):
     def _make_error_frame(self, msg: str) -> np.ndarray:
         h, w = 480, 640
         frame = np.zeros((h, w, 3), dtype=np.uint8)
-        cv2.putText(frame, "ERROR DE FUENTE", (int(w * 0.25), h // 2 - 30),
+        cv2.putText(frame, "SOURCE ERROR", (int(w * 0.25), h // 2 - 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.9, (85, 42, 24), 2, cv2.LINE_AA)
         for i, part in enumerate([msg[j:j+55] for j in range(0, min(len(msg), 165), 55)]):
             cv2.putText(frame, part, (20, h // 2 + 10 + i * 28),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.55, (200, 200, 200), 1, cv2.LINE_AA)
-        cv2.putText(frame, "Verifica la ruta o permisos de la fuente", (20, h - 28),
+        cv2.putText(frame, "Check the source path or permissions", (20, h - 28),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.48, (120, 120, 120), 1, cv2.LINE_AA)
         return frame
 
@@ -320,7 +320,7 @@ class EppPipeline(BasePersistPipeline):
                             self._protected_tids.add(tid)
                             self.total_protected += 1
                             insert_module_event("epp", self.source_id,
-                                                "protected", f"ID {tid} protegido")
+                                                "protected", f"ID {tid} protected")
                             for epp_cls in EPP_CLASS_IDS:
                                 if self._person_epp[tid].get(epp_cls) and any(self._person_epp[tid][epp_cls]):
                                     epp_name = EPP_CLASS_MAP[epp_cls]
@@ -333,7 +333,7 @@ class EppPipeline(BasePersistPipeline):
                                 self._alerts_sent.add(tid)
                                 self._save_evidence(annotated, tid, "sin_epp")
                                 insert_module_event("epp", self.source_id,
-                                                    "unprotected", f"ID {tid} sin EPP",
+                                                    "unprotected", f"ID {tid} missing PPE",
                                                     capture_path=self._evidencias[0].get("capture_path") if self._evidencias else None)
                     else:
                         self._person_window_frames[tid] = 0
@@ -367,11 +367,11 @@ class EppPipeline(BasePersistPipeline):
         overlay = annotated.copy()
         lines = []
         if self.master_enabled:
-            lines.append((f"PROTEGIDOS: {self.total_protected}", GREEN))
-            lines.append((f"SIN EPP: {self.total_unprotected}", RED))
+            lines.append((f"PROTECTED: {self.total_protected}", GREEN))
+            lines.append((f"MISSING PPE: {self.total_unprotected}", RED))
         else:
-            lines.append(("MODO: SOLO DETECCION", CYAN))
-            lines.append((f"PERSONAS: {len(persons)}", WHITE))
+            lines.append(("MODE: DETECTION ONLY", CYAN))
+            lines.append((f"PEOPLE: {len(persons)}", WHITE))
         lines.append((f"EPP: {', '.join(EPP_CLASS_MAP.get(c, str(c)) for c in sorted(self.required_epp))}", WHITE))
 
         h2 = len(lines) * lh + 10

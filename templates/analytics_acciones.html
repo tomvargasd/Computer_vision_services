@@ -1,31 +1,31 @@
 {% extends "base.html" %}
-{% block title %}Analytics · Acciones{% endblock %}
+{% block title %}Analytics · Actions{% endblock %}
 {% block page_title %}Analytics · {{ module.label }}{% endblock %}
 {% block content %}
 <div class="analytics-dashboard">
   <div class="analytics-kpi-row">
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Violencia</span><span class="analytics-kpi-value" id="kpi-violencia">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg> Robo/Amenaza</span><span class="analytics-kpi-value" id="kpi-robo">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Sospechoso</span><span class="analytics-kpi-value" id="kpi-sospechoso">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg> Celular</span><span class="analytics-kpi-value" id="kpi-celular">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> Caída</span><span class="analytics-kpi-value" id="kpi-caida">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Hoy</span><span class="analytics-kpi-value" id="kpi-today">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Fuentes activas</span><span class="analytics-kpi-value" id="kpi-sources">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Violence</span><span class="analytics-kpi-value" id="kpi-violencia">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg> Theft/Threat</span><span class="analytics-kpi-value" id="kpi-robo">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Suspicious</span><span class="analytics-kpi-value" id="kpi-sospechoso">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg> Phone use</span><span class="analytics-kpi-value" id="kpi-celular">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> Fall</span><span class="analytics-kpi-value" id="kpi-caida">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Today</span><span class="analytics-kpi-value" id="kpi-today">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Active sources</span><span class="analytics-kpi-value" id="kpi-sources">—</span></div>
   </div>
 
   <div class="analytics-chart-row">
     <div class="analytics-chart-card">
-      <h4>Timeline de detecciones</h4>
+      <h4>Detection timeline</h4>
       <canvas id="chart-timeline"></canvas>
     </div>
     <div class="analytics-chart-card">
-      <h4>Por fuente</h4>
+      <h4>By source</h4>
       <div id="per-source-table" class="analytics-per-source"></div>
     </div>
   </div>
 
   <div class="analytics-events">
-    <h4>Detecciones recientes</h4>
+    <h4>Recent detections</h4>
     <div id="events-list" class="analytics-events-list"></div>
   </div>
 </div>
@@ -44,7 +44,7 @@ async function loadKPIs() {
   const d = await r.json();
   const counters = d.counters || {};
   const sources = Object.keys(counters);
-  setText('kpi-sources', sources.length > 0 ? sources.length + (d.active ? ' activas' : '') : '—');
+  setText('kpi-sources', sources.length > 0 ? sources.length + (d.active ? ' active' : '') : '—');
 
   let totalViolencia = 0, totalRobo = 0, totalSospechoso = 0, totalCelular = 0, totalCaida = 0, todayVal = 0;
   const todayStr = new Date().toISOString().slice(0,10);
@@ -70,13 +70,13 @@ async function loadKPIs() {
 
   const psEl = document.getElementById('per-source-table');
   if (sources.length > 0) {
-    psEl.innerHTML = '<table class="ps-table"><tr><th>Fuente</th><th>Violencia</th><th>Robo</th><th>Sospechoso</th><th>Celular</th><th>Caída</th></tr>' +
+    psEl.innerHTML = '<table class="ps-table"><tr><th>Source</th><th>Violence</th><th>Theft</th><th>Suspicious</th><th>Phone use</th><th>Fall</th></tr>' +
       sources.map(sid => {
         const c = counters[sid] || {};
-        return `<tr><td>Fuente ${sid}</td><td>${c.violencia ?? 0}</td><td>${c.robo ?? 0}</td><td>${c.sospechoso ?? 0}</td><td>${c.celular ?? 0}</td><td>${c.caida ?? 0}</td></tr>`;
+        return `<tr><td>Source ${sid}</td><td>${c.violencia ?? 0}</td><td>${c.robo ?? 0}</td><td>${c.sospechoso ?? 0}</td><td>${c.celular ?? 0}</td><td>${c.caida ?? 0}</td></tr>`;
       }).join('') + '</table>';
   } else {
-    psEl.innerHTML = '<p class="text-muted">Sin datos de fuentes</p>';
+    psEl.innerHTML = '<p class="text-muted">No source data</p>';
   }
 }
 
@@ -104,11 +104,11 @@ async function loadTimeline() {
     data: {
       labels,
       datasets: [
-        { label: 'Violencia', data: violenciaData, backgroundColor: '#EF4444' },
-        { label: 'Robo', data: roboData, backgroundColor: '#F97316' },
-        { label: 'Sospechoso', data: sospechosoData, backgroundColor: '#F59E0B' },
-        { label: 'Celular', data: celularData, backgroundColor: '#3B82F6' },
-        { label: 'Caída', data: caidaData, backgroundColor: '#8B5CF6' },
+        { label: 'Violence', data: violenciaData, backgroundColor: '#EF4444' },
+        { label: 'Theft', data: roboData, backgroundColor: '#F97316' },
+        { label: 'Suspicious', data: sospechosoData, backgroundColor: '#F59E0B' },
+        { label: 'Phone use', data: celularData, backgroundColor: '#3B82F6' },
+        { label: 'Fall', data: caidaData, backgroundColor: '#8B5CF6' },
       ]
     },
     options: {

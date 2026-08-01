@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ source.name }} · CVVision Live — Vehículos</title>
+  <title>{{ source.name }} · CVVision Live — Vehicles</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -227,22 +227,22 @@
 <header class="lv-topbar">
   <a class="lv-back" href="/module/vehiculos">
     <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-    Volver
+    Back
   </a>
   <div class="lv-sep"></div>
   <span class="lv-source-name">{{ source.name }}</span>
   <span class="lv-badge {{ source.type }}">{{ source.type }}</span>
   <div class="lv-status">
     <span class="lv-dot on" id="lv-dot"></span>
-    <span id="lv-status-txt">Iniciando…</span>
+    <span id="lv-status-txt">Starting…</span>
   </div>
   <button class="lv-btn-reset" id="btn-reset">
     <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-    Reiniciar
+    Reset
   </button>
   <button class="lv-btn-stop" id="btn-stop">
     <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/></svg>
-    Detener
+    Stop
   </button>
 </header>
 
@@ -251,7 +251,7 @@
   <div class="lv-feed">
     <div class="lv-feed-placeholder" id="feed-placeholder">
       <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-      <p id="feed-placeholder-msg">Conectando con la fuente…</p>
+      <p id="feed-placeholder-msg">Connecting to source…</p>
       <span>{{ source.path }}</span>
     </div>
     <img class="lv-feed-img" id="lv-feed-img" src="" alt="Live feed" style="display:none">
@@ -262,8 +262,8 @@
 
     <!-- subtabs: Conteo / Placas -->
     <div class="lv-subtabs">
-      <button class="lv-subtab active" data-panel="conteo">Conteo</button>
-      <button class="lv-subtab" data-panel="placas">Placas detectadas</button>
+      <button class="lv-subtab active" data-panel="conteo">Count</button>
+      <button class="lv-subtab" data-panel="placas">Detected plates</button>
     </div>
 
     <!-- ══ TAB: Conteo ═══════════════════════════════════════ -->
@@ -272,21 +272,21 @@
       <div class="lv-section">
         <div class="lv-section-title">
           <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 12h18M12 3v18"/></svg>
-          Conteo de Vehículos
+          Vehicle Count
         </div>
 
         <div class="lv-row-group">
           <div class="lv-stat-card">
             <div class="lv-stat-val in" id="cnt-in">0</div>
-            <div class="lv-stat-lbl">Entradas</div>
+            <div class="lv-stat-lbl">Entries</div>
           </div>
           <div class="lv-stat-card">
             <div class="lv-stat-val out" id="cnt-out">0</div>
-            <div class="lv-stat-lbl">Salidas</div>
+            <div class="lv-stat-lbl">Exits</div>
           </div>
           <div class="lv-stat-card">
             <div class="lv-stat-val plate" id="cnt-plates">0</div>
-            <div class="lv-stat-lbl">Placas</div>
+            <div class="lv-stat-lbl">Plates</div>
           </div>
         </div>
       </div>
@@ -295,18 +295,18 @@
       <div class="lv-section">
         <div class="lv-section-title">
           <svg viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
-          Línea de conteo
+          Counting line
         </div>
 
         <div class="lv-settings-row">
-          <label>Orientación</label>
+          <label>Orientation</label>
           <select id="line-mode">
             <option value="horizontal" {% if settings.get('vehiculos_line_mode', 'horizontal') == 'horizontal' %}selected{% endif %}>Horizontal</option>
             <option value="vertical" {% if settings.get('vehiculos_line_mode', 'horizontal') == 'vertical' %}selected{% endif %}>Vertical</option>
           </select>
         </div>
         <div class="lv-settings-row">
-          <label>Posición</label>
+          <label>Position</label>
           <input type="range" id="line-pos" min="1" max="99" value="{{ settings.get('vehiculos_line_pos', '50') }}">
           <span class="line-pos-value" id="line-pos-val">{{ settings.get('vehiculos_line_pos', '50') }}%</span>
         </div>
@@ -316,12 +316,12 @@
       <div class="lv-section">
         <div class="lv-section-title">
           <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="14" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          Detección de Placas
+          Plate Detection
         </div>
         <div class="lv-func-row">
           <div class="lv-func-info">
-            <span class="lv-func-lbl">Detectar placas</span>
-            <span class="lv-func-sub">Reconoce placas en vehículos detectados</span>
+            <span class="lv-func-lbl">Detect plates</span>
+            <span class="lv-func-sub">Recognizes plates on detected vehicles</span>
           </div>
           <label class="toggle">
             <input type="checkbox" id="toggle-placas"
@@ -335,10 +335,10 @@
       <div class="lv-section">
         <div class="lv-section-title">
           <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          Últimos vehículos
+          Recent vehicles
         </div>
         <div class="reg-list" id="reg-list">
-          <p style="font-size:0.75rem;color:#9D9FA2;font-style:italic">Esperando detecciones…</p>
+          <p style="font-size:0.75rem;color:#9D9FA2;font-style:italic">Waiting for detections…</p>
         </div>
       </div>
 
@@ -350,16 +350,16 @@
       <div class="lv-section">
         <div class="lv-section-title">
           <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="14" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          Placas detectadas
+          Detected plates
         </div>
 
         <div class="lv-count-big">
           <div class="lv-count-num" id="cnt-plates-tab">0</div>
-          <div class="lv-count-lbl">placas reconocidas</div>
+          <div class="lv-count-lbl">plates recognized</div>
         </div>
 
         <div class="plate-list" id="plate-list">
-          <p style="font-size:0.75rem;color:#9D9FA2;font-style:italic">No se han detectado placas aún.</p>
+          <p style="font-size:0.75rem;color:#9D9FA2;font-style:italic">No plates detected yet.</p>
         </div>
       </div>
 
@@ -367,7 +367,7 @@
 
     <!-- Info -->
     <div class="lv-info-row">
-      <span>Fuente #<span class="lv-info-id">{{ source.id }}</span></span>
+      <span>Source #<span class="lv-info-id">{{ source.id }}</span></span>
       <span id="lv-fps">— fps</span>
     </div>
 
@@ -378,7 +378,7 @@
 <div class="lb-overlay" id="lb-overlay">
   <span class="lb-close" id="lb-close">×</span>
   <span class="lb-vehicle-id" id="lb-vid"></span>
-  <img id="lb-img" src="" alt="Captura">
+  <img id="lb-img" src="" alt="Capture">
   <div class="lb-plate-label" id="lb-plate"></div>
 </div>
 
@@ -392,15 +392,15 @@ let lastRegsJson = "";
 let lastPlacasJson = "";
 
 (async () => {
-  document.getElementById("feed-placeholder-msg").textContent = "Iniciando pipeline…";
+  document.getElementById("feed-placeholder-msg").textContent = "Starting pipeline…";
   const r = await fetch(`/api/vehiculos/sources/${SOURCE_ID}/start`, { method: "POST" });
   if (r.ok) {
-    document.getElementById("feed-placeholder-msg").textContent = "Cargando modelo de IA…";
+    document.getElementById("feed-placeholder-msg").textContent = "Loading AI model…";
     startStream();
     poll = setInterval(fetchStats, 2000);
     startFpsMeter();
   } else {
-    document.getElementById("feed-placeholder-msg").textContent = "Error al iniciar el pipeline";
+    document.getElementById("feed-placeholder-msg").textContent = "Error starting the pipeline";
     document.getElementById("lv-dot").classList.remove("on");
     document.getElementById("lv-status-txt").textContent = "Error";
   }
@@ -411,15 +411,15 @@ function startStream() {
   img.onload = () => {
     document.getElementById("feed-placeholder").style.display = "none";
     img.style.display = "block";
-    document.getElementById("lv-status-txt").textContent = "En línea";
+    document.getElementById("lv-status-txt").textContent = "Online";
     frameCount++;
   };
   img.onerror = () => {
     document.getElementById("feed-placeholder").style.display = "flex";
-    document.getElementById("feed-placeholder-msg").textContent = "Error de conexión con la fuente";
+    document.getElementById("feed-placeholder-msg").textContent = "Error connecting to source";
     img.style.display = "none";
     document.getElementById("lv-dot").classList.remove("on");
-    document.getElementById("lv-status-txt").textContent = "Sin señal";
+    document.getElementById("lv-status-txt").textContent = "No signal";
   };
   img.src = `/api/vehiculos/stream/${SOURCE_ID}`;
 }
@@ -461,27 +461,27 @@ function updateStats(d) {
 
   const now = new Date();
   document.getElementById("lv-ts").textContent =
-    now.toLocaleTimeString("es-MX", {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+    now.toLocaleTimeString("en-US", {hour:"2-digit", minute:"2-digit", second:"2-digit"});
 }
 
 function renderRegistros(regs) {
   const container = document.getElementById("reg-list");
   if (regs.length === 0) {
-    container.innerHTML = '<p style="font-size:0.75rem;color:#9D9FA2;font-style:italic">Esperando detecciones…</p>';
+    container.innerHTML = '<p style="font-size:0.75rem;color:#9D9FA2;font-style:italic">Waiting for detections…</p>';
     return;
   }
   container.innerHTML = regs.slice().reverse().map(r => {
     const src = `/static/uploads/captures/vehiculos/${r.image}`;
     const dirClass = r.direction === "in" ? "in" : "out";
-    const dirLabel = r.direction === "in" ? "Entrada" : "Salida";
+    const dirLabel = r.direction === "in" ? "Entry" : "Exit";
     const plateHtml = r.plate_text
       ? `<div class="reg-plate">${r.plate_text}</div>`
       : "";
     const plateEsc = (r.plate_text || "").replace(/'/g, "\\'");
     return `<div class="reg-item" onclick="openLightbox('${src}', '${plateEsc}', '${r.track_id}')">
-      <img class="reg-thumb" src="${src}" alt="Vehículo ${r.track_id}" loading="lazy">
+      <img class="reg-thumb" src="${src}" alt="Vehicle ${r.track_id}" loading="lazy">
       <div class="reg-info">
-        <div class="reg-id">Vehículo #${r.track_id}</div>
+        <div class="reg-id">Vehicle #${r.track_id}</div>
         <div class="reg-time">${r.timestamp}</div>
         <span class="reg-dir ${dirClass}">${dirLabel}</span>
         ${plateHtml}
@@ -493,14 +493,14 @@ function renderRegistros(regs) {
 function renderPlacas(placas) {
   const container = document.getElementById("plate-list");
   if (placas.length === 0) {
-    container.innerHTML = '<p style="font-size:0.75rem;color:#9D9FA2;font-style:italic">No se han detectado placas aún.</p>';
+    container.innerHTML = '<p style="font-size:0.75rem;color:#9D9FA2;font-style:italic">No plates detected yet.</p>';
     return;
   }
   container.innerHTML = placas.slice().reverse().map(p => {
     const src = `/static/uploads/captures/vehiculos/${p.image}`;
     const plateEsc = (p.plate || "").replace(/'/g, "\\'");
     return `<div class="plate-item" onclick="openLightbox('${src}', '${plateEsc}', '${p.track_id}')">
-      <img class="plate-thumb" src="${src}" alt="Placa" loading="lazy">
+      <img class="plate-thumb" src="${src}" alt="Plate" loading="lazy">
       <span class="plate-text">${p.plate}</span>
       <span class="plate-time">${p.timestamp}</span>
     </div>`;
@@ -523,7 +523,7 @@ function openLightbox(url, plateText, vehicleId) {
     lbPlate.classList.remove("has-plate");
   }
   if (vehicleId) {
-    lbVid.textContent = "Vehículo #" + vehicleId;
+    lbVid.textContent = "Vehicle #" + vehicleId;
     lbVid.classList.add("has-id");
   } else {
     lbVid.textContent = "";
@@ -587,8 +587,8 @@ document.getElementById("btn-reset").addEventListener("click", async () => {
   await fetch(`/api/vehiculos/sources/${SOURCE_ID}/reset`, { method: "POST" });
   lastRegsJson = "";
   lastPlacasJson = "";
-  document.getElementById("reg-list").innerHTML = '<p style="font-size:0.75rem;color:#9D9FA2;font-style:italic">Esperando detecciones…</p>';
-  document.getElementById("plate-list").innerHTML = '<p style="font-size:0.75rem;color:#9D9FA2;font-style:italic">No se han detectado placas aún.</p>';
+  document.getElementById("reg-list").innerHTML = '<p style="font-size:0.75rem;color:#9D9FA2;font-style:italic">Waiting for detections…</p>';
+  document.getElementById("plate-list").innerHTML = '<p style="font-size:0.75rem;color:#9D9FA2;font-style:italic">No plates detected yet.</p>';
   document.getElementById("cnt-in").textContent = "0";
   document.getElementById("cnt-out").textContent = "0";
   document.getElementById("cnt-plates").textContent = "0";
@@ -603,9 +603,9 @@ document.getElementById("btn-stop").addEventListener("click", async () => {
   document.getElementById("lv-feed-img").src = "";
   document.getElementById("lv-feed-img").style.display = "none";
   document.getElementById("feed-placeholder").style.display = "flex";
-  document.getElementById("feed-placeholder-msg").textContent = "Análisis detenido";
+  document.getElementById("feed-placeholder-msg").textContent = "Analysis stopped";
   document.getElementById("lv-dot").classList.remove("on");
-  document.getElementById("lv-status-txt").textContent = "Detenido";
+  document.getElementById("lv-status-txt").textContent = "Stopped";
   document.getElementById("lv-fps").textContent = "— fps";
 });
 

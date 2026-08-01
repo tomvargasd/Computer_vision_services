@@ -23,6 +23,7 @@ from src.database import (
     MODULES_META,
     save_module_counters, load_module_counters, reset_module_counters,
     insert_module_event, get_module_events, get_module_analytics,
+    get_module_analytics_daily,
     save_source_config, get_source_config, get_source_config_value,
     delete_source_config,
     create_chat_session, get_chat_sessions, get_chat_session,
@@ -144,7 +145,7 @@ def check_access():
 
     ip = request.remote_addr or ""
     if ip and is_ip_blocked(ip):
-        return jsonify({"error": "Acceso denegado: IP bloqueada"}), 403
+        return jsonify({"error": "Access denied: blocked IP"}), 403
 
     email = session.get("email")
     expires_at = session.get("expires_at")
@@ -170,7 +171,7 @@ def check_access():
             session.clear()
 
     if path.startswith("/api/"):
-        return jsonify({"error": "No autenticado", "needs_login": True}), 401
+        return jsonify({"error": "Not authenticated", "needs_login": True}), 401
 
     return None
 
@@ -276,9 +277,9 @@ def live_view(module_id, source_id):
 @app.route("/api/modules/<module_id>/toggle", methods=["POST"])
 def api_toggle_module(module_id):
     if g.get("access_type") == "limited":
-        return jsonify({"error": "No tienes permiso"}), 403
+        return jsonify({"error": "You don't have permission"}), 403
     if module_id not in MODULES_META:
-        return jsonify({"error": "Módulo no encontrado"}), 404
+        return jsonify({"error": "Module not found"}), 404
     enabled = db_toggle_module(module_id)
     if not enabled:
         stop_map = {
@@ -304,14 +305,14 @@ def api_toggle_module(module_id):
 @app.route("/api/modules/<module_id>/functions/<func_id>/toggle", methods=["POST"])
 def api_toggle_function(module_id, func_id):
     if g.get("access_type") == "limited":
-        return jsonify({"error": "No tienes permiso"}), 403
+        return jsonify({"error": "You don't have permission"}), 403
     if module_id not in MODULES_META:
-        return jsonify({"error": "Módulo no encontrado"}), 404
+        return jsonify({"error": "Module not found"}), 404
     if func_id not in MODULES_META[module_id]["functions"]:
-        return jsonify({"error": "Función no encontrada"}), 404
+        return jsonify({"error": "Function not found"}), 404
     fmeta = MODULES_META[module_id]["functions"][func_id]
     if fmeta.get("locked"):
-        return jsonify({"error": "Esta función no se puede desactivar", "locked": True}), 403
+        return jsonify({"error": "This function cannot be disabled", "locked": True}), 403
     enabled = db_toggle_function(module_id, func_id)
 
     func_state = {
@@ -381,10 +382,10 @@ def api_settings():
 @app.route("/api/settings/upload/<field>", methods=["POST"])
 def api_upload(field):
     if "file" not in request.files:
-        return jsonify({"error": "No se envió archivo"}), 400
+        return jsonify({"error": "No file was sent"}), 400
     f = request.files["file"]
     if not f.filename:
-        return jsonify({"error": "Nombre de archivo vacío"}), 400
+        return jsonify({"error": "Empty filename"}), 400
 
     target_map = {
         "logo": (UPLOAD_FOLDER, ALLOWED_IMG),
@@ -392,11 +393,11 @@ def api_upload(field):
         "model": (MODELS_FOLDER, ALLOWED_MODEL),
     }
     if field not in target_map:
-        return jsonify({"error": "Campo inválido"}), 400
+        return jsonify({"error": "Invalid field"}), 400
     dest_dir, allowed_set = target_map[field]
     ext = f.filename.rsplit(".", 1)[1].lower() if "." in f.filename else ""
     if ext not in allowed_set:
-        return jsonify({"error": f"Tipo de archivo no permitido ({ext})"}), 400
+        return jsonify({"error": f"File type not allowed ({ext})"}), 400
     fname = secure_filename(f.filename)
     dest = os.path.join(dest_dir, fname)
     f.save(dest)
@@ -410,13 +411,13 @@ def api_upload(field):
 @app.route("/api/settings/logo", methods=["POST"])
 def api_upload_logo():
     if "logo" not in request.files:
-        return jsonify({"error": "No se envió archivo"}), 400
+        return jsonify({"error": "No file was sent"}), 400
     f = request.files["logo"]
     if not f.filename:
-        return jsonify({"error": "Nombre vacío"}), 400
+        return jsonify({"error": "Empty name"}), 400
     ext = f.filename.rsplit(".", 1)[1].lower() if "." in f.filename else ""
     if ext not in ALLOWED_IMG:
-        return jsonify({"error": "Formato no permitido"}), 400
+        return jsonify({"error": "Format not allowed"}), 400
     fname = secure_filename(f.filename)
     f.save(os.path.join(UPLOAD_FOLDER, fname))
     set_setting("logo", fname)
@@ -426,12 +427,12 @@ def api_upload_logo():
 @app.route("/api/<module_id>/upload-model", methods=["POST"])
 def api_upload_module_model(module_id):
     if module_id not in MODULES_META:
-        return jsonify({"error": "Módulo no encontrado"}), 404
+        return jsonify({"error": "Module not found"}), 404
     if "model" not in request.files:
-        return jsonify({"error": "No se envió archivo"}), 400
+        return jsonify({"error": "No file was sent"}), 400
     f = request.files["model"]
     if not f.filename.endswith(".pt"):
-        return jsonify({"error": "Solo archivos .pt"}), 400
+        return jsonify({"error": "Only .pt files"}), 400
     fname = secure_filename(f.filename)
     f.save(os.path.join(MODELS_FOLDER, fname))
     rel = os.path.join("static", "uploads", "models", fname)
@@ -442,7 +443,7 @@ def api_upload_module_model(module_id):
 @app.route("/api/<module_id>/model", methods=["DELETE"])
 def api_remove_module_model(module_id):
     if module_id not in MODULES_META:
-        return jsonify({"error": "Módulo no encontrado"}), 404
+        return jsonify({"error": "Module not found"}), 404
     set_setting(f"{module_id}_model", "")
     return jsonify({"removed": True})
 
@@ -450,7 +451,7 @@ def api_remove_module_model(module_id):
 @app.route("/api/<module_id>/settings/conf", methods=["POST"])
 def api_set_conf(module_id):
     if module_id not in MODULES_META:
-        return jsonify({"error": "Módulo no encontrado"}), 404
+        return jsonify({"error": "Module not found"}), 404
     data = request.get_json(silent=True) or {}
     val = str(float(data.get("conf", 0.35)))
     set_setting(f"{module_id}_conf", val)
@@ -460,7 +461,7 @@ def api_set_conf(module_id):
 @app.route("/api/<module_id>/settings/half", methods=["POST"])
 def api_set_half(module_id):
     if module_id not in MODULES_META:
-        return jsonify({"error": "Módulo no encontrado"}), 404
+        return jsonify({"error": "Module not found"}), 404
     data = request.get_json(silent=True) or {}
     val = "1" if data.get("half") else "0"
     set_setting(f"{module_id}_half", val)
@@ -470,7 +471,7 @@ def api_set_half(module_id):
 @app.route("/api/<module_id>/settings/fps", methods=["POST"])
 def api_set_fps(module_id):
     if module_id not in MODULES_META:
-        return jsonify({"error": "Módulo no encontrado"}), 404
+        return jsonify({"error": "Module not found"}), 404
     data = request.get_json(silent=True) or {}
     for src_type in ("video", "stream"):
         if src_type in data:
@@ -485,7 +486,7 @@ def pallets_set_classes():
     raw = data.get("classes", "0,1,2,3")
     ids = [int(c.strip()) for c in raw.split(",") if c.strip()]
     if not ids or any(i < 0 or i > 255 for i in ids):
-        return jsonify({"error": "Lista de clases inválida"}), 400
+        return jsonify({"error": "Invalid class list"}), 400
     val = ",".join(str(i) for i in ids)
     set_setting("pallets_classes", val)
     PalletsManager.get().set_classes(ids)
@@ -510,10 +511,10 @@ def carga_descarga_settings_models():
 @app.route("/api/carga_descarga/settings/upload-model", methods=["POST"])
 def carga_descarga_upload_model():
     if "file" not in request.files:
-        return jsonify({"error": "No se envió archivo"}), 400
+        return jsonify({"error": "No file was sent"}), 400
     f = request.files["file"]
     if not f.filename.endswith(".pt"):
-        return jsonify({"error": "Solo archivos .pt"}), 400
+        return jsonify({"error": "Only .pt files"}), 400
     fname = secure_filename(f.filename)
     dest = os.path.join(MODELS_FOLDER, fname)
     f.save(dest)
@@ -599,7 +600,7 @@ def _register_standard_routes(app, module_id, manager_class, extra_routes=None):
     def _stats(source_id):
         stats = manager_class.get().get_stats(source_id)
         if stats is None:
-            return jsonify({"error": "Pipeline no activo"}), 404
+            return jsonify({"error": "Pipeline not active"}), 404
         return jsonify(stats)
 
     @app.route(f"/api/{module_id}/sources/<int:source_id>/reset",
@@ -628,7 +629,7 @@ def personas_start(source_id):
     sources = get_sources("personas")
     src = next((s for s in sources if s["id"] == source_id), None)
     if not src:
-        return jsonify({"error": "Fuente no encontrada"}), 404
+        return jsonify({"error": "Source not found"}), 404
     s = get_settings()
     fps_limit = _get_fps_limit("personas", src["type"], s)
     try:
@@ -664,7 +665,7 @@ def armas_start(source_id):
     sources = get_sources("armas")
     src = next((s for s in sources if s["id"] == source_id), None)
     if not src:
-        return jsonify({"error": "Fuente no encontrada"}), 404
+        return jsonify({"error": "Source not found"}), 404
     s = get_settings()
     fps_limit = _get_fps_limit("armas", src["type"], s)
     try:
@@ -690,7 +691,7 @@ def acciones_start(source_id):
     sources = get_sources("acciones")
     src = next((s for s in sources if s["id"] == source_id), None)
     if not src:
-        return jsonify({"error": "Fuente no encontrada"}), 404
+        return jsonify({"error": "Source not found"}), 404
     s = get_settings()
     fps_limit = _get_fps_limit("acciones", src["type"], s)
     try:
@@ -710,7 +711,7 @@ def acciones_teach_data(source_id):
     mgr = AccionesManager.get()
     data = mgr.get_teach_data(source_id)
     if data is None:
-        return jsonify({"error": "Pipeline no activo"}), 404
+        return jsonify({"error": "Pipeline not active"}), 404
     return jsonify(data)
 
 
@@ -718,15 +719,15 @@ def acciones_teach_data(source_id):
 def acciones_teach_save(source_id):
     body = request.get_json()
     if not body:
-        return jsonify({"error": "JSON requerido"}), 400
+        return jsonify({"error": "JSON required"}), 400
     tid = body.get("person_id")
     action = body.get("action")
     if tid is None or action not in ("violencia", "robo", "sospechoso", "celular", "caida"):
-        return jsonify({"error": "person_id y action requeridos (violencia|robo|sospechoso|celular|caida)"}), 400
+        return jsonify({"error": "person_id and action required (violencia|robo|sospechoso|celular|caida)"}), 400
     mgr = AccionesManager.get()
     pipeline = mgr.pipelines.get(source_id) if hasattr(mgr, "pipelines") else None
     if pipeline is None:
-        return jsonify({"error": "Pipeline no activo"}), 404
+        return jsonify({"error": "Pipeline not active"}), 404
     log = list(pipeline._person_log.get(tid, []))
     sample = {
         "id": str(uuid.uuid4()),
@@ -756,7 +757,7 @@ def troncos_start(source_id):
     sources = get_sources("troncos")
     src = next((s for s in sources if s["id"] == source_id), None)
     if not src:
-        return jsonify({"error": "Fuente no encontrada"}), 404
+        return jsonify({"error": "Source not found"}), 404
     s = get_settings()
     fps_limit = _get_fps_limit("troncos", src["type"], s)
     try:
@@ -792,7 +793,7 @@ def pallets_start(source_id):
     sources = get_sources("pallets")
     src = next((s for s in sources if s["id"] == source_id), None)
     if not src:
-        return jsonify({"error": "Fuente no encontrada"}), 404
+        return jsonify({"error": "Source not found"}), 404
     s = get_settings()
     classes_str = s.get("pallets_classes", "0,1,2,3")
     classes = [int(c.strip()) for c in classes_str.split(",") if c.strip()]
@@ -836,7 +837,7 @@ def cajas_start(source_id):
     sources = get_sources("cajas")
     src = next((s for s in sources if s["id"] == source_id), None)
     if not src:
-        return jsonify({"error": "Fuente no encontrada"}), 404
+        return jsonify({"error": "Source not found"}), 404
     s = get_settings()
     fps_limit = _get_fps_limit("cajas", src["type"], s)
     try:
@@ -872,7 +873,7 @@ def reglamento_start(source_id):
     sources = get_sources("reglamento")
     src = next((s for s in sources if s["id"] == source_id), None)
     if not src:
-        return jsonify({"error": "Fuente no encontrada"}), 404
+        return jsonify({"error": "Source not found"}), 404
     s = get_settings()
     fps_limit = _get_fps_limit("reglamento", src["type"], s)
     try:
@@ -977,7 +978,7 @@ def carga_descarga_start(source_id):
     sources = get_sources("carga_descarga")
     src = next((s for s in sources if s["id"] == source_id), None)
     if not src:
-        return jsonify({"error": "Fuente no encontrada"}), 404
+        return jsonify({"error": "Source not found"}), 404
     s = get_settings()
     line_mode = s.get("carga_descarga_line_mode", "horizontal")
     line_pos  = int(s.get("carga_descarga_line_pos", "50"))
@@ -1011,7 +1012,7 @@ def carga_descarga_line_mode(source_id):
     data = request.get_json(silent=True) or {}
     mode = data.get("mode", "horizontal")
     if mode not in ("horizontal", "vertical"):
-        return jsonify({"error": "Modo inválido"}), 400
+        return jsonify({"error": "Invalid mode"}), 400
     set_setting("carga_descarga_line_mode", mode)
     CargaDescargaManager.get().set_line_mode(source_id, mode)
     return jsonify({"line_mode": mode})
@@ -1044,7 +1045,7 @@ def carga_descarga_reload_model(source_id):
         models = []
     idx = int(data.get("model_idx", 0))
     if not models or idx < 0 or idx >= len(models):
-        return jsonify({"error": "Modelo no encontrado"}), 404
+        return jsonify({"error": "Model not found"}), 404
     m = models[idx]
     cls_str = m.get("classes", "")
     classes = [int(c.strip()) for c in cls_str.split(",") if c.strip()] if cls_str else None
@@ -1084,7 +1085,7 @@ def epp_start(source_id):
     sources = get_sources("epp")
     src = next((s for s in sources if s["id"] == source_id), None)
     if not src:
-        return jsonify({"error": "Fuente no encontrada"}), 404
+        return jsonify({"error": "Source not found"}), 404
     s = get_settings()
     fps_limit = _get_fps_limit("epp", src["type"], s)
     try:
@@ -1126,7 +1127,7 @@ def smoke_start(source_id):
     sources = get_sources("smoke")
     src = next((s for s in sources if s["id"] == source_id), None)
     if not src:
-        return jsonify({"error": "Fuente no encontrada"}), 404
+        return jsonify({"error": "Source not found"}), 404
     s = get_settings()
     fps_limit = _get_fps_limit("smoke", src["type"], s)
     try:
@@ -1152,7 +1153,7 @@ def vehiculos_start(source_id):
     sources = get_sources("vehiculos")
     src = next((s for s in sources if s["id"] == source_id), None)
     if not src:
-        return jsonify({"error": "Fuente no encontrada"}), 404
+        return jsonify({"error": "Source not found"}), 404
     s = get_settings()
     fps_limit = _get_fps_limit("vehiculos", src["type"], s)
     try:
@@ -1177,7 +1178,7 @@ def vehiculos_line_mode(source_id):
     data = request.get_json(silent=True) or {}
     mode = data.get("mode", "horizontal")
     if mode not in ("horizontal", "vertical"):
-        return jsonify({"error": "Modo inválido"}), 400
+        return jsonify({"error": "Invalid mode"}), 400
     set_setting("vehiculos_line_mode", mode)
     VehiculosManager.get().set_line_mode(source_id, mode)
     return jsonify({"mode": mode})
@@ -1203,10 +1204,10 @@ def vehiculos_plate_detection(source_id):
 @app.route("/api/vehiculos/upload-plate-model", methods=["POST"])
 def vehiculos_upload_plate_model():
     if "model" not in request.files:
-        return jsonify({"error": "No se envió archivo"}), 400
+        return jsonify({"error": "No file was sent"}), 400
     f = request.files["model"]
     if not f.filename.endswith(".pt"):
-        return jsonify({"error": "Solo archivos .pt"}), 400
+        return jsonify({"error": "Only .pt files"}), 400
     fname = secure_filename(f.filename)
     f.save(os.path.join(MODELS_FOLDER, fname))
     rel = os.path.join("static", "uploads", "models", fname)
@@ -1225,7 +1226,7 @@ def tanques_gas_start(source_id):
     sources = get_sources("tanques_gas")
     src = next((s for s in sources if s["id"] == source_id), None)
     if not src:
-        return jsonify({"error": "Fuente no encontrada"}), 404
+        return jsonify({"error": "Source not found"}), 404
     s = get_settings()
     fps_limit = _get_fps_limit("tanques_gas", src["type"], s)
     try:
@@ -1250,7 +1251,7 @@ def tanques_gas_line_mode(source_id):
     data = request.get_json(silent=True) or {}
     mode = data.get("mode", "horizontal")
     if mode not in ("horizontal", "vertical", "rectangle", "custom_line", "custom_rect"):
-        return jsonify({"error": "Modo inválido"}), 400
+        return jsonify({"error": "Invalid mode"}), 400
     set_setting("tanques_gas_line_mode", mode)
     TanquesGasManager.get().set_line_mode(source_id, mode)
     return jsonify({"line_mode": mode})
@@ -1281,7 +1282,7 @@ def tanques_gas_custom_rect(source_id):
     data = request.get_json(silent=True) or {}
     points = data.get("points", [])
     if len(points) != 4:
-        return jsonify({"error": "Se requieren exactamente 4 puntos"}), 400
+        return jsonify({"error": "Exactly 4 points are required"}), 400
     TanquesGasManager.get().set_custom_rect(source_id, points)
     return jsonify({"points": points})
 
@@ -1349,7 +1350,7 @@ def tanques_gas_teach_save(source_id):
     data = request.get_json(silent=True) or {}
     action = data.get("action", "").strip()
     if not action:
-        return jsonify({"error": "Acción requerida"}), 400
+        return jsonify({"error": "Action required"}), 400
     ok = TanquesGasManager.get().save_teach_action(source_id, action)
     return jsonify({"ok": ok})
 
@@ -1369,10 +1370,10 @@ def tanques_gas_actions_info(source_id):
 @app.route("/api/tanques_gas/upload-pose-model", methods=["POST"])
 def tanques_gas_upload_pose_model():
     if "model" not in request.files:
-        return jsonify({"error": "No se envió archivo"}), 400
+        return jsonify({"error": "No file was sent"}), 400
     f = request.files["model"]
     if not f.filename.endswith(".pt"):
-        return jsonify({"error": "Solo archivos .pt"}), 400
+        return jsonify({"error": "Only .pt files"}), 400
     fname = secure_filename(f.filename)
     f.save(os.path.join(MODELS_FOLDER, fname))
     rel = os.path.join("static", "uploads", "models", fname)
@@ -1383,10 +1384,10 @@ def tanques_gas_upload_pose_model():
 @app.route("/api/tanques_gas/upload-smoke-model", methods=["POST"])
 def tanques_gas_upload_smoke_model():
     if "model" not in request.files:
-        return jsonify({"error": "No se envió archivo"}), 400
+        return jsonify({"error": "No file was sent"}), 400
     f = request.files["model"]
     if not f.filename.endswith(".pt"):
-        return jsonify({"error": "Solo archivos .pt"}), 400
+        return jsonify({"error": "Only .pt files"}), 400
     fname = secure_filename(f.filename)
     f.save(os.path.join(MODELS_FOLDER, fname))
     rel = os.path.join("static", "uploads", "models", fname)
@@ -1401,18 +1402,18 @@ def tanques_gas_upload_smoke_model():
 @app.route("/api/sources", methods=["POST"])
 def api_add_source():
     if g.get("access_type") == "limited":
-        return jsonify({"error": "No tienes permiso para agregar fuentes"}), 403
+        return jsonify({"error": "You don't have permission to add sources"}), 403
     data = request.get_json(silent=True) or {}
     module_id = data.get("module_id")
     name = data.get("name", "").strip()
     src_type = data.get("type", "stream")
     path = data.get("path", "").strip()
     if module_id not in MODULES_META:
-        return jsonify({"error": "Módulo inválido"}), 400
+        return jsonify({"error": "Invalid module"}), 400
     if not name or not path:
-        return jsonify({"error": "Nombre y ruta requeridos"}), 400
+        return jsonify({"error": "Name and path are required"}), 400
     if src_type not in ("video", "stream"):
-        return jsonify({"error": "Tipo inválido"}), 400
+        return jsonify({"error": "Invalid type"}), 400
     path = _normalize_path(path, src_type)
     src = add_source(module_id, name, src_type, path)
     return jsonify(src), 201
@@ -1421,7 +1422,7 @@ def api_add_source():
 @app.route("/api/sources/<int:source_id>", methods=["PUT", "DELETE"])
 def api_source_crud(source_id):
     if g.get("access_type") == "limited":
-        return jsonify({"error": "No tienes permiso para modificar fuentes"}), 403
+        return jsonify({"error": "You don't have permission to modify sources"}), 403
     if request.method == "DELETE":
         src = get_source(source_id)
         if src:
@@ -1440,22 +1441,22 @@ def api_source_crud(source_id):
         path = _normalize_path(path, src_type)
     src = update_source(source_id, name=name, path=path)
     if not src:
-        return jsonify({"error": "Fuente no encontrada"}), 404
+        return jsonify({"error": "Source not found"}), 404
     return jsonify(src)
 
 
 @app.route("/api/sources/upload-video", methods=["POST"])
 def api_upload_video():
     if g.get("access_type") == "limited":
-        return jsonify({"error": "No tienes permiso para subir videos"}), 403
+        return jsonify({"error": "You don't have permission to upload videos"}), 403
     if "video" not in request.files:
-        return jsonify({"error": "No se envió archivo"}), 400
+        return jsonify({"error": "No file was sent"}), 400
     f = request.files["video"]
     if not f.filename:
-        return jsonify({"error": "Nombre vacío"}), 400
+        return jsonify({"error": "Empty name"}), 400
     ext = f.filename.rsplit(".", 1)[1].lower() if "." in f.filename else ""
     if ext not in ALLOWED_VIDEO:
-        return jsonify({"error": "Formato de video no permitido"}), 400
+        return jsonify({"error": "Video format not allowed"}), 400
     fname = secure_filename(f.filename)
     dest = os.path.join(VIDEOS_FOLDER, fname)
     f.save(dest)
@@ -1495,7 +1496,7 @@ def api_source_config_key(source_id, key):
 @app.route("/api/analytics/<module_id>/summary")
 def api_analytics_summary(module_id):
     if module_id not in MODULES_META:
-        return jsonify({"error": "Módulo no encontrado"}), 404
+        return jsonify({"error": "Module not found"}), 404
     days = request.args.get("days", 7, type=int)
     source_id = request.args.get("source_id", None, type=int)
     mgr = _get_manager(module_id)
@@ -1532,7 +1533,7 @@ def api_analytics_summary(module_id):
 @app.route("/api/analytics/<module_id>/events")
 def api_analytics_events(module_id):
     if module_id not in MODULES_META:
-        return jsonify({"error": "Módulo no encontrado"}), 404
+        return jsonify({"error": "Module not found"}), 404
     days = request.args.get("days", 7, type=int)
     source_id = request.args.get("source_id", None, type=int)
     event_type = request.args.get("event_type", None)
@@ -1544,7 +1545,7 @@ def api_analytics_events(module_id):
 @app.route("/api/analytics/<module_id>/timeline")
 def api_analytics_timeline(module_id):
     if module_id not in MODULES_META:
-        return jsonify({"error": "Módulo no encontrado"}), 404
+        return jsonify({"error": "Module not found"}), 404
     days = request.args.get("days", 7, type=int)
     source_id = request.args.get("source_id", None, type=int)
     data = get_module_analytics(module_id, source_id, days)
@@ -1560,121 +1561,92 @@ from datetime import datetime, timedelta
 
 @app.route("/api/analytics/tanques_gas/comprehensive")
 def api_tanques_gas_comprehensive():
-    sources = get_sources("tanques_gas")
+    days = request.args.get("days", 29, type=int)
+    days = max(1, min(days, 3650))
+    source_id = request.args.get("source_id", None, type=int)
+
+    all_sources = get_sources("tanques_gas")
+    sources = all_sources
+    if source_id is not None:
+        sources = [s for s in sources if s["id"] == source_id]
     if not sources:
-        return jsonify({"kpis": {}, "sources": [], "dailyTimeline": [], "eventTypeDistribution": {}, "actionDistribution": {}, "recentEvents": [], "empty": True})
+        return jsonify({
+            "kpis": {}, "sources": [], "dailyTimeline": [],
+            "eventTypeDistribution": {}, "actionDistribution": {},
+            "recentEvents": [],
+            "availableSources": [{"id": s["id"], "name": s["name"]} for s in all_sources],
+            "empty": True,
+        })
 
     source_ids = [s["id"] for s in sources]
     source_map  = {s["id"]: s for s in sources}
 
-    counters_all = {}
-    for sid in source_ids:
-        counters_all[sid] = load_module_counters("tanques_gas", sid)
-
     today_str = datetime.now().strftime("%Y-%m-%d")
 
-    # ── KPIs ──
-    total_entradas = sum(counters_all[sid].get("entrada", 0) if isinstance(counters_all[sid], dict) else 0 for sid in source_ids)
-    total_salidas  = sum(counters_all[sid].get("salida", 0) if isinstance(counters_all[sid], dict) else 0 for sid in source_ids)
+    # ── Eventos diarios por fuente (fuente de verdad) ──
+    daily_raw = get_module_analytics_daily("tanques_gas", source_id, days)
 
-    analytics = get_module_analytics("tanques_gas", days=365)
-    daily_raw = analytics["daily"]
-
-    today_events = sum(d["count"] for d in daily_raw if d["day"] == today_str)
-
-    total_eventos = sum(d["count"] for d in daily_raw)
-
-    total_acciones = 0
-    entries_by_source = {}
-    exits_by_source = {}
+    entries_by_source  = {}
+    exits_by_source    = {}
     acciones_by_source = {}
-    smoke_sources = []
+    action_dist        = {}
+    event_type_dist    = {"entry": 0, "exit": 0, "smoke_detected": 0, "action": 0}
+    smoke_sources      = set()
+    daily_agg          = {}
 
-    for sid in source_ids:
-        c = counters_all.get(sid, {})
-        if not isinstance(c, dict):
-            c = {}
-        ent = c.get("entrada", 0) or 0
-        sal = c.get("salida", 0) or 0
-        entries_by_source[sid] = ent
-        exits_by_source[sid] = sal
+    for d in daily_raw:
+        day = d["day"]
+        et  = d["event_type"]
+        cnt = d["count"]
+        sid = d["source_id"]
 
-        act_count = c.get("action_count", {})
-        if isinstance(act_count, str):
-            try:
-                act_count = json.loads(act_count)
-            except Exception:
-                act_count = {}
-        if isinstance(act_count, dict):
-            acc = sum(v for v in act_count.values() if isinstance(v, (int, float)))
+        if day not in daily_agg:
+            daily_agg[day] = {"day": day, "entradas": 0, "salidas": 0, "acciones": 0, "smoke": 0}
+
+        if et in ("entry", "entrada"):
+            daily_agg[day]["entradas"] += cnt
+            entries_by_source[sid] = entries_by_source.get(sid, 0) + cnt
+            event_type_dist["entry"] += cnt
+        elif et in ("exit", "salida"):
+            daily_agg[day]["salidas"] += cnt
+            exits_by_source[sid] = exits_by_source.get(sid, 0) + cnt
+            event_type_dist["exit"] += cnt
+        elif et == "smoke_detected":
+            daily_agg[day]["smoke"] += cnt
+            event_type_dist["smoke_detected"] += cnt
+            smoke_sources.add(sid)
         else:
-            acc = 0
-        acciones_by_source[sid] = acc
-        total_acciones += acc
+            daily_agg[day]["acciones"] += cnt
+            acciones_by_source[sid] = acciones_by_source.get(sid, 0) + cnt
+            action_dist[et] = action_dist.get(et, 0) + cnt
+            event_type_dist["action"] += cnt
 
-        sd = c.get("smoke_detected", 0)
-        if sd:
-            smoke_sources.append(sid)
-
+    total_entradas = sum(entries_by_source.values())
+    total_salidas  = sum(exits_by_source.values())
+    total_acciones = sum(acciones_by_source.values())
+    total_smoke_events = event_type_dist["smoke_detected"]
 
     ocupacion_neta = total_entradas - total_salidas
     ratio_es = round(total_entradas / total_salidas, 2) if total_salidas > 0 else total_entradas
 
-    # Daily timeline — aggregate by date
-    daily_agg = {}
-    for d in daily_raw:
-        day = d["day"]
-        et = d["event_type"]
-        cnt = d["count"]
-        if day not in daily_agg:
-            daily_agg[day] = {"day": day, "entradas": 0, "salidas": 0, "acciones": 0, "smoke": 0}
-        if et in ("entry", "entrada"):
-            daily_agg[day]["entradas"] += cnt
-        elif et in ("exit", "salida"):
-            daily_agg[day]["salidas"] += cnt
-        elif et == "smoke_detected":
-            daily_agg[day]["smoke"] += cnt
-        else:
-            daily_agg[day]["acciones"] += cnt
+    today_events = sum(d["count"] for d in daily_raw if d["day"] == today_str)
+    total_eventos = sum(v for v in event_type_dist.values())
 
     daily_timeline = sorted(daily_agg.values(), key=lambda x: x["day"])
 
-    # Event type distribution
-    event_type_dist = {"entry": 0, "exit": 0, "smoke_detected": 0, "action": 0}
-    for d in daily_raw:
-        et = d["event_type"]
-        cnt = d["count"]
-        if et in ("entry", "entrada"):
-            event_type_dist["entry"] += cnt
-        elif et in ("exit", "salida"):
-            event_type_dist["exit"] += cnt
-        elif et == "smoke_detected":
-            event_type_dist["smoke_detected"] += cnt
-        else:
-            event_type_dist["action"] += cnt
+    # KPIs históricos
+    daily_totals = [d["entradas"] + d["salidas"] + d["acciones"] + d["smoke"] for d in daily_timeline]
+    promedio_diario = round(sum(daily_totals) / len(daily_totals), 1) if daily_totals else 0
+    pico_diario = max(daily_totals) if daily_totals else 0
+    pico_dia = ""
+    for d in daily_timeline:
+        if d["entradas"] + d["salidas"] + d["acciones"] + d["smoke"] == pico_diario:
+            pico_dia = d["day"]
+            break
 
-    # Action distribution
-    action_dist = {}
-    for sid in source_ids:
-        c = counters_all.get(sid, {})
-        if isinstance(c, dict):
-            ac = c.get("action_count", {})
-            if isinstance(ac, str):
-                try:
-                    ac = json.loads(ac)
-                except Exception:
-                    ac = {}
-            if isinstance(ac, dict):
-                for act_name, act_cnt in ac.items():
-                    action_dist[act_name] = action_dist.get(act_name, 0) + (act_cnt if isinstance(act_cnt, (int, float)) else 0)
-
-    # Per-source breakdown
-    total_all = total_entradas + total_salidas + total_acciones
+    # Desglose por fuente (todas las fuentes del conjunto filtrado)
     source_list = []
     for sid in source_ids:
-        c = counters_all.get(sid, {})
-        if not isinstance(c, dict):
-            c = {}
         ent = entries_by_source.get(sid, 0)
         sal = exits_by_source.get(sid, 0)
         acc = acciones_by_source.get(sid, 0)
@@ -1692,16 +1664,6 @@ def api_tanques_gas_comprehensive():
 
     source_list.sort(key=lambda x: x["entradas"], reverse=True)
 
-    # Historical KPIs from daily data
-    daily_totals = [d["entradas"] + d["salidas"] + d["acciones"] + d["smoke"] for d in daily_timeline]
-    promedio_diario = round(sum(daily_totals) / len(daily_totals), 1) if daily_totals else 0
-    pico_diario = max(daily_totals) if daily_totals else 0
-    pico_dia = ""
-    for d in daily_timeline:
-        if d["entradas"] + d["salidas"] + d["acciones"] + d["smoke"] == pico_diario:
-            pico_dia = d["day"]
-            break
-
     fuente_top_id = max(entries_by_source, key=entries_by_source.get) if entries_by_source else None
     fuente_top = None
     if fuente_top_id:
@@ -1710,8 +1672,6 @@ def api_tanques_gas_comprehensive():
             "name": source_map[fuente_top_id]["name"],
             "entradas": entries_by_source[fuente_top_id],
         }
-
-    total_smoke_events = event_type_dist.get("smoke_detected", 0)
 
     kpis = {
         "totalEntradas": total_entradas,
@@ -1723,20 +1683,20 @@ def api_tanques_gas_comprehensive():
         "promedioDiario": promedio_diario,
         "picoDiario": pico_diario,
         "picoDia": pico_dia,
-        "totalEventos": total_eventos if total_eventos > 0 else total_entradas + total_salidas + total_acciones + total_smoke_events,
+        "totalEventos": total_eventos,
         "totalAcciones": total_acciones,
         "totalSmoke": total_smoke_events,
         "fuenteTop": fuente_top,
     }
 
-    # Recent events
-    raw_events = get_module_events("tanques_gas", days=365, limit=200)
+    # Eventos recientes (filtrados por fuente y período)
+    raw_events = get_module_events("tanques_gas", source_id, days=days, limit=200)
     recent_events = []
     for e in raw_events:
         recent_events.append({
             "id": e["id"],
             "source_id": e["source_id"],
-            "source_name": source_map.get(e["source_id"], {}).get("name", f"Fuente {e['source_id']}"),
+            "source_name": source_map.get(e["source_id"], {}).get("name", f"Source {e['source_id']}"),
             "event_type": e["event_type"],
             "label": e.get("label", ""),
             "created_at": e.get("created_at", ""),
@@ -1750,6 +1710,7 @@ def api_tanques_gas_comprehensive():
         "eventTypeDistribution": event_type_dist,
         "actionDistribution": action_dist,
         "recentEvents": recent_events,
+        "availableSources": [{"id": s["id"], "name": s["name"]} for s in all_sources],
         "totalEvents": len(raw_events),
         "empty": False,
     })
@@ -1758,10 +1719,10 @@ def api_tanques_gas_comprehensive():
 @app.route("/api/analytics/tanques_gas/seed", methods=["POST"])
 def api_tanques_gas_seed():
     if g.get("access_type") == "limited":
-        return jsonify({"error": "No tienes permiso"}), 403
+        return jsonify({"error": "You don't have permission"}), 403
     sources = get_sources("tanques_gas")
     if not sources:
-        return jsonify({"error": "No hay fuentes registradas. Registre al menos una fuente primero."}), 400
+        return jsonify({"error": "No sources registered. Register at least one source first."}), 400
 
     # Clear existing data
     from src.database import get_conn
@@ -1795,10 +1756,10 @@ def api_tanques_gas_seed():
         ("inspeccionar", 0.20), ("descargar", 0.10),
     ]
     action_labels_map = {
-        "levantar": "Levantando tanque",
-        "transportar": "Transportando tanque",
-        "inspeccionar": "Inspeccionando tanque",
-        "descargar": "Descargando tanque",
+        "levantar": "Lifting tank",
+        "transportar": "Transporting tank",
+        "inspeccionar": "Inspecting tank",
+        "descargar": "Unloading tank",
     }
 
     # Base activity per source (weight determines relative intensity)
@@ -1856,14 +1817,14 @@ def api_tanques_gas_seed():
                 m = random.randint(0, 59)
                 s = random.randint(0, 59)
                 ts = f"{day_str} {h:02d}:{m:02d}:{s:02d}"
-                all_events.append((sid, "entry", "Tanque detectado", "", ts))
+                all_events.append((sid, "entry", "Tank detected", "", ts))
 
             for _ in range(daily_exits):
                 h = random.choice(hours_pool)
                 m = random.randint(0, 59)
                 s = random.randint(0, 59)
                 ts = f"{day_str} {h:02d}:{m:02d}:{s:02d}"
-                all_events.append((sid, "exit", "Tanque en salida", "", ts))
+                all_events.append((sid, "exit", "Tank exiting", "", ts))
 
             # Actions — 10-30% of entries
             action_count = max(0, int(daily_entries * random.uniform(0.10, 0.30)))
@@ -1889,7 +1850,7 @@ def api_tanques_gas_seed():
                 m = random.randint(0, 59)
                 s = random.randint(0, 59)
                 ts = f"{day_str} {h:02d}:{m:02d}:{s:02d}"
-                all_events.append((sid, "smoke_detected", "Humo o fuego detectado", "", ts))
+                all_events.append((sid, "smoke_detected", "Smoke or fire detected", "", ts))
 
         current += timedelta(days=1)
 
@@ -1939,7 +1900,7 @@ def api_tanques_gas_seed():
 
     return jsonify({
         "success": True,
-        "message": f"Datos generados: {total_gen} eventos en {n_sources} fuentes (2026-07-01 → 2026-07-29)",
+        "message": f"Data generated: {total_gen} events in {n_sources} sources (2026-07-01 → 2026-07-29)",
         "total_events": total_gen,
         "sources_used": n_sources,
     })
@@ -1948,7 +1909,7 @@ def api_tanques_gas_seed():
 @app.route("/api/analytics/tanques_gas/clear", methods=["POST"])
 def api_tanques_gas_clear():
     if g.get("access_type") == "limited":
-        return jsonify({"error": "No tienes permiso"}), 403
+        return jsonify({"error": "You don't have permission"}), 403
     from src.database import get_conn
     with get_conn() as conn:
         conn.execute("DELETE FROM module_events WHERE module_id='tanques_gas'")
@@ -1970,7 +1931,7 @@ def api_tanques_gas_clear():
                 except Exception:
                     pass
 
-    return jsonify({"success": True, "message": "Datos eliminados correctamente"})
+    return jsonify({"success": True, "message": "Data deleted successfully"})
 
 
 # ─────────────────────────────────────────────
@@ -2204,7 +2165,7 @@ def api_chat():
         session_id = data.get("session_id") or ""
 
         if not prompt:
-            return jsonify({"error": "El prompt no puede estar vacío"}), 400
+            return jsonify({"error": "The prompt cannot be empty"}), 400
 
         # Rate limit: 1 request cada 2 segundos (evitar doble-click accidental)
         client_ip = request.remote_addr or "unknown"
@@ -2214,7 +2175,7 @@ def api_chat():
         if elapsed < 2 and last > 0:
             wait_for = int(2 - elapsed) + 1
             return jsonify({
-                "error": f"Debes esperar {wait_for} segundos antes de enviar otro mensaje.",
+                "error": f"You must wait {wait_for} seconds before sending another message.",
                 "retry_after": wait_for,
             }), 429
         _chat_rate_limit[client_ip] = now
@@ -2222,7 +2183,7 @@ def api_chat():
         settings = get_settings()
         api_key = settings.get("gemini_api_key", "").strip()
         if not api_key:
-            return jsonify({"error": "No hay API Key de Gemini configurada. Ve a Configuración > General para agregarla."}), 400
+            return jsonify({"error": "No Gemini API Key configured. Go to Settings > General to add it."}), 400
 
         # Crear o reusar sesión
         existing_messages = []
@@ -2268,7 +2229,7 @@ def api_chat():
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return jsonify({"error": f"Error interno: {type(e).__name__}: {str(e)}"}), 500
+        return jsonify({"error": f"Internal error: {type(e).__name__}: {str(e)}"}), 500
 
 
 @app.route("/api/chat/sessions", methods=["GET"])
@@ -2279,7 +2240,7 @@ def api_chat_sessions():
 
 @app.route("/api/chat/session", methods=["POST"])
 def api_chat_create_session():
-    title = (request.get_json(silent=True) or {}).get("title", "Nueva sesión")
+    title = (request.get_json(silent=True) or {}).get("title", "New session")
     session_id = create_chat_session(title)
     return jsonify({"session_id": session_id, "title": title}), 201
 
@@ -2291,7 +2252,7 @@ def api_chat_session(session_id):
         return jsonify({"deleted": True})
     session = get_chat_session(session_id)
     if not session:
-        return jsonify({"error": "Sesión no encontrada"}), 404
+        return jsonify({"error": "Session not found"}), 404
     messages = get_chat_messages(session_id)
     return jsonify({"session": session, "messages": messages})
 
@@ -2323,11 +2284,11 @@ def api_modules_order():
 @app.route("/api/evidences/<module_id>/<int:event_id>")
 def api_evidence(module_id, event_id):
     if module_id not in MODULES_META:
-        return jsonify({"error": "Módulo no encontrado"}), 404
+        return jsonify({"error": "Module not found"}), 404
     events = get_module_events(module_id, limit=100)
     event = next((e for e in events if e["id"] == event_id), None)
     if not event:
-        return jsonify({"error": "Evento no encontrado"}), 404
+        return jsonify({"error": "Event not found"}), 404
     capture_url = event.get("capture_path")
     extra_paths = event.get("extra_paths", [])
     return jsonify({
@@ -2351,15 +2312,15 @@ def api_access_login():
     ua = request.headers.get("User-Agent", "")
 
     if not email or not password:
-        return jsonify({"error": "Correo y clave requeridos"}), 400
+        return jsonify({"error": "Email and password are required"}), 400
 
     account = get_account_by_email(email)
     if not account or account["password"] != password:
-        add_access_log(email, "failed", ip, location, ua, "Credenciales inválidas")
-        return jsonify({"error": "Credenciales inválidas"}), 401
+        add_access_log(email, "failed", ip, location, ua, "Invalid credentials")
+        return jsonify({"error": "Invalid credentials"}), 401
 
     if not account.get("active", 1):
-        return jsonify({"error": "Cuenta desactivada"}), 403
+        return jsonify({"error": "Account disabled"}), 403
 
     access_type = account["access_type"]
     hours = 24 if access_type == "full" else 1
@@ -2413,14 +2374,14 @@ def api_access_accounts():
         password = data.get("password") or ""
         access_type = data.get("access_type", "limited")
         if not email or not password:
-            return jsonify({"error": "Correo y clave requeridos"}), 400
+            return jsonify({"error": "Email and password are required"}), 400
         if access_type not in ("full", "limited"):
-            return jsonify({"error": "Tipo debe ser full o limited"}), 400
+            return jsonify({"error": "Type must be full or limited"}), 400
         try:
             account = add_account(email, password, access_type)
             return jsonify({"account": account, "password": password}), 201
         except Exception:
-            return jsonify({"error": "El correo ya está registrado"}), 409
+            return jsonify({"error": "The email is already registered"}), 409
     accounts = get_accounts()
     return jsonify({"accounts": accounts})
 
@@ -2429,7 +2390,7 @@ def api_access_accounts():
 def api_access_delete_account(account_id):
     if delete_account(account_id):
         return jsonify({"deleted": True})
-    return jsonify({"error": "Cuenta no encontrada"}), 404
+    return jsonify({"error": "Account not found"}), 404
 
 
 @app.route("/api/access/accounts/<int:account_id>/reset-password", methods=["POST"])
@@ -2437,7 +2398,7 @@ def api_access_reset_password(account_id):
     new_password = secrets.token_hex(6)
     if update_account_password(account_id, new_password):
         return jsonify({"password": new_password})
-    return jsonify({"error": "Cuenta no encontrada"}), 404
+    return jsonify({"error": "Account not found"}), 404
 
 
 @app.route("/api/access/accounts/by-email/<email>", methods=["GET"])
@@ -2471,11 +2432,11 @@ def api_access_blacklist():
         ip = (data.get("ip") or "").strip()
         reason = data.get("reason", "")
         if not ip:
-            return jsonify({"error": "IP requerida"}), 400
+            return jsonify({"error": "IP required"}), 400
         entry = block_ip(ip, reason, session.get("email", ""))
         if entry:
             return jsonify({"entry": entry}), 201
-        return jsonify({"error": "La IP ya está bloqueada"}), 409
+        return jsonify({"error": "The IP is already blocked"}), 409
     return jsonify({"entries": get_blacklist()})
 
 
@@ -2483,7 +2444,7 @@ def api_access_blacklist():
 def api_access_unblock(entry_id):
     if unblock_ip(entry_id):
         return jsonify({"deleted": True})
-    return jsonify({"error": "Entrada no encontrada"}), 404
+    return jsonify({"error": "Entry not found"}), 404
 
 
 # ─────────────────────────────────────────────

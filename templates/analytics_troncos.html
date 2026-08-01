@@ -1,35 +1,35 @@
 {% extends "base.html" %}
-{% block title %}Analytics · Troncos{% endblock %}
+{% block title %}Analytics · Logs{% endblock %}
 {% block page_title %}Analytics · {{ module.label }}{% endblock %}
 {% block content %}
 <div class="analytics-dashboard">
   <div class="analytics-kpi-row">
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg> Conteo total</span><span class="analytics-kpi-value" id="kpi-total">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Hoy</span><span class="analytics-kpi-value" id="kpi-today">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> Promedio diario</span><span class="analytics-kpi-value" id="kpi-daily-avg">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Fuentes</span><span class="analytics-kpi-value" id="kpi-sources">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg> Total count</span><span class="analytics-kpi-value" id="kpi-total">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Today</span><span class="analytics-kpi-value" id="kpi-today">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> Daily average</span><span class="analytics-kpi-value" id="kpi-daily-avg">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Sources</span><span class="analytics-kpi-value" id="kpi-sources">—</span></div>
   </div>
 
   <div class="analytics-chart-row">
     <div class="analytics-chart-card">
-      <h4>Historial diario</h4>
+      <h4>Daily history</h4>
       <canvas id="chart-troncos-daily"></canvas>
     </div>
     <div class="analytics-chart-card">
-      <h4>Actividad por hora (hoy)</h4>
+      <h4>Hourly activity (today)</h4>
       <canvas id="chart-troncos-heatmap"></canvas>
     </div>
   </div>
 
   <div class="analytics-chart-row">
     <div class="analytics-chart-card">
-      <h4>Por fuente</h4>
+      <h4>By source</h4>
       <div id="per-source-table" class="analytics-per-source"></div>
     </div>
   </div>
 
   <div class="analytics-events">
-    <h4>Últimos cruces</h4>
+    <h4>Recent crossings</h4>
     <div id="events-list" class="analytics-events-list"></div>
   </div>
 </div>
@@ -48,7 +48,7 @@ async function loadKPIs() {
   const d = await r.json();
   const counters = d.counters || {};
   const sources = Object.keys(counters);
-  setText('kpi-sources', sources.length > 0 ? sources.length + (d.active ? ' activas' : '') : '—');
+  setText('kpi-sources', sources.length > 0 ? sources.length + (d.active ? ' active' : '') : '—');
 
   let totalVal = 0, todayVal = 0;
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -66,11 +66,11 @@ async function loadKPIs() {
 
   const psEl = document.getElementById('per-source-table');
   if (sources.length > 0) {
-    psEl.innerHTML = '<table class="ps-table"><tr><th>Fuente</th><th>Conteo</th></tr>' +
-      sources.map(sid => `<tr><td>Fuente ${sid}</td><td>${counters[sid]?.total_count ?? '—'}</td></tr>`).join('') +
+    psEl.innerHTML = '<table class="ps-table"><tr><th>Source</th><th>Count</th></tr>' +
+      sources.map(sid => `<tr><td>Source ${sid}</td><td>${counters[sid]?.total_count ?? '—'}</td></tr>`).join('') +
       '</table>';
   } else {
-    psEl.innerHTML = '<p class="text-muted">Sin datos de fuentes</p>';
+    psEl.innerHTML = '<p class="text-muted">No source data</p>';
   }
 }
 
@@ -88,7 +88,7 @@ async function loadTimeline() {
   if (dailyChart) dailyChart.destroy();
   dailyChart = new Chart(ctx, {
     type: 'bar',
-    data: { labels, datasets: [{ label: 'Cruces', data: values, backgroundColor: 'rgba(139, 92, 246, 0.6)', borderColor: '#8B5CF6', borderWidth: 1, borderRadius: 4 }] },
+    data: { labels, datasets: [{ label: 'Crossings', data: values, backgroundColor: 'rgba(139, 92, 246, 0.6)', borderColor: '#8B5CF6', borderWidth: 1, borderRadius: 4 }] },
     options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#9D9FA2' } }, y: { ticks: { color: '#9D9FA2' }, beginAtZero: true } } },
   });
   buildHourly(d.events || []);
@@ -109,7 +109,7 @@ function buildHourly(events) {
   if (hourlyChart) hourlyChart.destroy();
   hourlyChart = new Chart(ctx, {
     type: 'bar',
-    data: { labels: Array.from({ length: 24 }, (_, h) => `${h}:00`), datasets: [{ label: 'Eventos', data: hourly, backgroundColor: 'rgba(59, 130, 246, 0.5)', borderColor: '#3B82F6', borderWidth: 1, borderRadius: 3 }] },
+    data: { labels: Array.from({ length: 24 }, (_, h) => `${h}:00`), datasets: [{ label: 'Events', data: hourly, backgroundColor: 'rgba(59, 130, 246, 0.5)', borderColor: '#3B82F6', borderWidth: 1, borderRadius: 3 }] },
     options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#9D9FA2', maxTicksLimit: 12 } }, y: { ticks: { color: '#9D9FA2' }, beginAtZero: true } } },
   });
 }
@@ -127,7 +127,7 @@ async function loadTimelineData() {
   if (dailyChart) dailyChart.destroy();
   dailyChart = new Chart(ctx, {
     type: 'bar',
-    data: { labels, datasets: [{ label: 'Cruces', data: values, backgroundColor: 'rgba(139, 92, 246, 0.6)', borderColor: '#8B5CF6', borderWidth: 1, borderRadius: 4 }] },
+    data: { labels, datasets: [{ label: 'Crossings', data: values, backgroundColor: 'rgba(139, 92, 246, 0.6)', borderColor: '#8B5CF6', borderWidth: 1, borderRadius: 4 }] },
     options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#9D9FA2' } }, y: { ticks: { color: '#9D9FA2' }, beginAtZero: true } } },
   });
 }

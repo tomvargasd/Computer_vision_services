@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ source.name }} · CVVision Live — Humo/Fuego</title>
+  <title>{{ source.name }} · CVVision Live — Smoke/Fire</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -129,7 +129,7 @@
 <header class="lv-topbar">
   <a class="lv-back" href="/module/smoke">
     <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-    Volver
+    Back
   </a>
   <div class="lv-sep"></div>
   <span class="lv-source-name">{{ source.name }}</span>
@@ -137,17 +137,17 @@
 
   <div class="lv-status">
     <span class="lv-dot on" id="lv-dot"></span>
-    <span id="lv-status-txt">Iniciando…</span>
+    <span id="lv-status-txt">Starting…</span>
   </div>
 
   <button class="lv-btn-reset" id="btn-reset">
     <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-    Reiniciar
+    Reset
   </button>
 
   <button class="lv-btn-stop" id="btn-stop">
     <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/></svg>
-    Detener
+    Stop
   </button>
 </header>
 
@@ -158,7 +158,7 @@
   <div class="lv-feed">
     <div class="lv-feed-placeholder" id="feed-placeholder">
       <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-      <p id="feed-placeholder-msg">Conectando con la fuente…</p>
+      <p id="feed-placeholder-msg">Connecting to source…</p>
       <span>{{ source.path }}</span>
     </div>
     <img class="lv-feed-img" id="lv-feed-img" src="" alt="Live feed" style="display:none">
@@ -172,26 +172,26 @@
     <div class="lv-section">
       <div class="lv-section-title">
         <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        Estado
+        Status
       </div>
 
       <div id="alert-banner" class="lv-alert-banner" style="display:none">
         <div class="lv-alert-title">
           <svg viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2zm0 3l8 14H4l8-14zm-1 8v-4h2v4h-2zm0 4v-2h2v2h-2z"/></svg>
-          HUMO / FUEGO DETECTADO
+          SMOKE / FIRE DETECTED
         </div>
         <div class="lv-alert-time" id="alert-time">—</div>
       </div>
 
       <div class="lv-count-big">
         <div class="lv-count-num" id="cnt-detections">0</div>
-        <div class="lv-count-lbl">detecciones de humo/fuego</div>
+        <div class="lv-count-lbl">smoke/fire detections</div>
       </div>
     </div>
 
     <!-- ── 2. Info footer ────────────────────────────────── -->
     <div class="lv-info-row">
-      <span>Fuente #<span class="lv-info-id">{{ source.id }}</span></span>
+      <span>Source #<span class="lv-info-id">{{ source.id }}</span></span>
       <span id="lv-fps">— fps</span>
     </div>
 
@@ -206,15 +206,15 @@ let fpsTimer   = null;
 
 // ── Iniciar pipeline ──────────────────────────────────────────────────────
 (async () => {
-  document.getElementById("feed-placeholder-msg").textContent = "Iniciando pipeline…";
+  document.getElementById("feed-placeholder-msg").textContent = "Starting pipeline…";
   const r = await fetch(`/api/smoke/sources/${SOURCE_ID}/start`, { method: "POST" });
   if (r.ok) {
-    document.getElementById("feed-placeholder-msg").textContent = "Cargando modelo de IA…";
+    document.getElementById("feed-placeholder-msg").textContent = "Loading AI model…";
     startStream();
     poll = setInterval(fetchStats, 2000);
     startFpsMeter();
   } else {
-    document.getElementById("feed-placeholder-msg").textContent = "Error al iniciar el pipeline";
+    document.getElementById("feed-placeholder-msg").textContent = "Error starting the pipeline";
     document.getElementById("lv-dot").classList.remove("on");
     document.getElementById("lv-status-txt").textContent = "Error";
   }
@@ -225,15 +225,15 @@ function startStream() {
   img.onload = () => {
     document.getElementById("feed-placeholder").style.display = "none";
     img.style.display = "block";
-    document.getElementById("lv-status-txt").textContent = "En línea";
+    document.getElementById("lv-status-txt").textContent = "Online";
     frameCount++;
   };
   img.onerror = () => {
     document.getElementById("feed-placeholder").style.display = "flex";
-    document.getElementById("feed-placeholder-msg").textContent = "Error de conexión con la fuente";
+    document.getElementById("feed-placeholder-msg").textContent = "Error connecting to source";
     img.style.display = "none";
     document.getElementById("lv-dot").classList.remove("on");
-    document.getElementById("lv-status-txt").textContent = "Sin señal";
+    document.getElementById("lv-status-txt").textContent = "No signal";
   };
   img.src = `/api/smoke/stream/${SOURCE_ID}`;
 }
@@ -263,14 +263,14 @@ function updateStats(d) {
 
   if (d.alert_triggered) {
     alertBanner.style.display = "block";
-    document.getElementById("alert-time").textContent = `Primera vez detectado: ${d.first_detection || '--'}`;
+    document.getElementById("alert-time").textContent = `First detected: ${d.first_detection || '--'}`;
     dot.className = "lv-dot alert";
-    statusTxt.textContent = "ALERTA";
+    statusTxt.textContent = "ALERT";
     document.querySelector(".lv-count-num").classList.add("alert");
   } else {
     alertBanner.style.display = "none";
     dot.className = "lv-dot on";
-    statusTxt.textContent = "Monitoreando";
+    statusTxt.textContent = "Monitoring";
     document.querySelector(".lv-count-num").classList.remove("alert");
   }
 
@@ -278,7 +278,7 @@ function updateStats(d) {
 
   const now = new Date();
   document.getElementById("lv-ts").textContent =
-    now.toLocaleTimeString("es-MX", {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+    now.toLocaleTimeString("en-US", {hour:"2-digit", minute:"2-digit", second:"2-digit"});
 }
 
 // ── Reiniciar ─────────────────────────────────────────────────────────────
@@ -288,7 +288,7 @@ document.getElementById("btn-reset").addEventListener("click", async () => {
   document.getElementById("cnt-detections").textContent = "0";
   document.querySelector(".lv-count-num").classList.remove("alert");
   document.getElementById("lv-dot").className = "lv-dot on";
-  document.getElementById("lv-status-txt").textContent = "Monitoreando";
+  document.getElementById("lv-status-txt").textContent = "Monitoring";
 });
 
 // ── Detener ───────────────────────────────────────────────────────────────
@@ -299,9 +299,9 @@ document.getElementById("btn-stop").addEventListener("click", async () => {
   document.getElementById("lv-feed-img").src = "";
   document.getElementById("lv-feed-img").style.display = "none";
   document.getElementById("feed-placeholder").style.display = "flex";
-  document.getElementById("feed-placeholder-msg").textContent = "Análisis detenido";
+  document.getElementById("feed-placeholder-msg").textContent = "Analysis stopped";
   document.getElementById("lv-dot").classList.remove("on", "alert");
-  document.getElementById("lv-status-txt").textContent = "Detenido";
+  document.getElementById("lv-status-txt").textContent = "Stopped";
   document.getElementById("lv-fps").textContent = "— fps";
 });
 

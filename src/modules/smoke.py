@@ -97,12 +97,12 @@ class SmokePipeline(BasePersistPipeline):
     def _make_error_frame(self, msg: str) -> np.ndarray:
         h, w = 480, 640
         frame = np.zeros((h, w, 3), dtype=np.uint8)
-        cv2.putText(frame, "ERROR DE FUENTE", (int(w * 0.25), h // 2 - 30),
+        cv2.putText(frame, "SOURCE ERROR", (int(w * 0.25), h // 2 - 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.9, (85, 42, 24), 2, cv2.LINE_AA)
         for i, part in enumerate([msg[j:j+55] for j in range(0, min(len(msg), 165), 55)]):
             cv2.putText(frame, part, (20, h // 2 + 10 + i * 28),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.55, (200, 200, 200), 1, cv2.LINE_AA)
-        cv2.putText(frame, "Verifica la ruta o permisos de la fuente", (20, h - 28),
+        cv2.putText(frame, "Check the source path or permissions", (20, h - 28),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.48, (120, 120, 120), 1, cv2.LINE_AA)
         return frame
 
@@ -198,16 +198,16 @@ class SmokePipeline(BasePersistPipeline):
                     self._evidence_saved = True
                     cap_path = self._save_evidence(annotated)
                     insert_module_event("smoke", self.source_id,
-                                        "smoke_detected", "Humo/fuego detectado",
+                                        "smoke_detected", "Smoke/fire detected",
                                         capture_path=cap_path)
 
         overlay = annotated.copy()
         lines = []
         if self.smoke_detected:
-            lines.append(("HUMO / FUEGO DETECTADO", RED))
-            lines.append((f"Primera vez: {self.first_detection_time or '--'}", ORANGE))
+            lines.append(("SMOKE / FIRE DETECTED", RED))
+            lines.append((f"First seen: {self.first_detection_time or '--'}", ORANGE))
         else:
-            lines.append(("MONITOREANDO...", YELLOW))
+            lines.append(("MONITORING...", YELLOW))
 
         lh = 20
         for i, (txt, clr) in enumerate(lines):
@@ -221,7 +221,7 @@ class SmokePipeline(BasePersistPipeline):
             ax = w - alert_w - 16
             ay = h - alert_h - 16
             cv2.rectangle(overlay, (ax, ay), (ax + alert_w, ay + alert_h), RED, -1)
-            cv2.putText(overlay, "HUMO / FUEGO DETECTADO", (ax + 10, ay + 20),
+            cv2.putText(overlay, "SMOKE / FIRE DETECTED", (ax + 10, ay + 20),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.50, WHITE, 2, cv2.LINE_AA)
             cv2.putText(overlay, f"{self.first_detection_time or ''}", (ax + 10, ay + 40),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.40, WHITE, 1, cv2.LINE_AA)

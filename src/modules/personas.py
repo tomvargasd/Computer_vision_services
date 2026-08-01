@@ -134,14 +134,14 @@ class PersonasPipeline(BasePersistPipeline):
         h, w = 480, 640
         frame = np.zeros((h, w, 3), dtype=np.uint8)
         # Línea de fondo semi-visible
-        cv2.putText(frame, "ERROR DE FUENTE", (int(w * 0.25), h // 2 - 30),
+        cv2.putText(frame, "SOURCE ERROR", (int(w * 0.25), h // 2 - 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.9, (85, 42, 24), 2, cv2.LINE_AA)
         # Mensaje corto (split si es muy largo)
         max_chars = 55
         for i, part in enumerate([msg[j:j+max_chars] for j in range(0, min(len(msg), max_chars*3), max_chars)]):
             cv2.putText(frame, part, (20, h // 2 + 10 + i * 28),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.55, (200, 200, 200), 1, cv2.LINE_AA)
-        cv2.putText(frame, "Verifica la ruta o permisos de la fuente", (20, h - 28),
+        cv2.putText(frame, "Check the source path or permissions", (20, h - 28),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.48, (120, 120, 120), 1, cv2.LINE_AA)
         return frame
 
@@ -264,14 +264,14 @@ class PersonasPipeline(BasePersistPipeline):
                         if state == "none":
                             self.total_in += 1
                             insert_module_event("personas", self.source_id,
-                                                "entry", f"Persona ID {tid}")
+                                                "entry", f"Person ID {tid}")
                             self._cross_state[tid] = "inside"
 
                     elif crossed_down:
                         if state in ("none", "inside"):
                             self.total_out += 1
                             insert_module_event("personas", self.source_id,
-                                                "exit", f"Persona ID {tid}")
+                                                "exit", f"Person ID {tid}")
                             self._cross_state[tid] = "done"
                         # state == "done": ya salió antes, ignorar
 
@@ -348,7 +348,7 @@ class PersonasPipeline(BasePersistPipeline):
         # ── Contador de personas activas (siempre visible) ───────────────────
         cv2.putText(
             annotated,
-            f"Personas dentro: {self.current_persons_net}",
+            f"People inside: {self.current_persons_net}",
             (12, h - 14),
             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2, cv2.LINE_AA,
         )

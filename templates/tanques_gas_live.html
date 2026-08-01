@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ source.name }} · Tanques de Gas</title>
+  <title>{{ source.name }} · Gas Tanks</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -210,22 +210,22 @@
 <header class="lv-topbar">
   <a class="lv-back" href="/module/tanques_gas">
     <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-    Volver
+    Back
   </a>
   <div class="lv-sep"></div>
   <span class="lv-source-name">{{ source.name }}</span>
   <span class="lv-badge {{ source.type }}">{{ source.type }}</span>
   <div class="lv-status">
     <span class="lv-dot on" id="lv-dot"></span>
-    <span id="lv-status-txt">Iniciando…</span>
+    <span id="lv-status-txt">Starting…</span>
   </div>
   <button class="lv-btn-reset" id="btn-reset">
     <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-    Reiniciar
+    Reset
   </button>
   <button class="lv-btn-stop" id="btn-stop">
     <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/></svg>
-    Detener
+    Stop
   </button>
 </header>
 
@@ -233,22 +233,22 @@
   <div class="lv-feed" id="lv-feed-container">
     <div class="lv-feed-placeholder" id="feed-placeholder">
       <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-      <p id="feed-placeholder-msg">Conectando con la fuente…</p>
+      <p id="feed-placeholder-msg">Connecting to source…</p>
       <span>{{ source.path }}</span>
     </div>
     <img class="lv-feed-img" id="lv-feed-img" src="" alt="Live feed" style="display:none">
     <span class="lv-feed-ts" id="lv-ts"></span>
     <div class="lv-custom-editing" id="custom-editing-hint" style="display:none">
-      Haga clic en el video para colocar puntos
+      Click on the video to place points
     </div>
   </div>
 
   <div class="lv-panel" id="lv-panel">
     <div class="lv-tabs">
-      <div class="lv-tab active" data-tab="live">Conteo</div>
-      <div class="lv-tab" data-tab="acciones">Acciones</div>
-      <div class="lv-tab" data-tab="humo">Humo/Fuego</div>
-      <div class="lv-tab" data-tab="areas">Áreas Restr.</div>
+      <div class="lv-tab active" data-tab="live">Count</div>
+      <div class="lv-tab" data-tab="acciones">Actions</div>
+      <div class="lv-tab" data-tab="humo">Smoke/Fire</div>
+      <div class="lv-tab" data-tab="areas">Restr. Areas</div>
     </div>
 
     <!-- ══ TAB: LIVE / CONTEO ══ -->
@@ -256,32 +256,32 @@
       <div class="lv-section">
         <div class="lv-section-title">
           <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          Conteo - Tanques de Gas
+          Count - Gas Tanks
         </div>
         <div class="lv-inout">
           <div class="lv-inout-card in">
             <div class="lv-inout-val" id="cnt-in">0</div>
-            <div class="lv-inout-lbl">Entrada</div>
+            <div class="lv-inout-lbl">Entry</div>
           </div>
           <div class="lv-inout-card out">
             <div class="lv-inout-val" id="cnt-out">0</div>
-            <div class="lv-inout-lbl">Salida</div>
+            <div class="lv-inout-lbl">Exit</div>
           </div>
         </div>
 
         <div class="lv-line-config">
-          <div class="lv-line-lbl">Modo de conteo</div>
+          <div class="lv-line-lbl">Count mode</div>
           <div class="lv-btn-group" id="mode-buttons">
             <button class="lv-btn-mode active" data-mode="horizontal">Horizontal</button>
             <button class="lv-btn-mode" data-mode="vertical">Vertical</button>
-            <button class="lv-btn-mode" data-mode="rectangle">Rectángulo</button>
-            <button class="lv-btn-mode custom" data-mode="custom_line">Custom Línea</button>
+            <button class="lv-btn-mode" data-mode="rectangle">Rectangle</button>
+            <button class="lv-btn-mode custom" data-mode="custom_line">Custom Line</button>
             <button class="lv-btn-mode custom" data-mode="custom_rect">Custom Rect</button>
           </div>
         </div>
 
         <div class="lv-line-config" id="slider-config">
-          <div class="lv-line-lbl" id="slider-label">Posición de línea</div>
+          <div class="lv-line-lbl" id="slider-label">Line position</div>
           <div class="lv-line-row">
             <input type="range" id="line-pos" min="5" max="95" step="1" value="{{ settings.get('tanques_gas_line_pos', '50') }}">
             <span class="lv-line-val" id="line-pos-val">50%</span>
@@ -315,19 +315,19 @@
 
         <div class="lv-line-config" id="custom-buttons" style="display:none">
           <button class="lv-btn-teach" id="btn-custom-start" style="background:#FF8C00;">
-            Iniciar colocación de puntos
+            Start placing points
           </button>
           <div style="margin-top:8px;font-size:0.68rem;color:#9D9FA2;">
-            Puntos colocados: <span id="custom-points-count">0</span>
-            <span id="custom-points-needed" style="display:none;color:#EF4444;"> (necesita 2 para línea, 4 para rect)</span>
+            Points placed: <span id="custom-points-count">0</span>
+            <span id="custom-points-needed" style="display:none;color:#EF4444;"> (needs 2 for line, 4 for rect)</span>
           </div>
           <button class="lv-btn-reset" id="btn-custom-clear" style="margin-top:6px;width:100%;justify-content:center;">
-            Limpiar puntos
+            Clear points
           </button>
         </div>
       </div>
       <div class="lv-info-row">
-        <span>Fuente #<span class="lv-info-id">{{ source.id }}</span></span>
+        <span>Source #<span class="lv-info-id">{{ source.id }}</span></span>
         <span id="lv-fps">— fps</span>
       </div>
     </div>
@@ -337,26 +337,26 @@
       <div class="lv-section">
         <div class="lv-section-title">
           <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          Detección de Acciones
+          Action Detection
         </div>
         <button class="lv-btn-teach" id="btn-teach">
           <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-          Enseñar acción
+          Teach action
         </button>
         <div class="lv-line-config">
-          <div class="lv-line-lbl">Acciones disponibles</div>
+          <div class="lv-line-lbl">Available actions</div>
           <div id="actions-list" style="font-size:0.75rem;color:#9D9FA2;">
-            Cargando…
+            Loading…
           </div>
         </div>
         <div class="lv-line-config">
-          <div class="lv-line-lbl">Log de acciones recientes</div>
+          <div class="lv-line-lbl">Recent action log</div>
           <div class="lv-action-log" id="action-log">
-            <div style="color:#9D9FA2;text-align:center;padding:8px;">Esperando detecciones…</div>
+            <div style="color:#9D9FA2;text-align:center;padding:8px;">Waiting for detections…</div>
           </div>
         </div>
         <div class="lv-line-config">
-          <div class="lv-line-lbl">Personas en escena</div>
+          <div class="lv-line-lbl">People in scene</div>
           <div class="lv-count-big">
             <div class="lv-count-num" id="cnt-persons" style="font-size:2rem;">0</div>
           </div>
@@ -369,15 +369,15 @@
       <div class="lv-section">
         <div class="lv-section-title">
           <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          Detección de Humo / Fuego
+          Smoke / Fire Detection
         </div>
         <div id="smoke-status-ok" style="text-align:center;padding:20px;">
-          <div style="font-size:0.9rem;color:#22C55E;font-weight:600;">MONITOREANDO</div>
-          <div style="font-size:0.72rem;color:#9D9FA2;margin-top:4px;">No se ha detectado humo o fuego</div>
+          <div style="font-size:0.9rem;color:#22C55E;font-weight:600;">MONITORING</div>
+          <div style="font-size:0.72rem;color:#9D9FA2;margin-top:4px;">No smoke or fire detected</div>
         </div>
         <div id="smoke-status-alert" style="display:none;">
           <div class="lv-alert-card">
-            <div class="alert-title">!!! HUMO / FUEGO DETECTADO !!!</div>
+            <div class="alert-title">!!! SMOKE / FIRE DETECTED !!!</div>
             <div class="alert-sub" id="smoke-first-time">—</div>
           </div>
         </div>
@@ -389,18 +389,18 @@
       <div class="lv-section">
         <div class="lv-section-title">
           <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 11 12 14 15 9"/></svg>
-          Áreas Restringidas
+          Restricted Areas
         </div>
         <p style="font-size:0.72rem;color:#9D9FA2;margin-bottom:10px;">
-          Configure áreas donde no deben ingresar personas o tanques.
+          Configure areas where people or tanks must not enter.
         </p>
         <button class="lv-btn-teach" id="btn-add-area" style="background:#EF4444;">
-          + Agregar área restringida
+          + Add restricted area
         </button>
         <div class="lv-line-config">
-          <div class="lv-line-lbl">Áreas configuradas</div>
+          <div class="lv-line-lbl">Configured areas</div>
           <div id="areas-list">
-            <div style="font-size:0.72rem;color:#9D9FA2;text-align:center;padding:8px;">No hay áreas configuradas</div>
+            <div style="font-size:0.72rem;color:#9D9FA2;text-align:center;padding:8px;">No areas configured</div>
           </div>
         </div>
       </div>
@@ -412,17 +412,17 @@
 <div id="teach-modal" style="display:none;">
   <div class="teach-modal-backdrop">
     <div class="teach-modal">
-      <h3>Enseñar acción</h3>
+      <h3>Teach action</h3>
       <p style="font-size:0.8rem;color:#9D9FA2;margin-bottom:12px;">
-        Seleccione o escriba la acción que está realizando la persona capturada.
+        Select or type the action the captured person is performing.
       </p>
       <select id="teach-action-select">
-        <option value="">Seleccionar acción existente...</option>
+        <option value="">Select existing action...</option>
       </select>
-      <input type="text" id="teach-action-custom" placeholder="O escriba una acción nueva...">
+      <input type="text" id="teach-action-custom" placeholder="Or type a new action...">
       <div class="teach-modal-btns">
-        <button class="btn-tch-cancel" id="btn-teach-cancel">Cancelar</button>
-        <button class="btn-tch-save" id="btn-teach-save">Guardar acción</button>
+        <button class="btn-tch-cancel" id="btn-teach-cancel">Cancel</button>
+        <button class="btn-tch-save" id="btn-teach-save">Save action</button>
       </div>
     </div>
   </div>
@@ -432,18 +432,18 @@
 <div id="area-type-modal" style="display:none;">
   <div class="teach-modal-backdrop">
     <div class="teach-modal">
-      <h3>Tipo de restricción</h3>
+      <h3>Restriction type</h3>
       <p style="font-size:0.8rem;color:#9D9FA2;margin-bottom:12px;">
-        Seleccione qué debe restringir esta área:
+        Select what this area should restrict:
       </p>
       <select id="area-restrict-type" style="margin-bottom:16px;">
-        <option value="ambos">Personas y Tanques</option>
-        <option value="persona">Solo Personas</option>
-        <option value="tanque">Solo Tanques</option>
+        <option value="ambos">People and Tanks</option>
+        <option value="persona">People Only</option>
+        <option value="tanque">Tanks Only</option>
       </select>
       <div class="teach-modal-btns">
-        <button class="btn-tch-cancel" id="btn-area-cancel">Cancelar</button>
-        <button class="btn-tch-save" id="btn-area-save" style="background:#EF4444;">Guardar área</button>
+        <button class="btn-tch-cancel" id="btn-area-cancel">Cancel</button>
+        <button class="btn-tch-save" id="btn-area-save" style="background:#EF4444;">Save area</button>
       </div>
     </div>
   </div>
@@ -460,19 +460,19 @@ let areaPoints = [];
 let addingArea = false;
 
 (async () => {
-  document.getElementById("feed-placeholder-msg").textContent = "Iniciando pipeline…";
+  document.getElementById("feed-placeholder-msg").textContent = "Starting pipeline…";
   const r = await fetch(`/api/tanques_gas/sources/${SOURCE_ID}/start`, { method: "POST" });
   if (r.ok) {
-    document.getElementById("feed-placeholder-msg").textContent = "Cargando modelo de IA…";
-    document.getElementById("lv-status-txt").textContent = "Cargando…";
+    document.getElementById("feed-placeholder-msg").textContent = "Loading AI model…";
+    document.getElementById("lv-status-txt").textContent = "Loading…";
     const img = document.getElementById("lv-feed-img");
     img.onload = () => {
       img.style.display = "block";
       document.getElementById("feed-placeholder").style.display = "none";
-      document.getElementById("lv-status-txt").textContent = "En vivo";
+      document.getElementById("lv-status-txt").textContent = "Live";
     };
     img.onerror = () => {
-      document.getElementById("feed-placeholder-msg").textContent = "Error al conectar con la fuente";
+      document.getElementById("feed-placeholder-msg").textContent = "Error connecting to source";
       document.getElementById("lv-dot").classList.remove("on");
       document.getElementById("lv-status-txt").textContent = "Error";
     };
@@ -480,8 +480,8 @@ let addingArea = false;
     startPoll();
     startFpsCounter();
   } else {
-    document.getElementById("feed-placeholder-msg").textContent = "Error al iniciar el análisis";
-    document.getElementById("lv-status-txt").textContent = "Error al iniciar";
+    document.getElementById("feed-placeholder-msg").textContent = "Error starting analysis";
+    document.getElementById("lv-status-txt").textContent = "Error starting";
     document.getElementById("lv-dot").classList.remove("on");
   }
 })();
@@ -495,15 +495,15 @@ function startPoll() {
     document.getElementById("cnt-in").textContent  = d.entrada || 0;
     document.getElementById("cnt-out").textContent = d.salida || 0;
     document.getElementById("lv-ts").textContent =
-      new Date().toLocaleTimeString("es-MX", { hour12: false });
+      new Date().toLocaleTimeString("en-US", { hour12: false });
 
     // Actions tab
     const actionLog = d.action_log || [];
     const logEl = document.getElementById("action-log");
     if (actionLog.length > 0) {
       logEl.innerHTML = actionLog.slice(-10).reverse().map(e => {
-        const t = new Date(e.ts * 1000).toLocaleTimeString("es-MX");
-        return `<div class="lv-action-log-item">[${t}] Persona ID ${e.tid}: ${e.action}</div>`;
+        const t = new Date(e.ts * 1000).toLocaleTimeString("en-US");
+        return `<div class="lv-action-log-item">[${t}] Person ID ${e.tid}: ${e.action}</div>`;
       }).join("");
     }
 
@@ -511,7 +511,7 @@ function startPoll() {
     if (d.smoke_detected) {
       document.getElementById("smoke-status-ok").style.display = "none";
       document.getElementById("smoke-status-alert").style.display = "";
-      document.getElementById("smoke-first-time").textContent = `Detectado desde: ${d.first_detection || '—'}`;
+      document.getElementById("smoke-first-time").textContent = `Detected since: ${d.first_detection || '—'}`;
     }
 
     // Teach mode - if capture ready, show modal
@@ -561,7 +561,7 @@ async function setMode(mode) {
 
   if (mode === "horizontal" || mode === "vertical") {
     document.getElementById("slider-config").style.display = "";
-    document.getElementById("slider-label").textContent = mode === "horizontal" ? "Posición Y" : "Posición X";
+    document.getElementById("slider-label").textContent = mode === "horizontal" ? "Y Position" : "X Position";
   } else if (mode === "rectangle") {
     document.getElementById("rect-config").style.display = "";
   } else {
@@ -569,7 +569,7 @@ async function setMode(mode) {
     customMode = mode;
     document.getElementById("custom-points-needed").style.display = "";
     document.getElementById("custom-points-needed").textContent =
-      mode === "custom_line" ? " (necesita 2 puntos)" : " (necesita 4 puntos)";
+      mode === "custom_line" ? " (needs 2 points)" : " (needs 4 points)";
     customPoints = [];
     document.getElementById("custom-points-count").textContent = "0";
   }
@@ -624,7 +624,7 @@ document.getElementById("btn-custom-start").addEventListener("click", () => {
   customPoints = [];
   document.getElementById("custom-points-count").textContent = "0";
   document.getElementById("custom-editing-hint").style.display = "";
-  document.getElementById("btn-custom-start").textContent = `Colocando puntos... (haga clic en el video)`;
+  document.getElementById("btn-custom-start").textContent = `Placing points... (click on the video)`;
 });
 
 document.getElementById("lv-feed-img").addEventListener("click", async (e) => {
@@ -652,7 +652,7 @@ document.getElementById("lv-feed-img").addEventListener("click", async (e) => {
     document.getElementById("custom-points-count").textContent = customPoints.length;
     if (customPoints.length >= needed) {
       document.getElementById("custom-editing-hint").style.display = "none";
-      document.getElementById("btn-custom-start").textContent = "✓ Puntos colocados - Aceptar";
+      document.getElementById("btn-custom-start").textContent = "✓ Points placed - Accept";
       document.getElementById("btn-custom-start").style.background = "#22C55E";
       await sendCustomPoints();
     }
@@ -679,7 +679,7 @@ async function sendCustomPoints() {
 document.getElementById("btn-custom-clear").addEventListener("click", () => {
   customPoints = [];
   document.getElementById("custom-points-count").textContent = "0";
-  document.getElementById("btn-custom-start").textContent = "Iniciar colocación de puntos";
+  document.getElementById("btn-custom-start").textContent = "Start placing points";
   document.getElementById("btn-custom-start").style.background = "#FF8C00";
   document.getElementById("custom-editing-hint").style.display = "none";
 });
@@ -690,11 +690,11 @@ document.getElementById("btn-teach").addEventListener("click", async () => {
   if (btn.classList.contains("active")) {
     await fetch(`/api/tanques_gas/sources/${SOURCE_ID}/teach/cancel`, { method: "POST" });
     btn.classList.remove("active");
-    btn.textContent = "Enseñar acción";
+    btn.textContent = "Teach action";
     return;
   }
   btn.classList.add("active");
-  btn.textContent = "Capturando...";
+  btn.textContent = "Capturing...";
   await fetch(`/api/tanques_gas/sources/${SOURCE_ID}/teach/start`, { method: "POST" });
   // Wait for capture (poll will trigger modal)
 });
@@ -710,7 +710,7 @@ async function checkTeachCapture() {
     await loadActionSelect();
     document.getElementById("teach-modal").style.display = "";
     document.getElementById("btn-teach").classList.remove("active");
-    document.getElementById("btn-teach").textContent = "Enseñar acción";
+    document.getElementById("btn-teach").textContent = "Teach action";
     return;
   }
 }
@@ -722,7 +722,7 @@ async function loadActionSelect() {
   const samples = data.samples || [];
   const actions = [...new Set(samples.map(s => s.action))];
   const sel = document.getElementById("teach-action-select");
-  sel.innerHTML = '<option value="">Seleccionar acción existente...</option>';
+  sel.innerHTML = '<option value="">Select existing action...</option>';
   actions.forEach(a => {
     const opt = document.createElement("option");
     opt.value = a;
@@ -742,7 +742,7 @@ document.getElementById("btn-teach-save").addEventListener("click", async () => 
     action = document.getElementById("teach-action-custom").value.trim();
   }
   if (!action) {
-    alert("Debe seleccionar o escribir una acción.");
+    alert("You must select or type an action.");
     return;
   }
   await fetch(`/api/tanques_gas/sources/${SOURCE_ID}/teach/save`, {
@@ -763,13 +763,13 @@ async function loadActionsInfo() {
   const list = document.getElementById("actions-list");
   const entries = Object.entries(data);
   if (entries.length === 0) {
-    list.innerHTML = '<div style="color:#9D9FA2;text-align:center;padding:8px;">No hay acciones registradas</div>';
+    list.innerHTML = '<div style="color:#9D9FA2;text-align:center;padding:8px;">No actions registered</div>';
     return;
   }
   list.innerHTML = entries.map(([action, info]) => {
     return `<div style="padding:6px 0;border-bottom:1px solid #F0F1F3;">
       <strong style="color:#182A55;">${action}</strong>
-      <span style="color:#9D9FA2;float:right;">Detectado: ${info.count} veces</span>
+      <span style="color:#9D9FA2;float:right;">Detected: ${info.count} times</span>
     </div>`;
   }).join("");
 }
@@ -779,24 +779,24 @@ document.getElementById("btn-add-area").addEventListener("click", async () => {
   if (addingArea) {
     addingArea = false;
     areaPoints = [];
-    document.getElementById("btn-add-area").textContent = "+ Agregar área restringida";
+    document.getElementById("btn-add-area").textContent = "+ Add restricted area";
     document.getElementById("btn-add-area").style.background = "#EF4444";
     document.getElementById("custom-editing-hint").style.display = "none";
     return;
   }
   addingArea = true;
   areaPoints = [];
-  document.getElementById("btn-add-area").textContent = "Haga clic en 4 puntos en el video";
+  document.getElementById("btn-add-area").textContent = "Click on 4 points on the video";
   document.getElementById("btn-add-area").style.background = "#FF8C00";
   document.getElementById("custom-editing-hint").style.display = "";
-  document.getElementById("custom-editing-hint").textContent = "Haga clic para colocar puntos del área restringida";
+  document.getElementById("custom-editing-hint").textContent = "Click to place points of the restricted area";
 });
 
 document.getElementById("btn-area-cancel").addEventListener("click", () => {
   document.getElementById("area-type-modal").style.display = "none";
   addingArea = false;
   areaPoints = [];
-  document.getElementById("btn-add-area").textContent = "+ Agregar área restringida";
+  document.getElementById("btn-add-area").textContent = "+ Add restricted area";
   document.getElementById("btn-add-area").style.background = "#EF4444";
 });
 
@@ -810,7 +810,7 @@ document.getElementById("btn-area-save").addEventListener("click", async () => {
   document.getElementById("area-type-modal").style.display = "none";
   addingArea = false;
   areaPoints = [];
-  document.getElementById("btn-add-area").textContent = "+ Agregar área restringida";
+  document.getElementById("btn-add-area").textContent = "+ Add restricted area";
   document.getElementById("btn-add-area").style.background = "#EF4444";
   loadAreas();
 });
@@ -821,16 +821,16 @@ async function loadAreas() {
   const areas = await r.json();
   const list = document.getElementById("areas-list");
   if (areas.length === 0) {
-    list.innerHTML = '<div style="font-size:0.72rem;color:#9D9FA2;text-align:center;padding:8px;">No hay áreas configuradas</div>';
+    list.innerHTML = '<div style="font-size:0.72rem;color:#9D9FA2;text-align:center;padding:8px;">No areas configured</div>';
     return;
   }
-  const labels = { persona: "Solo Personas", tanque: "Solo Tanques", ambos: "Personas y Tanques" };
+  const labels = { persona: "People Only", tanque: "Tanks Only", ambos: "People and Tanks" };
   list.innerHTML = areas.map(a => {
     return `<div class="lv-area-item">
-      <strong>Área #${a.id.slice(0,8)}</strong>
-      <div class="lv-area-restrict-type">Restringe: ${labels[a.restrict_type] || a.restrict_type}</div>
+      <strong>Area #${a.id.slice(0,8)}</strong>
+      <div class="lv-area-restrict-type">Restricts: ${labels[a.restrict_type] || a.restrict_type}</div>
       <button class="lv-btn-reset" onclick="removeArea('${a.id}')" style="margin-top:4px;width:100%;justify-content:center;padding:4px;">
-        Eliminar
+        Delete
       </button>
     </div>`;
   }).join("");

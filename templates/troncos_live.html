@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -125,22 +125,22 @@
 <header class="lv-topbar">
   <a class="lv-back" href="/module/troncos">
     <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-    Volver
+    Back
   </a>
   <div class="lv-sep"></div>
   <span class="lv-source-name">{{ source.name }}</span>
   <span class="lv-badge {{ source.type }}">{{ source.type }}</span>
   <div class="lv-status">
     <span class="lv-dot on" id="lv-dot"></span>
-    <span id="lv-status-txt">Iniciando…</span>
+    <span id="lv-status-txt">Starting…</span>
   </div>
   <button class="lv-btn-reset" id="btn-reset">
     <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-    Reiniciar conteos
+    Reset counts
   </button>
   <button class="lv-btn-stop" id="btn-stop">
     <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/></svg>
-    Detener
+    Stop
   </button>
 </header>
 
@@ -148,7 +148,7 @@
   <div class="lv-feed">
     <div class="lv-feed-placeholder" id="feed-placeholder">
       <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-      <p id="feed-placeholder-msg">Conectando con la fuente…</p>
+      <p id="feed-placeholder-msg">Connecting to source…</p>
       <span>{{ source.path }}</span>
     </div>
     <img class="lv-feed-img" id="lv-feed-img" src="" alt="Live feed" style="display:none">
@@ -159,14 +159,14 @@
     <div class="lv-section">
       <div class="lv-section-title">
         <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        Conteo de Troncos
+        Log Count
       </div>
       <div class="lv-count-big">
         <div class="lv-count-num" id="cnt-total">0</div>
-        <div class="lv-count-lbl">Conteo total</div>
+        <div class="lv-count-lbl">Total count</div>
       </div>
       <div class="lv-line-config">
-        <div class="lv-line-lbl">Línea de conteo</div>
+        <div class="lv-line-lbl">Counting line</div>
         <div class="lv-line-row">
           <input type="range" id="line-x-slider" min="10" max="90" step="1" value="{{ settings.get('troncos_line_x', '50') }}">
           <span class="lv-line-val" id="line-x-val">{{ settings.get('troncos_line_x', '50') }}%</span>
@@ -174,7 +174,7 @@
       </div>
     </div>
     <div class="lv-info-row">
-      <span>Fuente #<span class="lv-info-id">{{ source.id }}</span></span>
+      <span>Source #<span class="lv-info-id">{{ source.id }}</span></span>
       <span id="lv-fps">— fps</span>
     </div>
   </div>
@@ -187,19 +187,19 @@ let frameCount = 0;
 let fpsTimer   = null;
 
 (async () => {
-  document.getElementById("feed-placeholder-msg").textContent = "Iniciando pipeline…";
+  document.getElementById("feed-placeholder-msg").textContent = "Starting pipeline…";
   const r = await fetch(`/api/troncos/sources/${SOURCE_ID}/start`, { method: "POST" });
   if (r.ok) {
-    document.getElementById("feed-placeholder-msg").textContent = "Cargando modelo de IA…";
-    document.getElementById("lv-status-txt").textContent = "Cargando…";
+    document.getElementById("feed-placeholder-msg").textContent = "Loading AI model…";
+    document.getElementById("lv-status-txt").textContent = "Loading…";
     const img = document.getElementById("lv-feed-img");
     img.onload = () => {
       img.style.display = "block";
       document.getElementById("feed-placeholder").style.display = "none";
-      document.getElementById("lv-status-txt").textContent = "En vivo";
+      document.getElementById("lv-status-txt").textContent = "Live";
     };
     img.onerror = () => {
-      document.getElementById("feed-placeholder-msg").textContent = "Error al conectar con la fuente";
+      document.getElementById("feed-placeholder-msg").textContent = "Error connecting to source";
       document.getElementById("lv-dot").classList.remove("on");
       document.getElementById("lv-status-txt").textContent = "Error";
     };
@@ -207,8 +207,8 @@ let fpsTimer   = null;
     startPoll();
     startFpsCounter();
   } else {
-    document.getElementById("feed-placeholder-msg").textContent = "Error al iniciar el análisis";
-    document.getElementById("lv-status-txt").textContent = "Error al iniciar";
+    document.getElementById("feed-placeholder-msg").textContent = "Error starting analysis";
+    document.getElementById("lv-status-txt").textContent = "Error starting";
     document.getElementById("lv-dot").classList.remove("on");
   }
 })();
@@ -222,7 +222,7 @@ function startPoll() {
     const totalEl = document.getElementById("cnt-total");
     if (totalEl) totalEl.textContent = d.total_count;
     document.getElementById("lv-ts").textContent =
-      new Date().toLocaleTimeString("es-MX", { hour12: false });
+      new Date().toLocaleTimeString("en-US", { hour12: false });
   }, 1500);
 }
 

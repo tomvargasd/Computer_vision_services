@@ -1,34 +1,34 @@
 {% extends "base.html" %}
-{% block title %}Dashboard · Tanques de Gas{% endblock %}
-{% block page_title %}Dashboard Analítico · {{ module.label }}{% endblock %}
+{% block title %}Dashboard · Gas Tanks{% endblock %}
+{% block page_title %}Analytics Dashboard · {{ module.label }}{% endblock %}
 {% block content %}
 <div class="tg-dashboard" id="dashboard-container">
 
   <!-- Toolbar -->
   <div class="tg-toolbar">
     <div class="tg-toolbar-group">
-      <label style="font-size:0.72rem;color:var(--muted)">Fuente:</label>
+      <label style="font-size:0.72rem;color:var(--muted)">Source:</label>
       <select class="tg-filter-select" id="filter-source">
-        <option value="all">Todas las fuentes</option>
+        <option value="all">All sources</option>
       </select>
     </div>
     <div class="tg-toolbar-group">
-      <label style="font-size:0.72rem;color:var(--muted)">Rango:</label>
+      <label style="font-size:0.72rem;color:var(--muted)">Range:</label>
       <select class="tg-filter-select" id="filter-range">
-        <option value="7">7 días</option>
-        <option value="15">15 días</option>
-        <option value="29" selected>29 días</option>
-        <option value="60">60 días</option>
-        <option value="365">Todo</option>
+        <option value="7">7 days</option>
+        <option value="15">15 days</option>
+        <option value="29" selected>29 days</option>
+        <option value="60">60 days</option>
+        <option value="365">All</option>
       </select>
     </div>
-    <button class="tg-btn tg-btn-refresh" id="btn-refresh" title="Actualizar">↻</button>
+    <button class="tg-btn tg-btn-refresh" id="btn-refresh" title="Refresh">↻</button>
     <div class="tg-toolbar-group" style="margin-left:auto">
       <div class="tg-btn tg-btn-pdf" tabindex="0">
-        📄 Exportar PDF
+        📄 Export PDF
         <div class="tg-pdf-dropdown">
-          <button class="tg-pdf-dropdown-item" onclick="exportPDF('todo')">Todo (completo)</button>
-          <button class="tg-pdf-dropdown-item" onclick="exportPDF('resumen')">Resumen ejecutivo</button>
+          <button class="tg-pdf-dropdown-item" onclick="exportPDF('todo')">All (complete)</button>
+          <button class="tg-pdf-dropdown-item" onclick="exportPDF('resumen')">Executive summary</button>
         </div>
       </div>
     </div>
@@ -36,22 +36,22 @@
 
   <!-- KPI Global Strip (max 6) -->
   <div class="tg-kpi-strip" id="kpi-strip">
-    <div class="tg-kpi-card blue"><div class="tg-kpi-label">Entradas</div><div class="tg-kpi-value" id="kpi-entradas">—</div><div class="tg-kpi-sub">totales</div></div>
-    <div class="tg-kpi-card green"><div class="tg-kpi-label">Salidas</div><div class="tg-kpi-value" id="kpi-salidas">—</div><div class="tg-kpi-sub">totales</div></div>
-    <div class="tg-kpi-card orange"><div class="tg-kpi-label">Ocupación Neta</div><div class="tg-kpi-value" id="kpi-ocupacion">—</div><div class="tg-kpi-sub">entradas − salidas</div></div>
-    <div class="tg-kpi-card purple"><div class="tg-kpi-label">Ratio E/S</div><div class="tg-kpi-value" id="kpi-ratio">—</div><div class="tg-kpi-sub">entradas por salida</div></div>
-    <div class="tg-kpi-card cyan"><div class="tg-kpi-label">Eventos Hoy</div><div class="tg-kpi-value" id="kpi-hoy">—</div><div class="tg-kpi-sub">actividad del día</div></div>
-    <div class="tg-kpi-card red"><div class="tg-kpi-label">Alertas Humo</div><div class="tg-kpi-value" id="kpi-humo">—</div><div class="tg-kpi-sub" id="kpi-humo-sub">fuentes con alerta</div></div>
+    <div class="tg-kpi-card blue"><div class="tg-kpi-label">Entries</div><div class="tg-kpi-value" id="kpi-entradas">—</div><div class="tg-kpi-sub">totals</div></div>
+    <div class="tg-kpi-card green"><div class="tg-kpi-label">Exits</div><div class="tg-kpi-value" id="kpi-salidas">—</div><div class="tg-kpi-sub">totals</div></div>
+    <div class="tg-kpi-card orange"><div class="tg-kpi-label">Net Occupancy</div><div class="tg-kpi-value" id="kpi-ocupacion">—</div><div class="tg-kpi-sub">entries − exits</div></div>
+    <div class="tg-kpi-card purple"><div class="tg-kpi-label">Entry/Exit Ratio</div><div class="tg-kpi-value" id="kpi-ratio">—</div><div class="tg-kpi-sub">entries per exit</div></div>
+    <div class="tg-kpi-card cyan"><div class="tg-kpi-label">Today's Events</div><div class="tg-kpi-value" id="kpi-hoy">—</div><div class="tg-kpi-sub">daily activity</div></div>
+    <div class="tg-kpi-card red"><div class="tg-kpi-label">Smoke Alerts</div><div class="tg-kpi-value" id="kpi-humo">—</div><div class="tg-kpi-sub" id="kpi-humo-sub">sources with alert</div></div>
   </div>
 
   <!-- Charts Row 1: Doughnut + Line -->
   <div class="tg-chart-pair">
     <div class="tg-chart-card">
-      <h4>📊 Entradas / Salidas por fuente</h4>
+      <h4>📊 Entries / Exits by source</h4>
       <canvas id="chart-pie-fuentes"></canvas>
     </div>
     <div class="tg-chart-card">
-      <h4>📈 Timeline 29 días</h4>
+      <h4 id="timeline-title">📈 Timeline 29 days</h4>
       <canvas id="chart-timeline"></canvas>
     </div>
   </div>
@@ -59,15 +59,15 @@
   <!-- KPI Mini Row + Bar Chart -->
   <div class="tg-chart-pair">
     <div class="tg-chart-card">
-      <h4>📊 Ranking de fuentes</h4>
+      <h4>📊 Source ranking</h4>
       <canvas id="chart-bar-fuentes"></canvas>
     </div>
     <div class="tg-section-card" style="justify-content:center">
       <div class="tg-kpi-mini-row">
-        <div class="tg-kpi-mini"><span class="tg-kpi-mini-label">Promedio Diario</span><span class="tg-kpi-mini-value" id="kpi-promedio">—</span><span class="tg-kpi-mini-sub">eventos/día</span></div>
-        <div class="tg-kpi-mini"><span class="tg-kpi-mini-label">Pico Diario</span><span class="tg-kpi-mini-value" id="kpi-pico">—</span><span class="tg-kpi-mini-sub" id="kpi-pico-sub">—</span></div>
-        <div class="tg-kpi-mini"><span class="tg-kpi-mini-label">Total Eventos</span><span class="tg-kpi-mini-value" id="kpi-total-eventos">—</span><span class="tg-kpi-mini-sub">en el período</span></div>
-        <div class="tg-kpi-mini"><span class="tg-kpi-mini-label">Acciones</span><span class="tg-kpi-mini-value" id="kpi-acciones">—</span><span class="tg-kpi-mini-sub">detectadas</span></div>
+        <div class="tg-kpi-mini"><span class="tg-kpi-mini-label">Daily Average</span><span class="tg-kpi-mini-value" id="kpi-promedio">—</span><span class="tg-kpi-mini-sub">events/day</span></div>
+        <div class="tg-kpi-mini"><span class="tg-kpi-mini-label">Daily Peak</span><span class="tg-kpi-mini-value" id="kpi-pico">—</span><span class="tg-kpi-mini-sub" id="kpi-pico-sub">—</span></div>
+        <div class="tg-kpi-mini"><span class="tg-kpi-mini-label">Total Events</span><span class="tg-kpi-mini-value" id="kpi-total-eventos">—</span><span class="tg-kpi-mini-sub">in the period</span></div>
+        <div class="tg-kpi-mini"><span class="tg-kpi-mini-label">Actions</span><span class="tg-kpi-mini-value" id="kpi-acciones">—</span><span class="tg-kpi-mini-sub">detected</span></div>
       </div>
     </div>
   </div>
@@ -75,29 +75,29 @@
   <!-- Charts Row 3: Doughnut Acciones + Polar Area -->
   <div class="tg-chart-pair-equal">
     <div class="tg-chart-card">
-      <h4>🎯 Acciones detectadas</h4>
+      <h4>🎯 Detected actions</h4>
       <canvas id="chart-acciones"></canvas>
     </div>
     <div class="tg-chart-card">
-      <h4>🔵 Distribución por tipo de evento</h4>
+      <h4>🔵 Distribution by event type</h4>
       <canvas id="chart-polar"></canvas>
     </div>
   </div>
 
   <!-- Source Table -->
   <div class="tg-table-container">
-    <h4>📋 Detalle por fuente</h4>
-    <input class="tg-table-search" id="source-search" type="text" placeholder="Buscar fuente..." oninput="filterSourceTable()">
+    <h4>📋 Detail by source</h4>
+    <input class="tg-table-search" id="source-search" type="text" placeholder="Search source..." oninput="filterSourceTable()">
     <table class="tg-table" id="source-table">
       <thead>
         <tr>
           <th onclick="sortSourceTable(0)" data-col="0"># <span class="sort-icon">↕</span></th>
-          <th onclick="sortSourceTable(1)" data-col="1">Fuente <span class="sort-icon">↕</span></th>
-          <th onclick="sortSourceTable(2)" data-col="2" class="sort-desc">Entradas <span class="sort-icon">↕</span></th>
-          <th onclick="sortSourceTable(3)" data-col="3">Salidas <span class="sort-icon">↕</span></th>
-          <th onclick="sortSourceTable(4)" data-col="4">Acciones <span class="sort-icon">↕</span></th>
-          <th onclick="sortSourceTable(5)" data-col="5">Humo <span class="sort-icon">↕</span></th>
-          <th onclick="sortSourceTable(6)" data-col="6">% Contribución <span class="sort-icon">↕</span></th>
+          <th onclick="sortSourceTable(1)" data-col="1">Source <span class="sort-icon">↕</span></th>
+          <th onclick="sortSourceTable(2)" data-col="2" class="sort-desc">Entries <span class="sort-icon">↕</span></th>
+          <th onclick="sortSourceTable(3)" data-col="3">Exits <span class="sort-icon">↕</span></th>
+          <th onclick="sortSourceTable(4)" data-col="4">Actions <span class="sort-icon">↕</span></th>
+          <th onclick="sortSourceTable(5)" data-col="5">Smoke <span class="sort-icon">↕</span></th>
+          <th onclick="sortSourceTable(6)" data-col="6">% Contribution <span class="sort-icon">↕</span></th>
         </tr>
       </thead>
       <tbody id="source-table-body"></tbody>
@@ -106,19 +106,19 @@
 
   <!-- Events List -->
   <div class="tg-events-container">
-    <h4>📜 Historial de eventos</h4>
+    <h4>📜 Event history</h4>
     <div class="tg-event-filters">
-      <button class="tg-event-chip active" data-type="all" onclick="filterEvents('all')">Todos</button>
-      <button class="tg-event-chip" data-type="entry" onclick="filterEvents('entry')">Entradas</button>
-      <button class="tg-event-chip" data-type="exit" onclick="filterEvents('exit')">Salidas</button>
-      <button class="tg-event-chip" data-type="smoke_detected" onclick="filterEvents('smoke_detected')">Humo</button>
-      <button class="tg-event-chip" data-type="action" onclick="filterEvents('action')">Acciones</button>
+      <button class="tg-event-chip active" data-type="all" onclick="filterEvents('all')">All</button>
+      <button class="tg-event-chip" data-type="entry" onclick="filterEvents('entry')">Entries</button>
+      <button class="tg-event-chip" data-type="exit" onclick="filterEvents('exit')">Exits</button>
+      <button class="tg-event-chip" data-type="smoke_detected" onclick="filterEvents('smoke_detected')">Smoke</button>
+      <button class="tg-event-chip" data-type="action" onclick="filterEvents('action')">Actions</button>
       <span style="color:var(--muted);font-size:0.72rem;margin:0 4px">|</span>
-      <label style="font-size:0.72rem;color:var(--muted)">Desde:</label>
+      <label style="font-size:0.72rem;color:var(--muted)">From:</label>
       <input class="tg-event-date-input" type="date" id="filter-date-from" onchange="applyEventFilters()">
-      <label style="font-size:0.72rem;color:var(--muted)">Hasta:</label>
+      <label style="font-size:0.72rem;color:var(--muted)">To:</label>
       <input class="tg-event-date-input" type="date" id="filter-date-to" onchange="applyEventFilters()">
-      <input class="tg-event-search" type="text" id="filter-event-search" placeholder="Buscar en eventos..." oninput="applyEventFilters()">
+      <input class="tg-event-search" type="text" id="filter-event-search" placeholder="Search in events..." oninput="applyEventFilters()">
     </div>
     <div class="tg-event-list" id="event-list"></div>
     <div class="tg-pagination" id="event-pagination"></div>
@@ -180,12 +180,15 @@ async function loadData() {
   try {
     const days = document.getElementById('filter-range').value;
     const srcFilter = document.getElementById('filter-source').value;
-    let url = `/api/analytics/${MODULE_ID}/comprehensive`;
-    if (srcFilter !== 'all') url += `?source_id=${srcFilter}`;
+    const params = new URLSearchParams();
+    params.set('days', days);
+    if (srcFilter !== 'all') params.set('source_id', srcFilter);
 
-    const r = await fetch(url);
-    if (!r.ok) throw new Error('Error al cargar datos');
+    const r = await fetch(`/api/analytics/${MODULE_ID}/comprehensive?${params.toString()}`);
+    if (!r.ok) throw new Error('Error loading data');
     allData = await r.json();
+
+    populateSourceFilter(allData.availableSources);
 
     if (allData.empty) {
       showEmptyState();
@@ -197,21 +200,64 @@ async function loadData() {
     renderSourceTable(allData.sources);
     eventData = allData.recentEvents || [];
     applyEventFilters();
+    updateTimelineTitle();
   } catch (e) {
     console.error(e);
-    showToast('Error al cargar datos del dashboard', true);
+    showToast('Error loading dashboard data', true);
   }
 
   refreshBtn.classList.remove('spin');
+}
+
+function populateSourceFilter(available) {
+  if (!available || available.length === 0) return;
+  const sel = document.getElementById('filter-source');
+  const existing = new Set([...sel.options].map(o => o.value));
+  available.forEach(s => {
+    const v = String(s.id);
+    if (!existing.has(v)) {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = s.name;
+      sel.appendChild(opt);
+      existing.add(v);
+    } else {
+      const opt = sel.querySelector(`option[value="${v}"]`);
+      if (opt) opt.textContent = s.name;
+    }
+  });
+}
+
+function updateTimelineTitle() {
+  const sel = document.getElementById('filter-range');
+  const el = document.getElementById('timeline-title');
+  if (sel && el) el.textContent = `📈 Timeline ${sel.selectedOptions[0]?.textContent || ''}`;
+}
+
+function setEventDateRange() {
+  const days = parseInt(document.getElementById('filter-range').value, 10) || 29;
+  const toDate = new Date();
+  const fromDate = new Date(toDate);
+  fromDate.setDate(toDate.getDate() - (days - 1));
+  document.getElementById('filter-date-from').value = fmtDate(fromDate);
+  document.getElementById('filter-date-to').value = fmtDate(toDate);
+  applyEventFilters();
+}
+
+function fmtDate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
 }
 
 function showEmptyState() {
   document.querySelectorAll('.tg-kpi-card .tg-kpi-value').forEach(el => el.textContent = '—');
   document.querySelectorAll('.tg-kpi-mini-value').forEach(el => el.textContent = '—');
   document.querySelectorAll('.tg-kpi-sub').forEach(el => el.textContent = '—');
-  document.getElementById('kpi-humo-sub').textContent = 'fuentes con alerta';
-  document.getElementById('source-table-body').innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">Sin datos — usa "Poblar datos de prueba" en la configuración del módulo</td></tr>';
-  document.getElementById('event-list').innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">Sin eventos registrados</div>';
+  document.getElementById('kpi-humo-sub').textContent = 'sources with alert';
+  document.getElementById('source-table-body').innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">No data — use "Populate test data" in the module settings</td></tr>';
+  document.getElementById('event-list').innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">No events recorded</div>';
   document.getElementById('event-pagination').innerHTML = '';
   Object.values(charts).forEach(c => { if (c) c.destroy(); });
   charts = {};
@@ -226,7 +272,7 @@ function renderKPIs(kpis) {
   setText('kpi-ratio', kpis.ratioES != null ? kpis.ratioES : '—');
   setText('kpi-hoy', formatNumber(kpis.eventosHoy));
   setText('kpi-humo', formatNumber(kpis.alertasHumo));
-  document.getElementById('kpi-humo-sub').textContent = kpis.alertasHumo === 1 ? 'fuente con alerta' : 'fuentes con alerta';
+  document.getElementById('kpi-humo-sub').textContent = kpis.alertasHumo === 1 ? 'source with alert' : 'sources with alert';
 
   setText('kpi-promedio', kpis.promedioDiario != null ? kpis.promedioDiario : '—');
   setText('kpi-pico', kpis.picoDiario != null ? kpis.picoDiario : '—');
@@ -252,13 +298,13 @@ function renderCharts(data) {
     const srcColors = ['#3B82F6','#22C55E','#F59E0B','#8B5CF6','#EC4899','#06B6D4','#6366F1','#14B8A6'];
     data.sources.forEach((s, i) => {
       const c = srcColors[i % srcColors.length];
-      labels.push(`${s.name} · Entradas`);
+      labels.push(`${s.name} · Entries`);
       values.push(s.entradas);
       colors.push(c);
     });
     data.sources.forEach((s, i) => {
       const c = srcColors[i % srcColors.length];
-      labels.push(`${s.name} · Salidas`);
+      labels.push(`${s.name} · Exits`);
       values.push(s.salidas);
       colors.push(c + '66');
     });
@@ -293,10 +339,10 @@ function renderCharts(data) {
       data: {
         labels,
         datasets: [
-          { label: 'Entradas', data: entryData, borderColor: '#22C55E', backgroundColor: 'rgba(34,197,94,0.08)', fill: true, tension: 0.3, pointRadius: 2 },
-          { label: 'Salidas', data: exitData, borderColor: '#EF4444', backgroundColor: 'rgba(239,68,68,0.06)', fill: true, tension: 0.3, pointRadius: 2 },
-          { label: 'Acciones', data: actionData, borderColor: '#8B5CF6', borderDash: [5, 5], tension: 0.3, pointRadius: 2 },
-          { label: 'Humo', data: smokeData, borderColor: '#F59E0B', backgroundColor: 'rgba(245,158,11,0.15)', fill: true, tension: 0.3, pointRadius: 3, pointBackgroundColor: '#F59E0B' },
+          { label: 'Entries', data: entryData, borderColor: '#22C55E', backgroundColor: 'rgba(34,197,94,0.08)', fill: true, tension: 0.3, pointRadius: 2 },
+          { label: 'Exits', data: exitData, borderColor: '#EF4444', backgroundColor: 'rgba(239,68,68,0.06)', fill: true, tension: 0.3, pointRadius: 2 },
+          { label: 'Actions', data: actionData, borderColor: '#8B5CF6', borderDash: [5, 5], tension: 0.3, pointRadius: 2 },
+          { label: 'Smoke', data: smokeData, borderColor: '#F59E0B', backgroundColor: 'rgba(245,158,11,0.15)', fill: true, tension: 0.3, pointRadius: 3, pointBackgroundColor: '#F59E0B' },
         ]
       },
       options: {
@@ -326,8 +372,8 @@ function renderCharts(data) {
       data: {
         labels,
         datasets: [
-          { label: 'Entradas', data: entData, backgroundColor: '#3B82F6', borderRadius: 4 },
-          { label: 'Salidas', data: salData, backgroundColor: '#EF4444', borderRadius: 4 },
+          { label: 'Entries', data: entData, backgroundColor: '#3B82F6', borderRadius: 4 },
+          { label: 'Exits', data: salData, backgroundColor: '#EF4444', borderRadius: 4 },
         ]
       },
       options: {
@@ -369,7 +415,7 @@ function renderCharts(data) {
     } else {
       charts.acciones = new Chart(actCtx, {
         type: 'doughnut',
-        data: { labels: ['Sin datos'], datasets: [{ data: [1], backgroundColor: ['#E5E7EB'] }] },
+        data: { labels: ['No data'], datasets: [{ data: [1], backgroundColor: ['#E5E7EB'] }] },
         options: { responsive: true, plugins: { legend: { display: false } } }
       });
     }
@@ -382,7 +428,7 @@ function renderCharts(data) {
     const labels = [];
     const values = [];
     const colorMap = { 'entry': '#22C55E', 'exit': '#EF4444', 'smoke_detected': '#F59E0B', 'action': '#8B5CF6' };
-    const labelMap = { 'entry': 'Entradas', 'exit': 'Salidas', 'smoke_detected': 'Humo/Fuego', 'action': 'Acciones' };
+    const labelMap = { 'entry': 'Entries', 'exit': 'Exits', 'smoke_detected': 'Smoke/Fire', 'action': 'Actions' };
     Object.entries(dist).forEach(([k, v]) => {
       if (v > 0) { labels.push(labelMap[k] || k); values.push(v); }
     });
@@ -413,7 +459,7 @@ let sourceSearchText = '';
 function renderSourceTable(sources) {
   const tbody = document.getElementById('source-table-body');
   if (!sources || sources.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">Sin fuentes registradas</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">No sources registered</td></tr>';
     return;
   }
 
@@ -438,7 +484,7 @@ function renderSourceTable(sources) {
     const idx = i + 1;
     const colorIdx = (s.id - 1) % SOURCE_COLORS.length;
     const smokeHtml = s.smoke
-      ? '<span><span class="tg-smoke-dot on"></span>🔥 Sí</span>'
+      ? '<span><span class="tg-smoke-dot on"></span>🔥 Yes</span>'
       : '<span><span class="tg-smoke-dot off"></span>—</span>';
     return `<tr>
       <td>${idx}</td>
@@ -528,13 +574,13 @@ function renderEvents() {
   const pageItems = eventFiltered.slice(start, start + EVENT_PAGE_SIZE);
 
   if (pageItems.length === 0) {
-    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">No se encontraron eventos</div>';
+    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">No events found</div>';
     pagination.innerHTML = '';
     return;
   }
 
   const typeLabels = {
-    'entry': 'Entrada', 'exit': 'Salida', 'smoke_detected': 'Humo/Fuego',
+    'entry': 'Entry', 'exit': 'Exit', 'smoke_detected': 'Smoke/Fire',
   };
 
   list.innerHTML = pageItems.map(e => {
@@ -542,13 +588,13 @@ function renderEvents() {
     const isAction = !['entry', 'exit', 'smoke_detected'].includes(et);
     const badgeType = isAction ? 'action' : et;
     const badgeLabel = isAction ? et : (typeLabels[et] || et);
-    const sourceName = e.source_name || `Fuente ${e.source_id}`;
+    const sourceName = e.source_name || `Source ${e.source_id}`;
     return `<div class="tg-event-item">
       <span class="tg-event-time">${e.created_at || ''}</span>
       <span class="tg-event-source">${sourceName}</span>
       <span class="tg-event-type-badge ${badgeType}">${badgeLabel}</span>
       <span class="tg-event-label">${e.label || ''}</span>
-      ${e.has_capture ? `<button class="tg-event-capture" onclick="openEvidence('${MODULE_ID}', ${e.id})" title="Ver evidencia">📷</button>` : '<span></span>'}
+      ${e.has_capture ? `<button class="tg-event-capture" onclick="openEvidence('${MODULE_ID}', ${e.id})" title="View evidence">📷</button>` : '<span></span>'}
     </div>`;
   }).join('');
 
@@ -562,7 +608,7 @@ function renderEvents() {
       pageBtns.push(`<button class="tg-page-btn ${i === eventPage ? 'active' : ''}" onclick="changePage(${i})">${i + 1}</button>`);
     }
     pageBtns.push(`<button class="tg-page-btn" onclick="changePage(${eventPage + 1})" ${eventPage >= totalPages - 1 ? 'disabled' : ''}>›</button>`);
-    pageBtns.push(`<span class="tg-page-info">${eventPage * EVENT_PAGE_SIZE + 1}–${Math.min((eventPage + 1) * EVENT_PAGE_SIZE, eventFiltered.length)} de ${eventFiltered.length}</span>`);
+    pageBtns.push(`<span class="tg-page-info">${eventPage * EVENT_PAGE_SIZE + 1}–${Math.min((eventPage + 1) * EVENT_PAGE_SIZE, eventFiltered.length)} of ${eventFiltered.length}</span>`);
   }
   pagination.innerHTML = pageBtns.join('');
 }
@@ -576,7 +622,7 @@ function changePage(page) {
 async function exportPDF(mode) {
   const btn = document.querySelector('.tg-btn-pdf');
   const origText = btn.innerHTML;
-  btn.innerHTML = '⏳ Generando PDF...';
+  btn.innerHTML = '⏳ Generating PDF...';
   btn.style.opacity = '0.6';
 
   try {
@@ -640,7 +686,7 @@ async function exportPDF(mode) {
         const dt = new Date();
         const ds = dt.toISOString().slice(0,10) + ' ' + dt.toTimeString().slice(0,5);
         const rt = document.getElementById('filter-range').selectedOptions[0].text;
-        hdr.innerHTML = `<div><strong style="font-size:16px">Tanques de Gas · Resumen</strong></div><div style="font-size:11px;opacity:0.8">${ds} · Rango: ${rt}</div>`;
+        hdr.innerHTML = `<div><strong style="font-size:16px">Gas Tanks · Summary</strong></div><div style="font-size:11px;opacity:0.8">${ds} · Range: ${rt}</div>`;
         exportEl.appendChild(hdr);
 
         // Clone KPI strip with chart images
@@ -709,10 +755,10 @@ async function exportPDF(mode) {
     }
 
     pdf.save(`tanques_gas_dashboard_${new Date().toISOString().slice(0, 10)}.pdf`);
-    showToast('PDF exportado correctamente');
+    showToast('PDF exported successfully');
   } catch (e) {
     console.error('PDF error:', e);
-    showToast('Error al generar PDF', true);
+    showToast('Error generating PDF', true);
   }
 
   btn.innerHTML = origText;
@@ -721,46 +767,12 @@ async function exportPDF(mode) {
 
 // ── Source filter ──
 document.getElementById('filter-source').addEventListener('change', loadData);
-document.getElementById('filter-range').addEventListener('change', loadData);
+document.getElementById('filter-range').addEventListener('change', () => { loadData(); setEventDateRange(); });
 document.getElementById('btn-refresh').addEventListener('click', loadData);
 
 // ── Init ──
 async function init() {
-  // Populate source filter with real names
-  try {
-    const r = await fetch(`/api/analytics/${MODULE_ID}/summary?days=365`);
-    if (r.ok) {
-      const d = await r.json();
-      const sel = document.getElementById('filter-source');
-      if (d.counters) {
-        Object.keys(d.counters).forEach(sid => {
-          const opt = document.createElement('option');
-          opt.value = sid;
-          opt.textContent = `Fuente ${sid}`;
-          sel.appendChild(opt);
-        });
-      }
-    }
-  } catch (e) {}
-  // Refresh source names in filter after data loads
-  const fixSourceNames = () => {
-    if (!allData?.sources) return;
-    const sel = document.getElementById('filter-source');
-    allData.sources.forEach(s => {
-      const opt = sel.querySelector(`option[value="${s.id}"]`);
-      if (opt) opt.textContent = s.name;
-    });
-  };
-  // Patch into existing loadData via periodic check
-  setInterval(fixSourceNames, 2000);
-
-  // Set default dates
-  const today = new Date();
-  const fromDate = new Date(2026, 6, 1); // July 1
-  const toDate = new Date(2026, 6, 29);  // July 29
-  document.getElementById('filter-date-from').value = fromDate.toISOString().slice(0, 10);
-  document.getElementById('filter-date-to').value = toDate.toISOString().slice(0, 10);
-
+  setEventDateRange();
   await loadData();
   setInterval(loadData, 5000);
 }

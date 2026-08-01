@@ -372,7 +372,7 @@ class VehiculosPipeline(BasePersistPipeline):
     def _make_error_frame(self, msg: str) -> np.ndarray:
         h, w = 480, 640
         frame = np.zeros((h, w, 3), dtype=np.uint8)
-        cv2.putText(frame, "ERROR DE FUENTE", (int(w * 0.25), h // 2 - 30),
+        cv2.putText(frame, "SOURCE ERROR", (int(w * 0.25), h // 2 - 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.9, (85, 42, 24), 2, cv2.LINE_AA)
         for i, part in enumerate(
             [msg[j:j+55] for j in range(0, min(len(msg), 165), 55)]
@@ -380,7 +380,7 @@ class VehiculosPipeline(BasePersistPipeline):
             cv2.putText(frame, part, (20, h // 2 + 10 + i * 28),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.55, (200, 200, 200),
                         1, cv2.LINE_AA)
-        cv2.putText(frame, "Verifica la ruta o permisos de la fuente",
+        cv2.putText(frame, "Check the source path or permissions",
                     (20, h - 28), cv2.FONT_HERSHEY_SIMPLEX, 0.48,
                     (120, 120, 120), 1, cv2.LINE_AA)
         return frame
@@ -573,16 +573,16 @@ class VehiculosPipeline(BasePersistPipeline):
                             pass
 
                 insert_module_event("vehiculos", self.source_id,
-                                    "crossing", f"Vehiculo ID {tid} {direction or 'in'}",
+                                    "crossing", f"Vehicle ID {tid} {direction or 'in'}",
                                     capture_path=cap_path)
 
         cv2.line(annotated, draw_p1, draw_p2, YELLOW, 2)
         cv2.putText(annotated,
-                    f"Entrada {self.total_in}  Salida {self.total_out}",
+                    f"In {self.total_in}  Out {self.total_out}",
                     (12, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, YELLOW, 2,
                     cv2.LINE_AA)
         cv2.putText(annotated,
-                    f"Vehiculos: {self.total_vehicles}",
+                    f"Vehicles: {self.total_vehicles}",
                     (12, 54), cv2.FONT_HERSHEY_SIMPLEX, 0.55, WHITE, 2,
                     cv2.LINE_AA)
         return annotated

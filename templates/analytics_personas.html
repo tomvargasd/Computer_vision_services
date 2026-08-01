@@ -1,36 +1,36 @@
 {% extends "base.html" %}
-{% block title %}Analytics · Personas{% endblock %}
+{% block title %}Analytics · People{% endblock %}
 {% block page_title %}Analytics · {{ module.label }}{% endblock %}
 {% block content %}
 <div class="analytics-dashboard">
   <div class="analytics-kpi-row">
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> En el área</span><span class="analytics-kpi-value" id="kpi-current_persons_net">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Entradas</span><span class="analytics-kpi-value" id="kpi-in_count">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg> Salidas</span><span class="analytics-kpi-value" id="kpi-out_count">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Hoy</span><span class="analytics-kpi-value" id="kpi-today">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Permanencia máx</span><span class="analytics-kpi-value" id="kpi-max_dwell">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> In the area</span><span class="analytics-kpi-value" id="kpi-current_persons_net">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Entries</span><span class="analytics-kpi-value" id="kpi-in_count">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg> Exits</span><span class="analytics-kpi-value" id="kpi-out_count">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Today</span><span class="analytics-kpi-value" id="kpi-today">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Max dwell</span><span class="analytics-kpi-value" id="kpi-max_dwell">—</span></div>
   </div>
 
   <div class="analytics-chart-row">
     <div class="analytics-chart-card">
-      <h4>Timeline: Flujo de personas</h4>
+      <h4>Timeline: People flow</h4>
       <canvas id="chart-personas-timeline"></canvas>
     </div>
     <div class="analytics-chart-card">
-      <h4>Actividad por hora (hoy)</h4>
+      <h4>Hourly activity (today)</h4>
       <canvas id="chart-personas-heatmap"></canvas>
     </div>
   </div>
 
   <div class="analytics-chart-row">
     <div class="analytics-chart-card">
-      <h4>Por fuente</h4>
+      <h4>By source</h4>
       <div id="per-source-table" class="analytics-per-source"></div>
     </div>
   </div>
 
   <div class="analytics-events">
-    <h4>Últimos eventos</h4>
+    <h4>Recent events</h4>
     <div id="events-list" class="analytics-events-list"></div>
   </div>
 </div>
@@ -82,13 +82,13 @@ async function loadKPIs() {
 
   const psEl = document.getElementById('per-source-table');
   if (sources.length > 0) {
-    psEl.innerHTML = '<table class="ps-table"><tr><th>Fuente</th><th>Entradas</th><th>Salidas</th><th>En área</th></tr>' +
+    psEl.innerHTML = '<table class="ps-table"><tr><th>Source</th><th>Entries</th><th>Exits</th><th>In area</th></tr>' +
       sources.map(sid => {
         const c = counters[sid];
-        return `<tr><td>Fuente ${sid}</td><td>${c?.in_count ?? '—'}</td><td>${c?.out_count ?? '—'}</td><td>${c?.current_persons_net ?? '—'}</td></tr>`;
+        return `<tr><td>Source ${sid}</td><td>${c?.in_count ?? '—'}</td><td>${c?.out_count ?? '—'}</td><td>${c?.current_persons_net ?? '—'}</td></tr>`;
       }).join('') + '</table>';
   } else {
-    psEl.innerHTML = '<p class="text-muted">Sin datos de fuentes</p>';
+    psEl.innerHTML = '<p class="text-muted">No source data</p>';
   }
 
   // Build hourly heatmap from today's events
@@ -116,8 +116,8 @@ function buildTimeline(data) {
     data: {
       labels,
       datasets: [
-        { label: 'Entradas', data: inData, borderColor: '#22C55E', tension: 0.3, fill: false },
-        { label: 'Salidas', data: outData, borderColor: '#EF4444', tension: 0.3, fill: false },
+        { label: 'Entries', data: inData, borderColor: '#22C55E', tension: 0.3, fill: false },
+        { label: 'Exits', data: outData, borderColor: '#EF4444', tension: 0.3, fill: false },
       ],
     },
     options: {
@@ -143,7 +143,7 @@ function buildHeatmap(events) {
   const labels = Array.from({length: 24}, (_, i) => `${i}:00`);
   heatmapChart = new Chart(ctx, {
     type: 'bar',
-    data: { labels, datasets: [{ label: 'Eventos', data: hours, backgroundColor: '#3B82F6' }] },
+    data: { labels, datasets: [{ label: 'Events', data: hours, backgroundColor: '#3B82F6' }] },
     options: { responsive: true, plugins: { legend: { display: false } },
       scales: { x: { ticks: { color: '#9D9FA2', maxTicksLimit: 12 } }, y: { ticks: { color: '#9D9FA2', stepSize: 1 } } } },
   });

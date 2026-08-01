@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% block title %}Sesiones · CVVision{% endblock %}
-{% block page_title %}Sesiones{% endblock %}
+{% block title %}Sessions · CVVision{% endblock %}
+{% block page_title %}Sessions{% endblock %}
 
 {% block content %}
 <div class="chat-container" id="chat-container">
@@ -9,34 +9,34 @@
       <div class="welcome-icon">
         <svg viewBox="0 0 24 24" width="48" height="48" stroke="currentColor" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/><path d="M13 7h-2v5l4.25 2.52.75-1.23-3.5-2.08V7z"/></svg>
       </div>
-      <h2>¿Qué deseas saber?</h2>
-      <p>Pregunta sobre cualquier módulo de detección del sistema</p>
+      <h2>What would you like to know?</h2>
+      <p>Ask about any detection module in the system</p>
     </div>
   </div>
 
   <div class="chat-input-area">
     <div class="chat-suggestions" id="chat-suggestions">
       <button class="suggestion-chip" data-prompt="Dame un resumen de los últimos 7 días del módulo de tanques de gas, solo métricas de entrada y salida">
-        Tanques de gas · 7 días
+        Gas tanks · 7 days
       </button>
       <button class="suggestion-chip" data-prompt="Cuántas alertas de humo o fuego se detectaron hoy en smoke">
-        Alertas de humo hoy
+        Smoke alerts today
       </button>
       <button class="suggestion-chip" data-prompt="Resumen de detección de personas y tiempo de permanencia de los últimos 3 días">
-        Personas · 3 días
+        People · 3 days
       </button>
       <button class="suggestion-chip" data-prompt="Eventos de carga y descarga de esta semana, cuántas entradas y salidas">
-        Carga/Descarga semanal
+        Weekly load/unload
       </button>
     </div>
     <div class="chat-input-row">
       <textarea class="chat-input" id="chat-input" rows="1"
-        placeholder="Ej: Dame un resumen de los últimos 7 días del módulo de tanques de gas..."></textarea>
-      <button class="chat-send-btn" id="chat-send-btn" disabled aria-label="Enviar mensaje">
+        placeholder="E.g. Give me a summary of the last 7 days of the gas tanks module..."></textarea>
+      <button class="chat-send-btn" id="chat-send-btn" disabled aria-label="Send message">
         <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
       </button>
     </div>
-    <p class="chat-footer-hint">Los datos provienen de módulos de detección. No se accede a datos de configuración.</p>
+    <p class="chat-footer-hint">Data comes from detection modules. Configuration data is not accessed.</p>
   </div>
 </div>
 

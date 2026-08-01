@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ source.name }} · CVVision Live — Armas</title>
+  <title>{{ source.name }} · CVVision Live — Weapons</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -189,7 +189,7 @@
 <header class="lv-topbar">
   <a class="lv-back" href="/module/armas">
     <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-    Volver
+    Back
   </a>
   <div class="lv-sep"></div>
   <span class="lv-source-name">{{ source.name }}</span>
@@ -197,17 +197,17 @@
 
   <div class="lv-status">
     <span class="lv-dot on" id="lv-dot"></span>
-    <span id="lv-status-txt">Iniciando…</span>
+    <span id="lv-status-txt">Starting…</span>
   </div>
 
   <button class="lv-btn-reset" id="btn-reset">
     <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-    Reiniciar
+    Reset
   </button>
 
   <button class="lv-btn-stop" id="btn-stop">
     <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/></svg>
-    Detener
+    Stop
   </button>
 </header>
 
@@ -218,7 +218,7 @@
   <div class="lv-feed">
     <div class="lv-feed-placeholder" id="feed-placeholder">
       <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-      <p id="feed-placeholder-msg">Conectando con la fuente…</p>
+      <p id="feed-placeholder-msg">Connecting to source…</p>
       <span>{{ source.path }}</span>
     </div>
     <img class="lv-feed-img" id="lv-feed-img" src="" alt="Live feed" style="display:none">
@@ -232,22 +232,22 @@
     <div class="lv-section" id="sec-armas">
       <div class="lv-section-title">
         <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        Armas Detectadas
+        Weapons Detected
       </div>
 
       <div class="lv-count-big">
         <div class="lv-count-num" id="cnt-total-armas">0</div>
-        <div class="lv-count-lbl">armas detectadas</div>
+        <div class="lv-count-lbl">weapons detected</div>
       </div>
 
       <div class="lv-tipo-row">
         <div class="lv-tipo-card blanca">
           <div class="lv-tipo-val" id="cnt-blanca">0</div>
-          <div class="lv-tipo-lbl">Arma Blanca</div>
+          <div class="lv-tipo-lbl">Bladed weapon</div>
         </div>
         <div class="lv-tipo-card fuego">
           <div class="lv-tipo-val" id="cnt-fuego">0</div>
-          <div class="lv-tipo-lbl">Arma de Fuego</div>
+          <div class="lv-tipo-lbl">Firearm</div>
         </div>
       </div>
     </div>
@@ -256,13 +256,13 @@
     <div class="lv-section" id="sec-alerta" style="display:none;">
       <div class="lv-section-title">
         <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        <span style="color:#EF4444;">ALERTA ARMA DETECTADA</span>
+        <span style="color:#EF4444;">WEAPON DETECTED ALERT</span>
       </div>
       <div style="background:#FEF2F2;border:2px solid #EF4444;border-radius:10px;padding:14px;">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
           <svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           <div>
-            <div style="font-size:0.85rem;font-weight:700;color:#EF4444;">Arma validada en escena</div>
+            <div style="font-size:0.85rem;font-weight:700;color:#EF4444;">Weapon validated in scene</div>
             <div style="font-size:0.68rem;color:#9D9FA2;" id="alerta-ts">—</div>
           </div>
         </div>
@@ -273,20 +273,20 @@
     <div class="lv-section" id="sec-capturas">
       <div class="lv-section-title">
         <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-        Capturas de Rostros
+        Face captures
       </div>
 
       <div class="lv-cap-total">
         <div>
           <div class="lv-cap-total-num" id="cnt-capturas">0</div>
-          <div class="lv-cap-total-lbl">capturas totales</div>
+          <div class="lv-cap-total-lbl">total captures</div>
         </div>
       </div>
 
       <!-- Grupos por tracker ID, renderizados por JS -->
       <div class="cap-groups" id="cap-groups">
         <p style="font-size:0.75rem;color:#9D9FA2;font-style:italic" id="cap-empty-msg">
-          Las capturas aparecerán aquí cuando se detecte un arma y se active la captura de rostro.
+          Captures will appear here when a weapon is detected and face capture is active.
         </p>
       </div>
     </div>
@@ -295,14 +295,14 @@
     <div class="lv-section" id="sec-funciones">
       <div class="lv-section-title">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        Funciones
+        Functions
       </div>
 
       <!-- Detección de arma -->
       <div class="lv-func-row">
         <div class="lv-func-info">
-          <span class="lv-func-lbl">Detección de arma</span>
-          <span class="lv-func-sub">Detecta presencia de armas en escena</span>
+          <span class="lv-func-lbl">Weapon detection</span>
+          <span class="lv-func-sub">Detects presence of weapons in scene</span>
         </div>
         <label class="toggle">
           <input type="checkbox" class="toggle-func-live"
@@ -315,8 +315,8 @@
       <!-- Captura de rostro -->
       <div class="lv-func-row">
         <div class="lv-func-info">
-          <span class="lv-func-lbl">Captura de rostro</span>
-          <span class="lv-func-sub">Guarda foto del portador del arma</span>
+          <span class="lv-func-lbl">Face capture</span>
+          <span class="lv-func-sub">Saves photo of the weapon carrier</span>
         </div>
         <label class="toggle">
           <input type="checkbox" class="toggle-func-live"
@@ -329,19 +329,19 @@
       <!-- Tipo de arma — LOCKED, siempre activo -->
       <div class="lv-func-row">
         <div class="lv-func-info">
-          <span class="lv-func-lbl">Clasificar tipo de arma</span>
-          <span class="lv-func-sub">Clasifica arma blanca o de fuego</span>
+          <span class="lv-func-lbl">Classify weapon type</span>
+          <span class="lv-func-sub">Classifies bladed or firearm</span>
         </div>
         <span class="lv-lock-badge">
           <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          Siempre activa
+          Always active
         </span>
       </div>
     </div>
 
     <!-- ── Info footer ─────────────────────────────────────── -->
     <div class="lv-info-row">
-      <span>Fuente #<span class="lv-info-id">{{ source.id }}</span></span>
+      <span>Source #<span class="lv-info-id">{{ source.id }}</span></span>
       <span id="lv-fps">— fps</span>
     </div>
 
@@ -351,7 +351,7 @@
 <!-- Lightbox -->
 <div class="lb-overlay" id="lb-overlay">
   <span class="lb-close" id="lb-close">×</span>
-  <img id="lb-img" src="" alt="Captura">
+  <img id="lb-img" src="" alt="Capture">
 </div>
 
 <script>
@@ -365,15 +365,15 @@ let capturesSnapshot = {};
 
 // ── Iniciar pipeline ──────────────────────────────────────────────────────
 (async () => {
-  document.getElementById("feed-placeholder-msg").textContent = "Iniciando pipeline…";
+  document.getElementById("feed-placeholder-msg").textContent = "Starting pipeline…";
   const r = await fetch(`/api/armas/sources/${SOURCE_ID}/start`, { method: "POST" });
   if (r.ok) {
-    document.getElementById("feed-placeholder-msg").textContent = "Cargando modelo de IA…";
+    document.getElementById("feed-placeholder-msg").textContent = "Loading AI model…";
     startStream();
     poll = setInterval(fetchStats, 2000);
     startFpsMeter();
   } else {
-    document.getElementById("feed-placeholder-msg").textContent = "Error al iniciar el pipeline";
+    document.getElementById("feed-placeholder-msg").textContent = "Error starting the pipeline";
     document.getElementById("lv-dot").classList.remove("on");
     document.getElementById("lv-status-txt").textContent = "Error";
   }
@@ -384,15 +384,15 @@ function startStream() {
   img.onload = () => {
     document.getElementById("feed-placeholder").style.display = "none";
     img.style.display = "block";
-    document.getElementById("lv-status-txt").textContent = "En línea";
+    document.getElementById("lv-status-txt").textContent = "Online";
     frameCount++;
   };
   img.onerror = () => {
     document.getElementById("feed-placeholder").style.display = "flex";
-    document.getElementById("feed-placeholder-msg").textContent = "Error de conexión con la fuente";
+    document.getElementById("feed-placeholder-msg").textContent = "Error connecting to source";
     img.style.display = "none";
     document.getElementById("lv-dot").classList.remove("on");
-    document.getElementById("lv-status-txt").textContent = "Sin señal";
+    document.getElementById("lv-status-txt").textContent = "No signal";
   };
   img.src = `/api/armas/stream/${SOURCE_ID}`;
 }
@@ -429,7 +429,7 @@ function updateStats(d) {
       const tsEl = document.getElementById("alerta-ts");
       if (tsEl && d.alert_timestamp) {
         const dts = new Date(d.alert_timestamp * 1000);
-        tsEl.textContent = dts.toLocaleTimeString("es-MX", {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+        tsEl.textContent = dts.toLocaleTimeString("en-US", {hour:"2-digit", minute:"2-digit", second:"2-digit"});
       }
     } else {
       alertaSec.style.display = "none";
@@ -442,7 +442,7 @@ function updateStats(d) {
   // Actualizar timestamp
   const now = new Date();
   document.getElementById("lv-ts").textContent =
-    now.toLocaleTimeString("es-MX", {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+    now.toLocaleTimeString("en-US", {hour:"2-digit", minute:"2-digit", second:"2-digit"});
 }
 
 // ── Galería de capturas ───────────────────────────────────────────────────
@@ -467,7 +467,7 @@ function renderCaptures(captures) {
 
     let groupEl = document.getElementById(`cap-group-${tid}`);
     const isArma = String(tid).startsWith("arma_");
-    const idLabel = isArma ? `Arma #${tid.replace("arma_","")}` : `ID #${tid}`;
+    const idLabel = isArma ? `Weapon #${tid.replace("arma_","")}` : `ID #${tid}`;
 
     if (!groupEl) {
       groupEl = document.createElement("div");
@@ -492,7 +492,7 @@ function renderCaptures(captures) {
       const img = document.createElement("img");
       img.className = "cap-thumb";
       img.src = url;
-      img.alt = `Captura ${idLabel}`;
+      img.alt = `Capture ${idLabel}`;
       img.loading = "lazy";
       img.addEventListener("click", () => openLightbox(url));
       grid.appendChild(img);
@@ -530,7 +530,7 @@ document.getElementById("btn-reset").addEventListener("click", async () => {
   capturesSnapshot = {};
   document.getElementById("cap-groups").innerHTML = `
     <p style="font-size:0.75rem;color:#1a3050;font-style:italic" id="cap-empty-msg">
-      Las capturas aparecerán aquí cuando se detecte un arma y se active la captura de rostro.
+      Captures will appear here when a weapon is detected and face capture is active.
     </p>`;
   document.getElementById("cnt-total-armas").textContent = "0";
   document.getElementById("cnt-capturas").textContent = "0";
@@ -546,9 +546,9 @@ document.getElementById("btn-stop").addEventListener("click", async () => {
   document.getElementById("lv-feed-img").src = "";
   document.getElementById("lv-feed-img").style.display = "none";
   document.getElementById("feed-placeholder").style.display = "flex";
-  document.getElementById("feed-placeholder-msg").textContent = "Análisis detenido";
+  document.getElementById("feed-placeholder-msg").textContent = "Analysis stopped";
   document.getElementById("lv-dot").classList.remove("on");
-  document.getElementById("lv-status-txt").textContent = "Detenido";
+  document.getElementById("lv-status-txt").textContent = "Stopped";
   document.getElementById("lv-fps").textContent = "— fps";
 });
 

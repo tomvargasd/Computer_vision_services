@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% block title %}Configuración · CVVision{% endblock %}
-{% block page_title %}Configuración{% endblock %}
+{% block title %}Settings · CVVision{% endblock %}
+{% block page_title %}Settings{% endblock %}
 
 {% block content %}
 <div class="settings-page">
@@ -8,8 +8,8 @@
   <!-- ══ Tabs principales ════════════════════════════ -->
   <div class="settings-tabs">
     <button class="settings-tab active" data-tab="general">General</button>
-    <button class="settings-tab" data-tab="modulos">Módulos</button>
-    <button class="settings-tab" data-tab="acceso">Acceso</button>
+    <button class="settings-tab" data-tab="modulos">Modules</button>
+    <button class="settings-tab" data-tab="acceso">Access</button>
   </div>
 
   <!-- ══ PANEL: General ═══════════════════════════════ -->
@@ -19,7 +19,7 @@
     <div class="settings-section">
       <div class="settings-section-header">
         <svg class="settings-section-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-        <span class="settings-section-title">Logo del sistema</span>
+        <span class="settings-section-title">System logo</span>
       </div>
       <div class="settings-section-body">
         <div class="logo-preview-wrap">
@@ -27,7 +27,7 @@
             {% if settings.logo %}
               <img id="logo-preview-img"
                    src="{{ url_for('static', filename='uploads/' ~ settings.logo) }}"
-                   alt="Logo actual"/>
+                   alt="Current logo"/>
             {% else %}
               <svg id="logo-preview-placeholder" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
             {% endif %}
@@ -35,11 +35,11 @@
           <div class="upload-area">
             <label class="upload-label" for="logo-file-input">
               <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              Subir logo
+              Upload logo
             </label>
             <input type="file" id="logo-file-input" accept=".png,.jpg,.jpeg,.svg,.webp,.gif"/>
-            <span class="upload-hint">PNG, JPG, SVG o WEBP · máx. 2 MB</span>
-            <div class="settings-toast" id="logo-toast">✓ Logo actualizado correctamente</div>
+            <span class="upload-hint">PNG, JPG, SVG or WEBP · max 2 MB</span>
+            <div class="settings-toast" id="logo-toast">✓ Logo updated successfully</div>
           </div>
         </div>
       </div>
@@ -49,17 +49,17 @@
     <div class="settings-section">
       <div class="settings-section-header">
         <svg class="settings-section-icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-        <span class="settings-section-title">Identidad del sistema</span>
+        <span class="settings-section-title">System identity</span>
       </div>
       <div class="settings-section-body">
         <div class="settings-field">
-          <label class="settings-label" for="system-name-input">Texto bajo el logo (sidebar)</label>
+          <label class="settings-label" for="system-name-input">Text under the logo (sidebar)</label>
           <input class="settings-input" id="system-name-input" type="text"
                  value="{{ settings.system_name }}" maxlength="40"
-                 placeholder="Ej: Computer Vision"/>
+                 placeholder="e.g. Computer Vision"/>
         </div>
-        <button class="settings-save-btn" id="save-name-btn">Guardar</button>
-        <div class="settings-toast" id="name-toast">✓ Nombre actualizado</div>
+        <button class="settings-save-btn" id="save-name-btn">Save</button>
+        <div class="settings-toast" id="name-toast">✓ Name updated</div>
       </div>
     </div>
 
@@ -67,11 +67,11 @@
     <div class="settings-section">
       <div class="settings-section-header">
         <svg class="settings-section-icon" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-        <span class="settings-section-title">Versión del sistema</span>
+        <span class="settings-section-title">System version</span>
       </div>
       <div class="settings-section-body">
         <div class="settings-field">
-          <label class="settings-label">Versión actual</label>
+          <label class="settings-label">Current version</label>
           <input class="settings-input" type="text" value="{{ settings.version }}" readonly/>
         </div>
       </div>
@@ -81,13 +81,13 @@
     <div class="settings-section">
       <div class="settings-section-header">
         <svg class="settings-section-icon" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-        <span class="settings-section-title">Multi-detección</span>
+        <span class="settings-section-title">Multi-detection</span>
       </div>
       <div class="settings-section-body">
         <div class="param-row" style="min-height:0">
           <div class="param-info">
-            <span class="param-label">Reproducción simultánea</span>
-            <span class="param-desc">Permite ejecutar hasta 4 reproducciones simultáneas entre todos los módulos. Cuando está desactivado, solo un pipeline puede ejecutarse por módulo a la vez.</span>
+            <span class="param-label">Simultaneous playback</span>
+            <span class="param-desc">Allows up to 4 simultaneous playback streams across all modules. When disabled, only one pipeline can run per module at a time.</span>
           </div>
           <div class="param-control">
             <label class="toggle">
@@ -97,7 +97,7 @@
             </label>
           </div>
         </div>
-        <div class="settings-toast" id="multi-toast">✓ Configuración actualizada</div>
+        <div class="settings-toast" id="multi-toast">✓ Settings updated</div>
       </div>
     </div>
 
@@ -105,22 +105,22 @@
     <div class="settings-section">
       <div class="settings-section-header">
         <svg class="settings-section-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/><path d="M13 7h-2v5l4.25 2.52.75-1.23-3.5-2.08V7z"/></svg>
-        <span class="settings-section-title">Integración Gemini IA</span>
+        <span class="settings-section-title">Gemini AI integration</span>
       </div>
       <div class="settings-section-body">
         <div class="settings-field">
-          <label class="settings-label" for="gemini-api-key-input">API Key de Gemini 2.0 Flash</label>
+          <label class="settings-label" for="gemini-api-key-input">Gemini 2.0 Flash API Key</label>
           <div style="display:flex;gap:8px;align-items:center">
             <input class="settings-input" id="gemini-api-key-input" type="password"
                    value="{{ settings.gemini_api_key }}"
                    placeholder="AIzaSy... (Google AI Studio)"
                    style="flex:1"/>
-            <button class="settings-save-btn" id="toggle-gemini-key-visibility" type="button" title="Mostrar/ocultar clave" style="padding:8px 12px;font-size:1rem">👁</button>
+            <button class="settings-save-btn" id="toggle-gemini-key-visibility" type="button" title="Show/hide key" style="padding:8px 12px;font-size:1rem">👁</button>
           </div>
-          <span class="upload-hint">Obtén tu API key en <a href="https://aistudio.google.com" target="_blank" style="color:#182A55;font-weight:600">Google AI Studio</a> · Solo texto, no se envían imágenes</span>
+          <span class="upload-hint">Get your API key at <a href="https://aistudio.google.com" target="_blank" style="color:#182A55;font-weight:600">Google AI Studio</a> · Text only, no images are sent</span>
         </div>
-        <button class="settings-save-btn" id="save-gemini-key-btn">Guardar API Key</button>
-        <div class="settings-toast" id="gemini-toast">✓ API Key guardada correctamente</div>
+        <button class="settings-save-btn" id="save-gemini-key-btn">Save API Key</button>
+        <div class="settings-toast" id="gemini-toast">✓ API Key saved successfully</div>
       </div>
     </div>
 
@@ -128,10 +128,10 @@
     <div class="settings-section">
       <div class="settings-section-header">
         <svg class="settings-section-icon" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
-        <span class="settings-section-title">Orden de Módulos en el Menú Lateral</span>
+        <span class="settings-section-title">Module order in the side menu</span>
       </div>
       <div class="settings-section-body">
-        <span class="settings-label">Arrastra los módulos para reordenarlos en el sidebar</span>
+        <span class="settings-label">Drag the modules to reorder them in the sidebar</span>
         <div class="modules-sortable-list" id="modules-sortable-list">
           {% set order_raw = settings.get('modules_order', '') %}
           {% if order_raw %}
@@ -142,15 +142,15 @@
           {% for mid in module_order %}
             {% if mid in modules %}
           <div class="sortable-item" draggable="true" data-module-id="{{ mid }}">
-            <span class="sortable-handle" title="Arrastrar">⠿</span>
+            <span class="sortable-handle" title="Drag">⠿</span>
             <span class="sortable-label">{{ modules[mid].label }}</span>
             <span class="status-dot {% if modules[mid]['enabled'] %}on{% endif %}"></span>
           </div>
             {% endif %}
           {% endfor %}
         </div>
-        <button class="settings-save-btn" id="save-modules-order-btn">Guardar Orden</button>
-        <div class="settings-toast" id="order-toast">✓ Orden guardado correctamente</div>
+        <button class="settings-save-btn" id="save-modules-order-btn">Save Order</button>
+        <div class="settings-toast" id="order-toast">✓ Order saved successfully</div>
       </div>
     </div>
 
@@ -179,31 +179,31 @@
       <div class="settings-section">
         <div class="settings-section-header">
           <svg class="settings-section-icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-          <span class="settings-section-title">Modelo de detección</span>
+          <span class="settings-section-title">Detection model</span>
         </div>
         <div class="settings-section-body">
           <div class="model-info-row">
             <div class="model-current">
-              <span class="model-current-lbl">Modelo activo:</span>
+              <span class="model-current-lbl">Active model:</span>
               <span class="model-current-val" id="model-name-{{ mid }}">
                 {% if settings.get(model_key) %}
                   {{ settings.get(model_key).split('/')[-1] }}
                 {% else %}
-                  Modelo por defecto
+                  Default model
                 {% endif %}
               </span>
             </div>
             <button class="btn-model-remove" id="btn-model-remove-{{ mid }}"
                     style="{% if not settings.get(model_key) %}display:none{% endif %}"
-                    title="Eliminar modelo personalizado">
+                    title="Remove custom model">
               <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-              Quitar modelo
+              Remove model
             </button>
           </div>
           <input type="file" id="model-file-{{ mid }}" accept=".pt" style="display:none"/>
           <label for="model-file-{{ mid }}" class="upload-area upload-area-model" id="upload-model-area-{{ mid }}">
             <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            <span id="model-upload-label-{{ mid }}">Haz clic o arrastra un archivo .pt aquí</span>
+            <span id="model-upload-label-{{ mid }}">Click or drag a .pt file here</span>
           </label>
           <div class="upload-progress" id="model-upload-progress-{{ mid }}" hidden>
             <div class="upload-progress-bar" id="model-upload-bar-{{ mid }}"></div>
@@ -216,31 +216,31 @@
       <div class="settings-section">
         <div class="settings-section-header">
           <svg class="settings-section-icon" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          <span class="settings-section-title">Modelo de Acciones (Pose)</span>
+          <span class="settings-section-title">Action model (Pose)</span>
         </div>
         <div class="settings-section-body">
           <div class="model-info-row">
             <div class="model-current">
-              <span class="model-current-lbl">Modelo activo:</span>
+              <span class="model-current-lbl">Active model:</span>
               <span class="model-current-val" id="pose-model-name-tanques_gas">
                 {% if settings.get('tanques_gas_pose_model') %}
                   {{ settings.get('tanques_gas_pose_model').split('/')[-1] }}
                 {% else %}
-                  Modelo por defecto (yolo11n-pose.pt)
+                  Default model (yolo11n-pose.pt)
                 {% endif %}
               </span>
             </div>
             <button class="btn-model-remove" id="btn-pose-model-remove-tanques_gas"
                     style="{% if not settings.get('tanques_gas_pose_model') %}display:none{% endif %}"
-                    title="Eliminar modelo personalizado">
+                    title="Remove custom model">
               <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-              Quitar modelo
+              Remove model
             </button>
           </div>
           <input type="file" id="pose-model-file-tanques_gas" accept=".pt" style="display:none"/>
           <label for="pose-model-file-tanques_gas" class="upload-area upload-area-model" id="upload-pose-model-area-tanques_gas">
             <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            <span id="pose-model-upload-label-tanques_gas">Subir modelo .pt para detección de acciones</span>
+            <span id="pose-model-upload-label-tanques_gas">Upload .pt model for action detection</span>
           </label>
           <div class="upload-progress" id="pose-model-upload-progress-tanques_gas" hidden>
             <div class="upload-progress-bar" id="pose-model-upload-bar-tanques_gas"></div>
@@ -251,31 +251,31 @@
       <div class="settings-section">
         <div class="settings-section-header">
           <svg class="settings-section-icon" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          <span class="settings-section-title">Modelo de Humo/Fuego</span>
+          <span class="settings-section-title">Smoke/Fire model</span>
         </div>
         <div class="settings-section-body">
           <div class="model-info-row">
             <div class="model-current">
-              <span class="model-current-lbl">Modelo activo:</span>
+              <span class="model-current-lbl">Active model:</span>
               <span class="model-current-val" id="smoke-model-name-tanques_gas">
                 {% if settings.get('tanques_gas_smoke_model') %}
                   {{ settings.get('tanques_gas_smoke_model').split('/')[-1] }}
                 {% else %}
-                  Modelo por defecto (yolo11n.pt)
+                  Default model (yolo11n.pt)
                 {% endif %}
               </span>
             </div>
             <button class="btn-model-remove" id="btn-smoke-model-remove-tanques_gas"
                     style="{% if not settings.get('tanques_gas_smoke_model') %}display:none{% endif %}"
-                    title="Eliminar modelo personalizado">
+                    title="Remove custom model">
               <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-              Quitar modelo
+              Remove model
             </button>
           </div>
           <input type="file" id="smoke-model-file-tanques_gas" accept=".pt" style="display:none"/>
           <label for="smoke-model-file-tanques_gas" class="upload-area upload-area-model" id="upload-smoke-model-area-tanques_gas">
             <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            <span id="smoke-model-upload-label-tanques_gas">Subir modelo .pt para detección de humo/fuego</span>
+            <span id="smoke-model-upload-label-tanques_gas">Upload .pt model for smoke/fire detection</span>
           </label>
           <div class="upload-progress" id="smoke-model-upload-progress-tanques_gas" hidden>
             <div class="upload-progress-bar" id="smoke-model-upload-bar-tanques_gas"></div>
@@ -288,13 +288,13 @@
       <div class="settings-section">
         <div class="settings-section-header">
           <svg class="settings-section-icon" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          <span class="settings-section-title">Umbral de Humo/Fuego</span>
+          <span class="settings-section-title">Smoke/Fire threshold</span>
         </div>
         <div class="settings-section-body">
           <div class="param-row">
             <div class="param-info">
-              <span class="param-label">Confianza mínima</span>
-              <span class="param-desc">Umbral de detección para el modelo de humo/fuego (0 – 100 %)</span>
+              <span class="param-label">Minimum confidence</span>
+              <span class="param-desc">Detection threshold for the smoke/fire model (0 – 100%)</span>
             </div>
             <div class="param-control">
               <input type="range" class="conf-slider" id="smoke-conf-slider-tanques_gas"
@@ -311,31 +311,31 @@
       <div class="settings-section">
         <div class="settings-section-header">
           <svg class="settings-section-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="14" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          <span class="settings-section-title">Modelo de Placas</span>
+          <span class="settings-section-title">Plate model</span>
         </div>
         <div class="settings-section-body">
           <div class="model-info-row">
             <div class="model-current">
-              <span class="model-current-lbl">Modelo activo:</span>
+              <span class="model-current-lbl">Active model:</span>
               <span class="model-current-val" id="plate-model-name-vehiculos">
                 {% if settings.get('vehiculos_plate_model') %}
                   {{ settings.get('vehiculos_plate_model').split('/')[-1] }}
                 {% else %}
-                  No hay modelo de placas
+                  No plate model
                 {% endif %}
               </span>
             </div>
             <button class="btn-model-remove" id="btn-plate-model-remove-vehiculos"
                     style="{% if not settings.get('vehiculos_plate_model') %}display:none{% endif %}"
-                    title="Eliminar modelo de placas">
+                    title="Remove plate model">
               <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-              Quitar modelo
+              Remove model
             </button>
           </div>
           <input type="file" id="plate-model-file-vehiculos" accept=".pt" style="display:none"/>
           <label for="plate-model-file-vehiculos" class="upload-area upload-area-model" id="upload-plate-model-area-vehiculos">
             <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            <span id="plate-model-upload-label-vehiculos">Subir modelo .pt para detección de placas</span>
+            <span id="plate-model-upload-label-vehiculos">Upload .pt model for license plate detection</span>
           </label>
           <div class="upload-progress" id="plate-model-upload-progress-vehiculos" hidden>
             <div class="upload-progress-bar" id="plate-model-upload-bar-vehiculos"></div>
@@ -348,13 +348,13 @@
       <div class="settings-section">
         <div class="settings-section-header">
           <svg class="settings-section-icon" viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
-          <span class="settings-section-title">Parámetros de detección</span>
+          <span class="settings-section-title">Detection parameters</span>
         </div>
         <div class="settings-section-body">
           <div class="param-row">
             <div class="param-info">
-              <span class="param-label">Umbral de confianza</span>
-              <span class="param-desc">Confianza mínima para aceptar una detección (0 – 100 %)</span>
+              <span class="param-label">Confidence threshold</span>
+              <span class="param-desc">Minimum confidence to accept a detection (0 – 100%)</span>
             </div>
             <div class="param-control">
               <input type="range" class="conf-slider" id="conf-slider-{{ mid }}"
@@ -364,8 +364,8 @@
           </div>
           <div class="param-row param-row-divider">
             <div class="param-info">
-              <span class="param-label">Precisión media (FP16)</span>
-              <span class="param-desc">Reduce uso de memoria y acelera inferencia en GPU/MPS compatible</span>
+              <span class="param-label">Half precision (FP16)</span>
+              <span class="param-desc">Reduces memory usage and speeds up inference on compatible GPU/MPS</span>
             </div>
             <div class="param-control">
               <label class="toggle">
@@ -378,8 +378,8 @@
           {% set plate_conf_val = ((settings.get('vehiculos_plate_conf') or '0.35') | float * 100) | int %}
           <div class="param-row" style="border-top:1px solid #E8E8EC;padding-top:14px;margin-top:6px">
             <div class="param-info">
-              <span class="param-label">Umbral de placas</span>
-              <span class="param-desc">Confianza mínima para detectar una placa (0 – 100 %)</span>
+              <span class="param-label">Plate threshold</span>
+              <span class="param-desc">Minimum confidence to detect a plate (0 – 100%)</span>
             </div>
             <div class="param-control">
               <input type="range" class="conf-slider" id="plate-conf-slider-vehiculos"
@@ -395,13 +395,13 @@
       <div class="settings-section">
         <div class="settings-section-header">
           <svg class="settings-section-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          <span class="settings-section-title">Timesleep por tipo de fuente</span>
+          <span class="settings-section-title">Timesleep by source type</span>
         </div>
         <div class="settings-section-body">
           <div class="param-row">
             <div class="param-info">
               <span class="param-label">Timesleep · Video</span>
-              <span class="param-desc">Pausa entre frames para archivos de video (segundos)</span>
+              <span class="param-desc">Pause between frames for video files (seconds)</span>
             </div>
             <div class="param-control">
               <input type="number" class="fps-input" data-module="{{ mid }}" data-src-type="video"
@@ -412,7 +412,7 @@
           <div class="param-row">
             <div class="param-info">
               <span class="param-label">Timesleep · Stream</span>
-              <span class="param-desc">Pausa entre frames para fuentes en vivo / RTSP (segundos)</span>
+              <span class="param-desc">Pause between frames for live / RTSP sources (seconds)</span>
             </div>
             <div class="param-control">
               <input type="number" class="fps-input" data-module="{{ mid }}" data-src-type="stream"
@@ -420,7 +420,7 @@
                      value="{{ settings.get(mid ~ '_fps_limit_stream', '0.0') }}">
             </div>
           </div>
-          <div class="settings-toast" id="fps-toast-{{ mid }}">✓ Timesleep actualizado</div>
+          <div class="settings-toast" id="fps-toast-{{ mid }}">✓ Timesleep updated</div>
         </div>
       </div>
       </div>
@@ -430,14 +430,14 @@
       <div class="settings-section">
         <div class="settings-section-header">
           <svg class="settings-section-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-          <span class="settings-section-title">Clases a detectar</span>
+          <span class="settings-section-title">Classes to detect</span>
         </div>
         <div class="settings-section-body">
-          <span class="settings-label" style="margin-bottom:-6px">Selecciona qué clases detectar y dibujar en pantalla:</span>
-          {% for cid, clbl in {'0': 'Pallet', '1': 'Montacargas', '2': 'Montacargas ocupado', '3': 'Pass / Peatón'}.items() %}
+          <span class="settings-label" style="margin-bottom:-6px">Select which classes to detect and draw on screen:</span>
+          {% for cid, clbl in {'0': 'Pallet', '1': 'Forklift', '2': 'Occupied forklift', '3': 'Pass / Pedestrian'}.items() %}
           <div class="param-row" style="min-height:0;padding-top:0">
             <div class="param-info">
-              <span class="param-label">{{ clbl }} <span class="param-desc" style="display:inline">(clase {{ cid }})</span></span>
+              <span class="param-label">{{ clbl }} <span class="param-desc" style="display:inline">(class {{ cid }})</span></span>
             </div>
             <div class="param-control">
               <label class="toggle">
@@ -456,12 +456,12 @@
       <div class="settings-section">
         <div class="settings-section-header">
           <svg class="settings-section-icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3 8 12 13 21 8"/></svg>
-          <span class="settings-section-title">Modelos de carga</span>
+          <span class="settings-section-title">Load models</span>
         </div>
         <div class="settings-section-body" id="carga-models-list">
-          <span class="settings-label">Agrega modelos .pt con nombre y selecciona las clases a contar:</span>
+          <span class="settings-label">Add named .pt models and select the classes to count:</span>
           <div id="carga-models-container"></div>
-          <button class="btn" id="add-carga-model" style="margin-top:10px">+ Agregar modelo</button>
+          <button class="btn" id="add-carga-model" style="margin-top:10px">+ Add model</button>
         </div>
       </div>
       {% endif %}
@@ -478,18 +478,18 @@
     <div class="access-section">
       <div class="access-section-title">
         <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:#16A34A;fill:none;stroke-width:2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        Acceso Total
+        Full access
       </div>
       <div class="access-add-form">
-        <input type="email" id="new-full-email" placeholder="Correo electrónico" />
-        <input type="text" id="new-full-pass" placeholder="Clave" />
-        <button class="btn-gen" type="button" onclick="genPass('full')">Generar</button>
-        <button class="btn-add" type="button" onclick="addAccount('full')">Agregar</button>
+        <input type="email" id="new-full-email" placeholder="Email" />
+        <input type="text" id="new-full-pass" placeholder="Password" />
+        <button class="btn-gen" type="button" onclick="genPass('full')">Generate</button>
+        <button class="btn-add" type="button" onclick="addAccount('full')">Add</button>
       </div>
       <div class="access-password-reveal" id="pw-reveal-full"></div>
       <div class="access-table-wrap">
         <table class="access-table" id="full-accounts-table">
-          <thead><tr><th>Correo</th><th>Creado</th><th>Acciones</th></tr></thead>
+          <thead><tr><th>Email</th><th>Created</th><th>Actions</th></tr></thead>
           <tbody id="full-accounts-body"></tbody>
         </table>
       </div>
@@ -499,18 +499,18 @@
     <div class="access-section">
       <div class="access-section-title">
         <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:#CA8A04;fill:none;stroke-width:2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        Acceso Limitado
+        Limited access
       </div>
       <div class="access-add-form">
-        <input type="email" id="new-limited-email" placeholder="Correo electrónico" />
-        <input type="text" id="new-limited-pass" placeholder="Clave" />
-        <button class="btn-gen" type="button" onclick="genPass('limited')">Generar</button>
-        <button class="btn-add" type="button" onclick="addAccount('limited')">Agregar</button>
+        <input type="email" id="new-limited-email" placeholder="Email" />
+        <input type="text" id="new-limited-pass" placeholder="Password" />
+        <button class="btn-gen" type="button" onclick="genPass('limited')">Generate</button>
+        <button class="btn-add" type="button" onclick="addAccount('limited')">Add</button>
       </div>
       <div class="access-password-reveal" id="pw-reveal-limited"></div>
       <div class="access-table-wrap">
         <table class="access-table" id="limited-accounts-table">
-          <thead><tr><th>Correo</th><th>Creado</th><th>Acciones</th></tr></thead>
+          <thead><tr><th>Email</th><th>Created</th><th>Actions</th></tr></thead>
           <tbody id="limited-accounts-body"></tbody>
         </table>
       </div>
@@ -519,7 +519,7 @@
       <div style="margin-top:16px">
         <div class="settings-section-header" style="margin-bottom:8px">
           <svg class="settings-section-icon" viewBox="0 0 24 24" style="width:16px;height:16px"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          <span class="settings-section-title">Módulos visibles para acceso limitado</span>
+          <span class="settings-section-title">Modules visible for limited access</span>
         </div>
         <div class="access-mod-perms" id="limited-mod-perms">
           {% for mid, meta in modules.items() %}
@@ -530,8 +530,8 @@
           </label>
           {% endfor %}
         </div>
-        <button class="settings-save-btn" onclick="saveLimitedModules()">Guardar módulos permitidos</button>
-        <div class="settings-toast" id="mod-perms-toast">✓ Módulos actualizados</div>
+        <button class="settings-save-btn" onclick="saveLimitedModules()">Save allowed modules</button>
+        <div class="settings-toast" id="mod-perms-toast">✓ Modules updated</div>
       </div>
     </div>
 
@@ -539,16 +539,16 @@
     <div class="access-section">
       <div class="access-section-title">
         <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:#DC2626;fill:none;stroke-width:2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
-        Lista Negra de IPs
+        IP blacklist
       </div>
       <div class="access-add-form">
-        <input type="text" id="block-ip-input" placeholder="IP a bloquear (ej: 192.168.1.100)" />
-        <input type="text" id="block-ip-reason" placeholder="Motivo (opcional)" />
-        <button class="btn-add" onclick="blockIP()">Bloquear IP</button>
+        <input type="text" id="block-ip-input" placeholder="IP to block (e.g. 192.168.1.100)" />
+        <input type="text" id="block-ip-reason" placeholder="Reason (optional)" />
+        <button class="btn-add" onclick="blockIP()">Block IP</button>
       </div>
       <div class="access-table-wrap">
         <table class="access-table">
-          <thead><tr><th>IP</th><th>Motivo</th><th>Bloqueado por</th><th>Fecha</th><th></th></tr></thead>
+          <thead><tr><th>IP</th><th>Reason</th><th>Blocked by</th><th>Date</th><th></th></tr></thead>
           <tbody id="blacklist-body"></tbody>
         </table>
       </div>
@@ -558,16 +558,16 @@
     <div class="access-section">
       <div class="access-section-title">
         <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:#182A55;fill:none;stroke-width:2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-        Historial de Accesos
+        Access history
       </div>
       <div class="access-add-form">
-        <input type="email" id="log-email-filter" placeholder="Filtrar por correo..." style="max-width:250px" />
-        <button class="btn-gen" onclick="loadLogs(1)">Filtrar</button>
-        <button class="btn-gen" onclick="document.getElementById('log-email-filter').value='';loadLogs(1)">Limpiar</button>
+        <input type="email" id="log-email-filter" placeholder="Filter by email..." style="max-width:250px" />
+        <button class="btn-gen" onclick="loadLogs(1)">Filter</button>
+        <button class="btn-gen" onclick="document.getElementById('log-email-filter').value='';loadLogs(1)">Clear</button>
       </div>
       <div class="access-table-wrap">
         <table class="access-table">
-          <thead><tr><th>Correo</th><th>Acción</th><th>IP</th><th>Ubicación</th><th>Fecha</th></tr></thead>
+          <thead><tr><th>Email</th><th>Action</th><th>IP</th><th>Location</th><th>Date</th></tr></thead>
           <tbody id="logs-body"></tbody>
         </table>
       </div>
@@ -610,7 +610,7 @@ document.getElementById("logo-file-input").addEventListener("change", async (e) 
   try {
     const res  = await fetch("/api/settings/logo", { method: "POST", body: form });
     const data = await res.json();
-    if (!res.ok) { alert(data.error || "Error al subir logo"); return; }
+    if (!res.ok) { alert(data.error || "Error uploading logo"); return; }
     const reader = new FileReader();
     reader.onload = (ev) => {
       const box = document.getElementById("logo-preview-box");
@@ -683,8 +683,8 @@ function doUploadModel(modId, file) {
   const modelName   = document.getElementById("model-name-" + modId);
   const btnRemove   = document.getElementById("btn-model-remove-" + modId);
 
-  if (!file.name.endsWith(".pt")) { alert("Solo se permiten archivos .pt"); return; }
-  modelLabel.textContent = `Subiendo: ${file.name}…`;
+  if (!file.name.endsWith(".pt")) { alert("Only .pt files are allowed"); return; }
+  modelLabel.textContent = `Uploading: ${file.name}…`;
   modelProg.hidden = false;
   modelBar.style.width = "0%";
 
@@ -699,15 +699,15 @@ function doUploadModel(modId, file) {
     if (xhr.status === 200) {
       const d = JSON.parse(xhr.responseText);
       modelBar.style.width = "100%";
-      modelLabel.textContent = "Haz clic para cambiar el modelo";
+      modelLabel.textContent = "Click to change the model";
       if (modelName) modelName.textContent = d.model;
       if (btnRemove) btnRemove.style.display = "";
     } else {
-      modelLabel.textContent = "Error al subir el modelo";
+      modelLabel.textContent = "Error uploading the model";
       modelProg.hidden = true;
     }
   };
-  xhr.onerror = () => { modelLabel.textContent = "Error de red"; };
+  xhr.onerror = () => { modelLabel.textContent = "Network error"; };
   xhr.send(fd);
 }
 
@@ -715,14 +715,14 @@ ALL_MIDS.forEach(mid => {
   const btnRemove = document.getElementById("btn-model-remove-" + mid);
   if (btnRemove) {
     btnRemove.addEventListener("click", async () => {
-      if (!confirm("¿Eliminar el modelo personalizado y usar el modelo por defecto?")) return;
+      if (!confirm("Delete the custom model and use the default model?")) return;
       const r = await fetch(`/api/${mid}/model`, { method: "DELETE" });
       if (r.ok) {
         const modelName = document.getElementById("model-name-" + mid);
         const modelLabel = document.getElementById("model-upload-label-" + mid);
         const modelProg = document.getElementById("model-upload-progress-" + mid);
-        if (modelName) modelName.textContent = "Modelo por defecto";
-        if (modelLabel) modelLabel.textContent = "Subir modelo .pt personalizado";
+        if (modelName) modelName.textContent = "Default model";
+        if (modelLabel) modelLabel.textContent = "Upload custom .pt model";
         if (modelProg) modelProg.hidden = true;
         btnRemove.style.display = "none";
       }
@@ -748,7 +748,7 @@ ALL_MIDS.forEach(mid => {
           body: JSON.stringify({ conf }),
         });
         if (!r.ok) throw new Error(await r.text());
-      } catch (e) { console.error("Error guardando umbral:", e); }
+      } catch (e) { console.error("Error saving threshold:", e); }
     }, 600);
   });
 });
@@ -765,7 +765,7 @@ document.querySelectorAll(".half-toggle").forEach(toggle => {
       });
       if (!r.ok) throw new Error(await r.text());
     } catch (e) {
-      console.error("Error guardando FP16:", e);
+      console.error("Error saving FP16:", e);
       toggle.checked = !toggle.checked;
     }
   });
@@ -791,7 +791,7 @@ document.querySelectorAll(".fps-input").forEach(input => {
         const toast = document.getElementById("fps-toast-" + mid);
         if (toast) { toast.classList.add("show"); setTimeout(() => toast.classList.remove("show"), 2000); }
       } catch (e) {
-        console.error("Error guardando timesleep:", e);
+        console.error("Error saving timesleep:", e);
       }
     }, 400);
   });
@@ -819,8 +819,8 @@ if (poseArea) {
 }
 
 function uploadPoseModel(file) {
-  if (!file.name.endsWith(".pt")) { alert("Solo se permiten archivos .pt"); return; }
-  poseLabel.textContent = `Subiendo: ${file.name}…`;
+  if (!file.name.endsWith(".pt")) { alert("Only .pt files are allowed"); return; }
+  poseLabel.textContent = `Uploading: ${file.name}…`;
   poseProg.hidden = false;
   poseBar.style.width = "0%";
   const fd = new FormData();
@@ -834,29 +834,29 @@ function uploadPoseModel(file) {
     if (xhr.status === 200) {
       const d = JSON.parse(xhr.responseText);
       poseBar.style.width = "100%";
-      poseLabel.textContent = "Haz clic para cambiar el modelo";
+      poseLabel.textContent = "Click to change the model";
       if (poseName) poseName.textContent = d.model;
       if (poseRemove) poseRemove.style.display = "";
     } else {
-      poseLabel.textContent = "Error al subir el modelo";
+      poseLabel.textContent = "Error uploading the model";
       poseProg.hidden = true;
     }
   };
-  xhr.onerror = () => { poseLabel.textContent = "Error de red"; };
+  xhr.onerror = () => { poseLabel.textContent = "Network error"; };
   xhr.send(fd);
 }
 
 if (poseRemove) {
   poseRemove.addEventListener("click", async () => {
-    if (!confirm("¿Eliminar el modelo de pose y usar el modelo por defecto?")) return;
+    if (!confirm("Delete the pose model and use the default model?")) return;
     const r = await fetch("/api/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tanques_gas_pose_model: "" }),
     });
     if (r.ok) {
-      if (poseName) poseName.textContent = "Modelo por defecto (yolo11n-pose.pt)";
-      if (poseLabel) poseLabel.textContent = "Subir modelo .pt para detección de acciones";
+      if (poseName) poseName.textContent = "Default model (yolo11n-pose.pt)";
+      if (poseLabel) poseLabel.textContent = "Upload .pt model for action detection";
       if (poseProg) poseProg.hidden = true;
       poseRemove.style.display = "none";
     }
@@ -885,8 +885,8 @@ if (smokeArea) {
 }
 
 function uploadSmokeModel(file) {
-  if (!file.name.endsWith(".pt")) { alert("Solo se permiten archivos .pt"); return; }
-  smokeLabel.textContent = `Subiendo: ${file.name}…`;
+  if (!file.name.endsWith(".pt")) { alert("Only .pt files are allowed"); return; }
+  smokeLabel.textContent = `Uploading: ${file.name}…`;
   smokeProg.hidden = false;
   smokeBar.style.width = "0%";
   const fd = new FormData();
@@ -900,29 +900,29 @@ function uploadSmokeModel(file) {
     if (xhr.status === 200) {
       const d = JSON.parse(xhr.responseText);
       smokeBar.style.width = "100%";
-      smokeLabel.textContent = "Haz clic para cambiar el modelo";
+      smokeLabel.textContent = "Click to change the model";
       if (smokeName) smokeName.textContent = d.model;
       if (smokeRemove) smokeRemove.style.display = "";
     } else {
-      smokeLabel.textContent = "Error al subir el modelo";
+      smokeLabel.textContent = "Error uploading the model";
       smokeProg.hidden = true;
     }
   };
-  xhr.onerror = () => { smokeLabel.textContent = "Error de red"; };
+  xhr.onerror = () => { smokeLabel.textContent = "Network error"; };
   xhr.send(fd);
 }
 
 if (smokeRemove) {
   smokeRemove.addEventListener("click", async () => {
-    if (!confirm("¿Eliminar el modelo de humo/fuego y usar el modelo por defecto?")) return;
+    if (!confirm("Delete the smoke/fire model and use the default model?")) return;
     const r = await fetch("/api/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tanques_gas_smoke_model: "" }),
     });
     if (r.ok) {
-      if (smokeName) smokeName.textContent = "Modelo por defecto (yolo11n.pt)";
-      if (smokeLabel) smokeLabel.textContent = "Subir modelo .pt para detección de humo/fuego";
+      if (smokeName) smokeName.textContent = "Default model (yolo11n.pt)";
+      if (smokeLabel) smokeLabel.textContent = "Upload .pt model for smoke/fire detection";
       if (smokeProg) smokeProg.hidden = true;
       smokeRemove.style.display = "none";
     }
@@ -951,8 +951,8 @@ if (plateArea) {
 }
 
 function uploadPlateModel(file) {
-  if (!file.name.endsWith(".pt")) { alert("Solo se permiten archivos .pt"); return; }
-  plateLabel.textContent = `Subiendo: ${file.name}…`;
+  if (!file.name.endsWith(".pt")) { alert("Only .pt files are allowed"); return; }
+  plateLabel.textContent = `Uploading: ${file.name}…`;
   plateProg.hidden = false;
   plateBar.style.width = "0%";
   const fd = new FormData();
@@ -966,29 +966,29 @@ function uploadPlateModel(file) {
     if (xhr.status === 200) {
       const d = JSON.parse(xhr.responseText);
       plateBar.style.width = "100%";
-      plateLabel.textContent = "Haz clic para cambiar el modelo";
+      plateLabel.textContent = "Click to change the model";
       if (plateName) plateName.textContent = d.model;
       if (plateRemove) plateRemove.style.display = "";
     } else {
-      plateLabel.textContent = "Error al subir el modelo";
+      plateLabel.textContent = "Error uploading the model";
       plateProg.hidden = true;
     }
   };
-  xhr.onerror = () => { plateLabel.textContent = "Error de red"; };
+  xhr.onerror = () => { plateLabel.textContent = "Network error"; };
   xhr.send(fd);
 }
 
 if (plateRemove) {
   plateRemove.addEventListener("click", async () => {
-    if (!confirm("¿Eliminar el modelo de placas y usar detección por visión?")) return;
+    if (!confirm("Delete the plate model and use vision-based detection?")) return;
     const r = await fetch("/api/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ vehiculos_plate_model: "" }),
     });
     if (r.ok) {
-      if (plateName) plateName.textContent = "No hay modelo de placas";
-      if (plateLabel) plateLabel.textContent = "Subir modelo .pt para detección de placas";
+      if (plateName) plateName.textContent = "No plate model";
+      if (plateLabel) plateLabel.textContent = "Upload .pt model for license plate detection";
       if (plateProg) plateProg.hidden = true;
       plateRemove.style.display = "none";
     }
@@ -1012,7 +1012,7 @@ if (plateSlider) {
           body: JSON.stringify({ vehiculos_plate_conf: String(conf) }),
         });
         if (!r.ok) throw new Error(await r.text());
-      } catch (e) { console.error("Error guardando umbral de placas:", e); }
+      } catch (e) { console.error("Error saving plate threshold:", e); }
     }, 600);
   });
 }
@@ -1033,7 +1033,7 @@ if (smokeSlider) {
           body: JSON.stringify({ tanques_gas_smoke_conf: String(conf) }),
         });
         if (!r.ok) throw new Error(await r.text());
-      } catch (e) { console.error("Error guardando umbral de humo:", e); }
+      } catch (e) { console.error("Error saving smoke threshold:", e); }
     }, 600);
   });
 }
@@ -1056,7 +1056,7 @@ document.querySelectorAll(".pallets-class-toggle").forEach(toggle => {
       });
       if (!r.ok) throw new Error(await r.text());
     } catch (e) {
-      console.error("Error guardando clases:", e);
+      console.error("Error saving classes:", e);
       toggle.checked = !toggle.checked;
     }
   });
@@ -1072,7 +1072,7 @@ async function loadCargaModels() {
     cargaModels = await r.json();
     renderCargaModels();
   } catch (e) {
-    console.error("Error cargando modelos:", e);
+    console.error("Error loading models:", e);
   }
 }
 
@@ -1080,23 +1080,23 @@ function renderCargaModels() {
   const container = document.getElementById("carga-models-container");
   if (!container) return;
   if (cargaModels.length === 0) {
-    container.innerHTML = '<p style="font-size:0.75rem;color:#9D9FA2;padding:8px 0">No hay modelos agregados aún.</p>';
+    container.innerHTML = '<p style="font-size:0.75rem;color:#9D9FA2;padding:8px 0">No models added yet.</p>';
     return;
   }
   container.innerHTML = cargaModels.map((m, i) => `
     <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #E8E8EC">
       <div style="flex:1;min-width:0">
         <div style="font-size:0.78rem;font-weight:600;color:#182A55">${m.name}</div>
-        <div style="font-size:0.65rem;color:#9D9FA2">${m.path.split('/').pop()} · Clases: ${m.classes || 'todas'}</div>
+        <div style="font-size:0.65rem;color:#9D9FA2">${m.path.split('/').pop()} · Classes: ${m.classes || 'all'}</div>
       </div>
-      <button class="btn" style="font-size:0.65rem;padding:4px 10px" onclick="editCargaModel(${i})">Editar</button>
+      <button class="btn" style="font-size:0.65rem;padding:4px 10px" onclick="editCargaModel(${i})">Edit</button>
       <button class="btn" style="font-size:0.65rem;padding:4px 10px;color:#EF4444" onclick="deleteCargaModel(${i})">✕</button>
     </div>
   `).join("");
 }
 
 async function addCargaModel() {
-  const name = prompt("Nombre del modelo (ej: Cajas pequeñas):");
+  const name = prompt("Model name (e.g. Small boxes):");
   if (!name || !name.trim()) return;
   const input = document.createElement("input");
   input.type = "file";
@@ -1112,12 +1112,12 @@ async function addCargaModel() {
       });
       if (!r.ok) throw new Error(await r.text());
       const data = await r.json();
-      const classes = prompt("Clases a contar (separadas por coma, ej: 0,1,2). Vacío = todas:") || "";
+      const classes = prompt("Classes to count (comma-separated, e.g. 0,1,2). Empty = all:") || "";
       cargaModels.push({ name: name.trim(), path: data.path, classes });
       await saveCargaModels();
       loadCargaModels();
     } catch (e) {
-      alert("Error subiendo modelo: " + e.message);
+      alert("Error uploading model: " + e.message);
     }
   };
   input.click();
@@ -1126,16 +1126,16 @@ async function addCargaModel() {
 function editCargaModel(idx) {
   const m = cargaModels[idx];
   if (!m) return;
-  const name = prompt("Nombre del modelo:", m.name);
+  const name = prompt("Model name:", m.name);
   if (!name || !name.trim()) return;
-  const classes = prompt("Clases a contar (separadas por coma):", m.classes);
+  const classes = prompt("Classes to count (comma-separated):", m.classes);
   cargaModels[idx] = { ...m, name: name.trim(), classes: classes ?? "" };
   saveCargaModels();
   loadCargaModels();
 }
 
 async function deleteCargaModel(idx) {
-  if (!confirm("¿Eliminar este modelo?")) return;
+  if (!confirm("Delete this model?")) return;
   cargaModels.splice(idx, 1);
   await saveCargaModels();
   loadCargaModels();
@@ -1149,7 +1149,7 @@ async function saveCargaModels() {
       body: JSON.stringify({ models: cargaModels }),
     });
   } catch (e) {
-    console.error("Error guardando modelos:", e);
+    console.error("Error saving models:", e);
   }
 }
 
@@ -1164,7 +1164,7 @@ document.getElementById("multi-detection-toggle").addEventListener("change", asy
     if (!res.ok) throw new Error(await res.text());
     showToast("multi-toast");
   } catch (e) {
-    console.error("Error guardando multi-detección:", e);
+    console.error("Error saving multi-detection:", e);
     this.checked = !this.checked;
   }
 });
@@ -1276,7 +1276,7 @@ function genPass(prefix) {
 
 function showPwReveal(prefix, pass) {
   var el = document.getElementById('pw-reveal-' + prefix);
-  el.innerHTML = 'Clave generada (guárdala, solo se muestra una vez):<br><span class="pw-value">' + pass + '</span>';
+  el.innerHTML = 'Generated password (save it, only shown once):<br><span class="pw-value">' + pass + '</span>';
   el.className = 'access-password-reveal show';
   setTimeout(function() { el.className = 'access-password-reveal'; }, 15000);
 }
@@ -1284,7 +1284,7 @@ function showPwReveal(prefix, pass) {
 function addAccount(accessType) {
   var email = document.getElementById('new-' + accessType + '-email').value.trim();
   var pass = document.getElementById('new-' + accessType + '-pass').value.trim();
-  if (!email || !pass) { alert('Completa correo y clave'); return; }
+  if (!email || !pass) { alert('Fill in email and password'); return; }
 
   fetch('/api/access/accounts', {
     method: 'POST',
@@ -1299,35 +1299,35 @@ function addAccount(accessType) {
       showPwReveal(accessType, res.data.password);
       loadAccounts();
     } else {
-      alert(res.data.error || 'Error al crear cuenta');
+      alert(res.data.error || 'Error creating account');
     }
   })
-  .catch(function() { alert('Error de conexión'); });
+  .catch(function() { alert('Connection error'); });
 }
 
 function deleteAccount(id, email) {
-  if (!confirm('¿Eliminar cuenta de ' + email + '?')) return;
+  if (!confirm('Delete account for ' + email + '?')) return;
   fetch('/api/access/accounts/' + id, { method: 'DELETE' })
   .then(function(r) { return r.json(); })
   .then(function(d) {
     if (d.deleted) loadAccounts();
     else alert(d.error || 'Error');
   })
-  .catch(function() { alert('Error de conexión'); });
+  .catch(function() { alert('Connection error'); });
 }
 
 function resetPassword(id) {
-  if (!confirm('¿Generar nueva clave para esta cuenta?')) return;
+  if (!confirm('Generate a new password for this account?')) return;
   fetch('/api/access/accounts/' + id + '/reset-password', { method: 'POST' })
   .then(function(r) { return r.json().then(function(d) { return { status: r.status, data: d }; }); })
   .then(function(res) {
     if (res.status === 200) {
-      alert('Nueva clave (guárdala ahora): ' + res.data.password);
+      alert('New password (save it now): ' + res.data.password);
     } else {
       alert(res.data.error || 'Error');
     }
   })
-  .catch(function() { alert('Error de conexión'); });
+  .catch(function() { alert('Connection error'); });
 }
 
 function loadAccounts() {
@@ -1344,8 +1344,8 @@ function loadAccounts() {
       tr.innerHTML = '<td>' + a.email + '</td>' +
         '<td>' + (a.created_at || '') + '</td>' +
         '<td>' +
-        '<button class="access-btn-sm warning" onclick="resetPassword(' + a.id + ')" style="margin-right:4px">Reset clave</button>' +
-        '<button class="access-btn-sm danger" onclick="deleteAccount(' + a.id + ',\'' + a.email.replace(/'/g,"\\'") + '\')">Eliminar</button>' +
+        '<button class="access-btn-sm warning" onclick="resetPassword(' + a.id + ')" style="margin-right:4px">Reset password</button>' +
+        '<button class="access-btn-sm danger" onclick="deleteAccount(' + a.id + ',\'' + a.email.replace(/'/g,"\\'") + '\')">Delete</button>' +
         '</td>';
       if (a.access_type === 'full') fullBody.appendChild(tr);
       else limBody.appendChild(tr);
@@ -1372,7 +1372,7 @@ function saveLimitedModules() {
 function blockIP() {
   var ip = document.getElementById('block-ip-input').value.trim();
   var reason = document.getElementById('block-ip-reason').value.trim();
-  if (!ip) { alert('Ingresa una IP'); return; }
+  if (!ip) { alert('Enter an IP'); return; }
   fetch('/api/access/blacklist', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1388,18 +1388,18 @@ function blockIP() {
       alert(res.data.error || 'Error');
     }
   })
-  .catch(function() { alert('Error de conexión'); });
+  .catch(function() { alert('Connection error'); });
 }
 
 function unblockIP(id) {
-  if (!confirm('¿Desbloquear esta IP?')) return;
+  if (!confirm('Unblock this IP?')) return;
   fetch('/api/access/blacklist/' + id, { method: 'DELETE' })
   .then(function(r) { return r.json(); })
   .then(function(d) {
     if (d.deleted) loadBlacklist();
     else alert(d.error || 'Error');
   })
-  .catch(function() { alert('Error de conexión'); });
+  .catch(function() { alert('Connection error'); });
 }
 
 function loadBlacklist() {
@@ -1415,7 +1415,7 @@ function loadBlacklist() {
         '<td>' + (e.reason || '') + '</td>' +
         '<td>' + (e.created_by || '') + '</td>' +
         '<td>' + (e.created_at || '') + '</td>' +
-        '<td><button class="access-btn-sm danger" onclick="unblockIP(' + e.id + ')">Desbloquear</button></td>';
+        '<td><button class="access-btn-sm danger" onclick="unblockIP(' + e.id + ')">Unblock</button></td>';
       tbody.appendChild(tr);
     });
   })
@@ -1461,14 +1461,14 @@ function loadLogs(page) {
     // Pagination
     var pag = document.getElementById('logs-pagination');
     if (data.pages > 1) {
-      var html = '<button onclick="loadLogs(1)" ' + (data.page <= 1 ? 'disabled' : '') + '>Primera</button>' +
-        '<button onclick="loadLogs(' + (data.page - 1) + ')" ' + (data.page <= 1 ? 'disabled' : '') + '>Anterior</button>' +
-        '<span class="page-info">Página ' + data.page + ' de ' + data.pages + ' (' + data.total + ' registros)</span>' +
-        '<button onclick="loadLogs(' + (data.page + 1) + ')" ' + (data.page >= data.pages ? 'disabled' : '') + '>Siguiente</button>' +
-        '<button onclick="loadLogs(' + data.pages + ')" ' + (data.page >= data.pages ? 'disabled' : '') + '>Última</button>';
+      var html = '<button onclick="loadLogs(1)" ' + (data.page <= 1 ? 'disabled' : '') + '>First</button>' +
+        '<button onclick="loadLogs(' + (data.page - 1) + ')" ' + (data.page <= 1 ? 'disabled' : '') + '>Previous</button>' +
+        '<span class="page-info">Page ' + data.page + ' of ' + data.pages + ' (' + data.total + ' records)</span>' +
+        '<button onclick="loadLogs(' + (data.page + 1) + ')" ' + (data.page >= data.pages ? 'disabled' : '') + '>Next</button>' +
+        '<button onclick="loadLogs(' + data.pages + ')" ' + (data.page >= data.pages ? 'disabled' : '') + '>Last</button>';
       pag.innerHTML = html;
     } else {
-      pag.innerHTML = '<span class="page-info">' + data.total + ' registros</span>';
+      pag.innerHTML = '<span class="page-info">' + data.total + ' records</span>';
     }
   })
   .catch(function() {});

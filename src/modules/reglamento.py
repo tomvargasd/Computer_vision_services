@@ -137,12 +137,12 @@ class AreaPipeline(BasePersistPipeline):
     def _make_error_frame(self, msg: str) -> np.ndarray:
         h, w = 480, 640
         frame = np.zeros((h, w, 3), dtype=np.uint8)
-        cv2.putText(frame, "ERROR DE FUENTE", (int(w * 0.25), h // 2 - 30),
+        cv2.putText(frame, "SOURCE ERROR", (int(w * 0.25), h // 2 - 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.9, (85, 42, 24), 2, cv2.LINE_AA)
         for i, part in enumerate([msg[j:j+55] for j in range(0, min(len(msg), 165), 55)]):
             cv2.putText(frame, part, (20, h // 2 + 10 + i * 28),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.55, (200, 200, 200), 1, cv2.LINE_AA)
-        cv2.putText(frame, "Verifica la ruta o permisos de la fuente", (20, h - 28),
+        cv2.putText(frame, "Check the source path or permissions", (20, h - 28),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.48, (120, 120, 120), 1, cv2.LINE_AA)
         return frame
 
@@ -421,12 +421,12 @@ class AreaPipeline(BasePersistPipeline):
                 if compliance == 'cumplio':
                     self.total_cumplimientos += 1
                     insert_module_event("reglamento", self.source_id,
-                                        "cumplio", f"ID {tid} cumplio reglamento")
+                                        "cumplio", f"ID {tid} complied with regulations")
                 else:
                     self.total_incumplimientos += 1
                     path = self._save_evidence(annotated, tid, boot_st, elapsed)
                     insert_module_event("reglamento", self.source_id,
-                                        "incumplio", f"ID {tid} incumplio reglamento",
+                                        "incumplio", f"ID {tid} violated regulations",
                                         capture_path=f"/static/uploads/captures/reglamento/{os.path.basename(path)}")
 
                 if boot_st == 'con_botas':
@@ -454,10 +454,10 @@ class AreaPipeline(BasePersistPipeline):
 
             if boot_st == 'con_botas':
                 color = GREEN
-                label = f"ID[{tid}] CON BOTAS {seconds:.1f}s"
+                label = f"ID[{tid}] WITH BOOTS {seconds:.1f}s"
             elif boot_st == 'sin_botas':
                 color = RED
-                label = f"ID[{tid}] SIN BOTAS {seconds:.1f}s"
+                label = f"ID[{tid}] WITHOUT BOOTS {seconds:.1f}s"
             elif boot_st is None and tid in self._entry_time:
                 color = CYAN
                 label = f"ID[{tid}] LOADING {seconds:.1f}s"
@@ -474,7 +474,7 @@ class AreaPipeline(BasePersistPipeline):
         mid_x = (rx1 + rx2) // 2
         cv2.line(annotated, (rx1, area_mid_y), (rx2, area_mid_y), PURPLE, 1,
                  cv2.LINE_AA)
-        cv2.putText(annotated, "Area de analisis", (rx1 + 4, max(ry1 - 6, 14)),
+        cv2.putText(annotated, "Analysis area", (rx1 + 4, max(ry1 - 6, 14)),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.45, PURPLE, 1, cv2.LINE_AA)
 
         ox = 12
@@ -486,10 +486,10 @@ class AreaPipeline(BasePersistPipeline):
         cv2.addWeighted(overlay, 0.55, annotated, 0.45, 0, annotated)
 
         items = [
-            (f"CON BOTAS: {self.total_con_botas}", GREEN),
-            (f"SIN BOTAS: {self.total_sin_botas}", RED),
-            (f"CUMPLIMIENTO: {self.total_cumplimientos}", GREEN),
-            (f"INCUMPLIMIENTO: {self.total_incumplimientos}", RED),
+            (f"WITH BOOTS: {self.total_con_botas}", GREEN),
+            (f"WITHOUT BOOTS: {self.total_sin_botas}", RED),
+            (f"COMPLIANCE: {self.total_cumplimientos}", GREEN),
+            (f"NON-COMPLIANCE: {self.total_incumplimientos}", RED),
         ]
         for i, (txt, clr) in enumerate(items):
             cv2.putText(annotated, txt, (ox, oy + i * lh),

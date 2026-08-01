@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -180,22 +180,22 @@
 <header class="lv-topbar">
   <a class="lv-back" href="/module/reglamento">
     <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-    Volver
+    Back
   </a>
   <div class="lv-sep"></div>
   <span class="lv-source-name">{{ source.name }}</span>
   <span class="lv-badge {{ source.type }}">{{ source.type }}</span>
   <div class="lv-status">
     <span class="lv-dot on" id="lv-dot"></span>
-    <span id="lv-status-txt">Iniciando…</span>
+    <span id="lv-status-txt">Starting…</span>
   </div>
   <button class="lv-btn-reset" id="btn-reset">
     <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-    Reiniciar conteos
+    Reset counts
   </button>
   <button class="lv-btn-stop" id="btn-stop">
     <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/></svg>
-    Detener
+    Stop
   </button>
 </header>
 
@@ -203,7 +203,7 @@
   <div class="lv-feed">
     <div class="lv-feed-placeholder" id="feed-placeholder">
       <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-      <p id="feed-placeholder-msg">Conectando con la fuente…</p>
+      <p id="feed-placeholder-msg">Connecting to source…</p>
       <span>{{ source.path }}</span>
     </div>
     <img class="lv-feed-img" id="lv-feed-img" src="" alt="Live feed" style="display:none">
@@ -212,7 +212,7 @@
 
   <div class="lv-panel" id="lv-panel">
     <div class="lv-tabs">
-      <div class="lv-tab active" data-tab="live">En Vivo</div>
+      <div class="lv-tab active" data-tab="live">Live</div>
       <div class="lv-tab" data-tab="analytics">Analytics</div>
     </div>
 
@@ -220,29 +220,29 @@
       <div class="lv-section">
         <div class="lv-section-title">
           <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 11 12 14 15 9"/></svg>
-          Detección de Reglamento
+          Regulation Detection
         </div>
 
         <div class="lv-grid-2">
           <div class="lv-stat-card green">
             <div class="lv-stat-val" id="cnt-con-botas">0</div>
-            <div class="lv-stat-lbl">Con botas</div>
+            <div class="lv-stat-lbl">With boots</div>
           </div>
           <div class="lv-stat-card red">
             <div class="lv-stat-val" id="cnt-sin-botas">0</div>
-            <div class="lv-stat-lbl">Sin botas</div>
+            <div class="lv-stat-lbl">Without boots</div>
           </div>
           <div class="lv-stat-card green">
             <div class="lv-stat-val" id="cnt-cumplimientos">0</div>
-            <div class="lv-stat-lbl">Cumplimiento</div>
+            <div class="lv-stat-lbl">Compliance</div>
           </div>
           <div class="lv-stat-card red">
             <div class="lv-stat-val" id="cnt-incumplimientos">0</div>
-            <div class="lv-stat-lbl">Incumplimiento</div>
+            <div class="lv-stat-lbl">Non-compliance</div>
           </div>
         </div>
         <div class="lv-area-config">
-          <div class="lv-area-lbl">Área de análisis</div>
+          <div class="lv-area-lbl">Analysis area</div>
           <div class="lv-area-row">
             <span class="lv-area-label">X1</span>
             <input type="range" id="area-x1" min="0" max="100" step="1" value="{{ settings.get('reglamento_area_x1', '30') }}">
@@ -265,7 +265,7 @@
           </div>
         </div>
         <div class="lv-opt-block">
-          <div class="lv-opt-lbl">Optimización</div>
+          <div class="lv-opt-lbl">Optimization</div>
           <div class="lv-opt-row">
             <span class="lv-opt-label">JPEG</span>
             <input type="range" id="opt-jpeg-q" min="10" max="100" step="1" value="{{ settings.get('reglamento_jpeg_q', '72') }}">
@@ -287,10 +287,10 @@
       <div class="lv-section" id="section-evidencias">
         <div class="lv-section-title">
           <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-          Evidencias
+          Evidence
         </div>
         <div id="evidence-list" class="lv-evidence-list">
-          <div class="lv-evidence-empty">Sin evidencias aún</div>
+          <div class="lv-evidence-empty">No evidence yet</div>
         </div>
       </div>
     </div>
@@ -302,12 +302,12 @@
           Analytics
         </div>
         <div style="margin-bottom:10px">
-          <label style="font-size:0.65rem;color:#9D9FA2;text-transform:uppercase;letter-spacing:.06em;">Días</label>
+          <label style="font-size:0.65rem;color:#9D9FA2;text-transform:uppercase;letter-spacing:.06em;">Days</label>
           <select id="analytics-days" style="margin-left:8px;font-size:0.75rem;padding:3px 8px;border:1px solid #D8DCE3;border-radius:5px;">
-            <option value="1">Hoy</option>
-            <option value="7" selected>7 días</option>
-            <option value="30">30 días</option>
-            <option value="90">90 días</option>
+            <option value="1">Today</option>
+            <option value="7" selected>7 days</option>
+            <option value="30">30 days</option>
+            <option value="90">90 days</option>
           </select>
         </div>
         <div class="lv-chart-row">
@@ -325,7 +325,7 @@
     </div>
 
     <div class="lv-info-row">
-      <span>Fuente #<span class="lv-info-id">{{ source.id }}</span></span>
+      <span>Source #<span class="lv-info-id">{{ source.id }}</span></span>
       <span id="lv-fps">— fps</span>
     </div>
   </div>
@@ -333,7 +333,7 @@
 
 <div class="lv-toast" id="lv-toast">
   <button class="lv-toast-close" id="toast-close">&times;</button>
-  <img class="lv-toast-img" id="toast-img" src="" alt="Evidencia">
+  <img class="lv-toast-img" id="toast-img" src="" alt="Evidence">
   <div class="lv-toast-body" id="toast-body"></div>
 </div>
 
@@ -347,19 +347,19 @@ let chartDist = null;
 let chartTime = null;
 let chartDaily = null;
 (async () => {
-  document.getElementById("feed-placeholder-msg").textContent = "Iniciando pipeline…";
+  document.getElementById("feed-placeholder-msg").textContent = "Starting pipeline…";
   const r = await fetch(`/api/reglamento/sources/${SOURCE_ID}/start`, { method: "POST" });
   if (r.ok) {
-    document.getElementById("feed-placeholder-msg").textContent = "Cargando modelo de IA…";
-    document.getElementById("lv-status-txt").textContent = "Cargando…";
+    document.getElementById("feed-placeholder-msg").textContent = "Loading AI model…";
+    document.getElementById("lv-status-txt").textContent = "Loading…";
     const img = document.getElementById("lv-feed-img");
     img.onload = () => {
       img.style.display = "block";
       document.getElementById("feed-placeholder").style.display = "none";
-      document.getElementById("lv-status-txt").textContent = "En vivo";
+      document.getElementById("lv-status-txt").textContent = "Live";
     };
     img.onerror = () => {
-      document.getElementById("feed-placeholder-msg").textContent = "Error al conectar con la fuente";
+      document.getElementById("feed-placeholder-msg").textContent = "Error connecting to source";
       document.getElementById("lv-dot").classList.remove("on");
       document.getElementById("lv-status-txt").textContent = "Error";
     };
@@ -367,8 +367,8 @@ let chartDaily = null;
     startPoll();
     startFpsCounter();
   } else {
-    document.getElementById("feed-placeholder-msg").textContent = "Error al iniciar el análisis";
-    document.getElementById("lv-status-txt").textContent = "Error al iniciar";
+    document.getElementById("feed-placeholder-msg").textContent = "Error starting analysis";
+    document.getElementById("lv-status-txt").textContent = "Error starting";
     document.getElementById("lv-dot").classList.remove("on");
   }
 })();
@@ -385,7 +385,7 @@ function startPoll() {
     document.getElementById("cnt-cumplimientos").textContent = d.cumplimientos;
     document.getElementById("cnt-incumplimientos").textContent = d.incumplimientos;
     document.getElementById("lv-ts").textContent =
-      new Date().toLocaleTimeString("es-MX", { hour12: false });
+      new Date().toLocaleTimeString("en-US", { hour12: false });
 
     const ev = d.evidencias;
     if (ev && ev.length > 0) {
@@ -415,14 +415,14 @@ function startFpsCounter() {
 function renderEvidencias(evidencias) {
   const container = document.getElementById("evidence-list");
   if (!evidencias || evidencias.length === 0) {
-    container.innerHTML = '<div class="lv-evidence-empty">Sin evidencias aún</div>';
+    container.innerHTML = '<div class="lv-evidence-empty">No evidence yet</div>';
     return;
   }
   container.innerHTML = evidencias.map(e => `
     <div class="lv-evidence-item" onclick="showEvidence(this)" data-json='${JSON.stringify(e).replace(/'/g,"&#39;")}'>
-      <img src="${e.capture_path}" alt="Evidencia" loading="lazy">
+      <img src="${e.capture_path}" alt="Evidence" loading="lazy">
       <div class="lv-evidence-info">
-        <div class="e-label">ID[${e.track_id}] ${e.boot_status === 'con_botas' ? 'CON BOTAS' : e.boot_status === 'sin_botas' ? 'SIN BOTAS' : e.boot_status}</div>
+        <div class="e-label">ID[${e.track_id}] ${e.boot_status === 'con_botas' ? 'WITH BOOTS' : e.boot_status === 'sin_botas' ? 'WITHOUT BOOTS' : e.boot_status}</div>
         <div class="e-meta">${e.date} ${e.timestamp} · ${e.seconds}s</div>
       </div>
     </div>
@@ -441,11 +441,11 @@ function showToast(data) {
   }
   const toast = document.getElementById("lv-toast");
   document.getElementById("toast-img").src = data.capture_path || "";
-  const statusLabel = data.boot_status === 'con_botas' ? 'CON BOTAS' :
-                      data.boot_status === 'sin_botas' ? 'SIN BOTAS' : data.boot_status;
+  const statusLabel = data.boot_status === 'con_botas' ? 'WITH BOOTS' :
+                      data.boot_status === 'sin_botas' ? 'WITHOUT BOOTS' : data.boot_status;
   document.getElementById("toast-body").innerHTML =
     `<strong>ID[${data.track_id}]</strong> · ${statusLabel}<br>
-     ${data.date} ${data.timestamp} · ${data.seconds}s en el área`;
+     ${data.date} ${data.timestamp} · ${data.seconds}s in the area`;
   toast.classList.add("show");
 }
 
@@ -542,7 +542,7 @@ function renderAnalytics(data) {
   chartDist = new Chart(ctxDist, {
     type: "doughnut",
     data: {
-      labels: ["Con botas", "Sin botas"],
+      labels: ["With boots", "Without boots"],
       datasets: [{
         data: [conBoots, sinBoots],
         backgroundColor: ["#22C55E", "#EF4444"],
@@ -553,7 +553,7 @@ function renderAnalytics(data) {
       responsive: true, maintainAspectRatio: true,
       plugins: {
         legend: { display: false },
-        title: { display: true, text: "Botas", font: { size: 10 }, color: "#9D9FA2" },
+        title: { display: true, text: "Boots", font: { size: 10 }, color: "#9D9FA2" },
       },
     },
   });
@@ -562,7 +562,7 @@ function renderAnalytics(data) {
   chartTime = new Chart(ctxTime, {
     type: "doughnut",
     data: {
-      labels: ["Cumplimiento", "Incumplimiento"],
+      labels: ["Compliance", "Non-compliance"],
       datasets: [{
         data: [cumplimientos, incumplimientos],
         backgroundColor: ["#22C55E", "#EF4444"],
@@ -573,7 +573,7 @@ function renderAnalytics(data) {
       responsive: true, maintainAspectRatio: true,
       plugins: {
         legend: { display: false },
-        title: { display: true, text: "Tiempo", font: { size: 10 }, color: "#9D9FA2" },
+        title: { display: true, text: "Time", font: { size: 10 }, color: "#9D9FA2" },
       },
     },
   });
@@ -585,13 +585,13 @@ function renderAnalytics(data) {
       data: {
         labels: daily.map(d => d.day.slice(5)),
         datasets: [
-          { label: "Con botas", data: daily.map(d => parseInt(d.con_botas) || 0),
+          { label: "With boots", data: daily.map(d => parseInt(d.con_botas) || 0),
             backgroundColor: "#22C55E", borderRadius: 3 },
-          { label: "Sin botas", data: daily.map(d => parseInt(d.sin_botas) || 0),
+          { label: "Without boots", data: daily.map(d => parseInt(d.sin_botas) || 0),
             backgroundColor: "#EF4444", borderRadius: 3 },
-          { label: "Cumplimiento", data: daily.map(d => parseInt(d.cumplimientos) || 0),
+          { label: "Compliance", data: daily.map(d => parseInt(d.cumplimientos) || 0),
             backgroundColor: "#86EFAC", borderRadius: 3 },
-          { label: "Incumplimiento", data: daily.map(d => parseInt(d.incumplimientos) || 0),
+          { label: "Non-compliance", data: daily.map(d => parseInt(d.incumplimientos) || 0),
             backgroundColor: "#FCA5A5", borderRadius: 3 },
         ],
       },
@@ -599,7 +599,7 @@ function renderAnalytics(data) {
         responsive: true, maintainAspectRatio: true,
         plugins: {
           legend: { position: "top", labels: { boxWidth: 10, padding: 8, font: { size: 9 } } },
-          title: { display: true, text: "Tendencia diaria", font: { size: 10 }, color: "#9D9FA2" },
+          title: { display: true, text: "Daily trend", font: { size: 10 }, color: "#9D9FA2" },
         },
         scales: {
           x: { grid: { display: false }, ticks: { font: { size: 8 } } },
@@ -619,7 +619,7 @@ document.getElementById("btn-reset").addEventListener("click", async () => {
     if (el) el.textContent = "0";
   });
   document.getElementById("evidence-list").innerHTML =
-    '<div class="lv-evidence-empty">Sin evidencias aún</div>';
+    '<div class="lv-evidence-empty">No evidence yet</div>';
   document.getElementById("lv-toast").classList.remove("show");
 });
 

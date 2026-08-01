@@ -1,27 +1,27 @@
 {% extends "base.html" %}
-{% block title %}Analytics · Tarimas{% endblock %}
+{% block title %}Analytics · Pallets{% endblock %}
 {% block page_title %}Analytics · {{ module.label }}{% endblock %}
 {% block content %}
 <div class="analytics-dashboard">
   <div class="analytics-kpi-row">
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3 8 12 13 21 8"/></svg> Conteo total</span><span class="analytics-kpi-value" id="kpi-total">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Hoy</span><span class="analytics-kpi-value" id="kpi-today">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Fuentes activas</span><span class="analytics-kpi-value" id="kpi-sources">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3 8 12 13 21 8"/></svg> Total count</span><span class="analytics-kpi-value" id="kpi-total">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Today</span><span class="analytics-kpi-value" id="kpi-today">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Active sources</span><span class="analytics-kpi-value" id="kpi-sources">—</span></div>
   </div>
 
   <div class="analytics-chart-row">
     <div class="analytics-chart-card">
-      <h4>Timeline de detecciones</h4>
+      <h4>Detection timeline</h4>
       <canvas id="chart-timeline"></canvas>
     </div>
     <div class="analytics-chart-card">
-      <h4>Por fuente</h4>
+      <h4>By source</h4>
       <div id="per-source-table" class="analytics-per-source"></div>
     </div>
   </div>
 
   <div class="analytics-events">
-    <h4>Detecciones recientes</h4>
+    <h4>Recent detections</h4>
     <div id="events-list" class="analytics-events-list"></div>
   </div>
 </div>
@@ -40,7 +40,7 @@ async function loadKPIs() {
   const d = await r.json();
   const counters = d.counters || {};
   const sources = Object.keys(counters);
-  setText('kpi-sources', sources.length > 0 ? sources.length + (d.active ? ' activas' : '') : '—');
+  setText('kpi-sources', sources.length > 0 ? sources.length + (d.active ? ' active' : '') : '—');
 
   let totalVal = 0, todayVal = 0;
   const todayStr = new Date().toISOString().slice(0,10);
@@ -52,11 +52,11 @@ async function loadKPIs() {
 
   const psEl = document.getElementById('per-source-table');
   if (sources.length > 0) {
-    psEl.innerHTML = '<table class="ps-table"><tr><th>Fuente</th><th>Conteo</th></tr>' +
-      sources.map(sid => `<tr><td>Fuente ${sid}</td><td>${counters[sid]?.total_count ?? '—'}</td></tr>`).join('') +
+    psEl.innerHTML = '<table class="ps-table"><tr><th>Source</th><th>Count</th></tr>' +
+      sources.map(sid => `<tr><td>Source ${sid}</td><td>${counters[sid]?.total_count ?? '—'}</td></tr>`).join('') +
       '</table>';
   } else {
-    psEl.innerHTML = '<p class="text-muted">Sin datos de fuentes</p>';
+    psEl.innerHTML = '<p class="text-muted">No source data</p>';
   }
 }
 
@@ -74,7 +74,7 @@ async function loadTimeline() {
   if (timelineChart) timelineChart.destroy();
   timelineChart = new Chart(ctx, {
     type: 'bar',
-    data: { labels, datasets: [{ label: 'Detecciones', data, backgroundColor: '#8B5CF6' }] },
+    data: { labels, datasets: [{ label: 'Detections', data, backgroundColor: '#8B5CF6' }] },
     options: { responsive: true, plugins: { legend: { display: false } },
       scales: { x: { ticks: { color: '#9D9FA2' } }, y: { ticks: { color: '#9D9FA2', stepSize: 1 } } } },
   });

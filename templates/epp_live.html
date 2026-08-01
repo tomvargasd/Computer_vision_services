@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -176,22 +176,22 @@
 <header class="lv-topbar">
   <a class="lv-back" href="/module/epp">
     <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-    Volver
+    Back
   </a>
   <div class="lv-sep"></div>
   <span class="lv-source-name">{{ source.name }}</span>
   <span class="lv-badge {{ source.type }}">{{ source.type }}</span>
   <div class="lv-status">
     <span class="lv-dot on" id="lv-dot"></span>
-    <span id="lv-status-txt">Iniciando…</span>
+    <span id="lv-status-txt">Starting…</span>
   </div>
   <button class="lv-btn-reset" id="btn-reset">
     <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-    Reiniciar conteos
+    Reset counts
   </button>
   <button class="lv-btn-stop" id="btn-stop">
     <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/></svg>
-    Detener
+    Stop
   </button>
 </header>
 
@@ -199,7 +199,7 @@
   <div class="lv-feed">
     <div class="lv-feed-placeholder" id="feed-placeholder">
       <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-      <p id="feed-placeholder-msg">Conectando con la fuente…</p>
+      <p id="feed-placeholder-msg">Connecting to source…</p>
       <span>{{ source.path }}</span>
     </div>
     <img class="lv-feed-img" id="lv-feed-img" src="" alt="Live feed" style="display:none">
@@ -208,7 +208,7 @@
 
   <div class="lv-panel" id="lv-panel">
     <div class="lv-tabs">
-      <div class="lv-tab active" data-tab="live">En Vivo</div>
+      <div class="lv-tab active" data-tab="live">Live</div>
       <div class="lv-tab" data-tab="analytics">Analytics</div>
     </div>
 
@@ -216,10 +216,10 @@
       <div class="lv-section">
         <div class="lv-section-title">
           <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 11 12 14 15 9"/></svg>
-          Detección de EPP
+          PPE Detection
         </div>
         <div class="lv-master-row">
-          <span>Análisis de EPP</span>
+          <span>PPE Analysis</span>
           <label class="toggle">
             <input type="checkbox" id="master-switch" checked>
             <span class="slider"></span>
@@ -228,37 +228,37 @@
         <div class="lv-grid-2">
           <div class="lv-stat-card green">
             <div class="lv-stat-val" id="cnt-protected">0</div>
-            <div class="lv-stat-lbl">Protegidos</div>
+            <div class="lv-stat-lbl">Protected</div>
           </div>
           <div class="lv-stat-card red">
             <div class="lv-stat-val" id="cnt-unprotected">0</div>
-            <div class="lv-stat-lbl">Sin EPP</div>
+            <div class="lv-stat-lbl">Missing PPE</div>
           </div>
         </div>
         <div style="margin-top:12px;padding-top:12px;border-top:1px solid #D8DCE3;">
-          <div style="font-size:0.65rem;color:#9D9FA2;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">EPP requerido</div>
+          <div style="font-size:0.65rem;color:#9D9FA2;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Required PPE</div>
           <div class="lv-switch-row">
-            <span>Casco</span>
+            <span>Helmet</span>
             <label class="toggle"><input type="checkbox" class="epp-req" data-cls="4" checked><span class="slider"></span></label>
           </div>
           <div class="lv-switch-row">
-            <span>Chaleco</span>
+            <span>Vest</span>
             <label class="toggle"><input type="checkbox" class="epp-req" data-cls="6" checked><span class="slider"></span></label>
           </div>
           <div class="lv-switch-row">
-            <span>Botas</span>
+            <span>Boots</span>
             <label class="toggle"><input type="checkbox" class="epp-req" data-cls="0"><span class="slider"></span></label>
           </div>
           <div class="lv-switch-row">
-            <span>Protectores auditivos</span>
+            <span>Hearing protection</span>
             <label class="toggle"><input type="checkbox" class="epp-req" data-cls="1"><span class="slider"></span></label>
           </div>
           <div class="lv-switch-row">
-            <span>Lentes</span>
+            <span>Safety glasses</span>
             <label class="toggle"><input type="checkbox" class="epp-req" data-cls="2"><span class="slider"></span></label>
           </div>
           <div class="lv-switch-row">
-            <span>Guantes</span>
+            <span>Gloves</span>
             <label class="toggle"><input type="checkbox" class="epp-req" data-cls="3"><span class="slider"></span></label>
           </div>
         </div>
@@ -266,10 +266,10 @@
       <div class="lv-section">
         <div class="lv-section-title">
           <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-          Alertas
+          Alerts
         </div>
         <div id="evidence-list" class="lv-evidence-list">
-          <div class="lv-evidence-empty">Sin alertas aún</div>
+          <div class="lv-evidence-empty">No alerts yet</div>
         </div>
       </div>
     </div>
@@ -281,22 +281,22 @@
           Analytics
         </div>
         <div style="margin-bottom:10px">
-          <label style="font-size:0.65rem;color:#9D9FA2;text-transform:uppercase;letter-spacing:.06em;">Vista</label>
+          <label style="font-size:0.65rem;color:#9D9FA2;text-transform:uppercase;letter-spacing:.06em;">View</label>
           <select id="analytics-days" style="margin-left:8px;font-size:0.75rem;padding:3px 8px;border:1px solid #D8DCE3;border-radius:5px;">
-            <option value="1" selected>En vivo</option>
+            <option value="1" selected>Live</option>
           </select>
         </div>
         <div id="epp-ranking-container">
-          <div style="font-size:0.72rem;font-weight:600;color:#182A55;margin-bottom:8px;">EPP más usado</div>
+          <div style="font-size:0.72rem;font-weight:600;color:#182A55;margin-bottom:8px;">Most used PPE</div>
           <div id="epp-ranking" class="lv-ranking-list">
-            <div style="color:#9D9FA2;font-size:0.72rem;">Sin datos aún</div>
+            <div style="color:#9D9FA2;font-size:0.72rem;">No data yet</div>
           </div>
         </div>
       </div>
     </div>
 
     <div class="lv-info-row">
-      <span>Fuente #<span class="lv-info-id">{{ source.id }}</span></span>
+      <span>Source #<span class="lv-info-id">{{ source.id }}</span></span>
       <span id="lv-fps">— fps</span>
     </div>
   </div>
@@ -304,7 +304,7 @@
 
 <div class="lv-toast" id="lv-toast">
   <button class="lv-toast-close" id="toast-close">&times;</button>
-  <img class="lv-toast-img" id="toast-img" src="" alt="Alerta">
+  <img class="lv-toast-img" id="toast-img" src="" alt="Alert">
   <div class="lv-toast-body" id="toast-body"></div>
 </div>
 
@@ -316,19 +316,19 @@ let fpsTimer = null;
 let prevToastData = null;
 
 (async () => {
-  document.getElementById("feed-placeholder-msg").textContent = "Iniciando pipeline…";
+  document.getElementById("feed-placeholder-msg").textContent = "Starting pipeline…";
   const r = await fetch(`/api/epp/sources/${SOURCE_ID}/start`, { method: "POST" });
   if (r.ok) {
-    document.getElementById("feed-placeholder-msg").textContent = "Cargando modelo de IA…";
-    document.getElementById("lv-status-txt").textContent = "Cargando…";
+    document.getElementById("feed-placeholder-msg").textContent = "Loading AI model…";
+    document.getElementById("lv-status-txt").textContent = "Loading…";
     const img = document.getElementById("lv-feed-img");
     img.onload = () => {
       img.style.display = "block";
       document.getElementById("feed-placeholder").style.display = "none";
-      document.getElementById("lv-status-txt").textContent = "En vivo";
+      document.getElementById("lv-status-txt").textContent = "Live";
     };
     img.onerror = () => {
-      document.getElementById("feed-placeholder-msg").textContent = "Error al conectar con la fuente";
+      document.getElementById("feed-placeholder-msg").textContent = "Error connecting to source";
       document.getElementById("lv-dot").classList.remove("on");
       document.getElementById("lv-status-txt").textContent = "Error";
     };
@@ -336,8 +336,8 @@ let prevToastData = null;
     startPoll();
     startFpsCounter();
   } else {
-    document.getElementById("feed-placeholder-msg").textContent = "Error al iniciar el análisis";
-    document.getElementById("lv-status-txt").textContent = "Error al iniciar";
+    document.getElementById("feed-placeholder-msg").textContent = "Error starting analysis";
+    document.getElementById("lv-status-txt").textContent = "Error starting";
     document.getElementById("lv-dot").classList.remove("on");
   }
 })();
@@ -351,7 +351,7 @@ function startPoll() {
     document.getElementById("cnt-protected").textContent = d.protected;
     document.getElementById("cnt-unprotected").textContent = d.unprotected;
     document.getElementById("lv-ts").textContent =
-      new Date().toLocaleTimeString("es-MX", { hour12: false });
+      new Date().toLocaleTimeString("en-US", { hour12: false });
 
     const ev = d.evidencias;
     if (ev && ev.length > 0) {
@@ -382,14 +382,14 @@ function startFpsCounter() {
 function renderEvidencias(evidencias) {
   const container = document.getElementById("evidence-list");
   if (!evidencias || evidencias.length === 0) {
-    container.innerHTML = '<div class="lv-evidence-empty">Sin alertas aún</div>';
+    container.innerHTML = '<div class="lv-evidence-empty">No alerts yet</div>';
     return;
   }
   container.innerHTML = evidencias.map(e => `
     <div class="lv-evidence-item" onclick="showEvidence(this)" data-json='${JSON.stringify(e).replace(/'/g,"&#39;")}'>
-      <img src="${e.capture_path}" alt="Alerta" loading="lazy">
+      <img src="${e.capture_path}" alt="Alert" loading="lazy">
       <div class="lv-evidence-info">
-        <div class="e-label">ID[${e.track_id}] ${e.status === 'sin_epp' ? 'SIN EPP' : e.status}</div>
+        <div class="e-label">ID[${e.track_id}] ${e.status === 'sin_epp' ? 'MISSING PPE' : e.status}</div>
         <div class="e-meta">${e.date} ${e.timestamp}</div>
       </div>
     </div>
@@ -399,7 +399,7 @@ function renderEvidencias(evidencias) {
 function renderRanking(ranking) {
   const container = document.getElementById("epp-ranking");
   if (!ranking || ranking.length === 0) {
-    container.innerHTML = '<div style="color:#9D9FA2;font-size:0.72rem;">Sin datos aún</div>';
+    container.innerHTML = '<div style="color:#9D9FA2;font-size:0.72rem;">No data yet</div>';
     return;
   }
   container.innerHTML = ranking.map((item, i) => `
@@ -423,7 +423,7 @@ function showToast(data) {
   const toast = document.getElementById("lv-toast");
   document.getElementById("toast-img").src = data.capture_path || "";
   document.getElementById("toast-body").innerHTML =
-    `<strong>ID[${data.track_id}]</strong> · SIN EPP<br>
+    `<strong>ID[${data.track_id}]</strong> · MISSING PPE<br>
      ${data.date} ${data.timestamp}`;
   toast.classList.add("show");
 }
@@ -476,9 +476,9 @@ document.getElementById("btn-reset").addEventListener("click", async () => {
     if (el) el.textContent = "0";
   });
   document.getElementById("evidence-list").innerHTML =
-    '<div class="lv-evidence-empty">Sin alertas aún</div>';
+    '<div class="lv-evidence-empty">No alerts yet</div>';
   document.getElementById("epp-ranking").innerHTML =
-    '<div style="color:#9D9FA2;font-size:0.72rem;">Sin datos aún</div>';
+    '<div style="color:#9D9FA2;font-size:0.72rem;">No data yet</div>';
   document.getElementById("lv-toast").classList.remove("show");
 });
 

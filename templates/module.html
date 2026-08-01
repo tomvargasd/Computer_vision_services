@@ -9,7 +9,7 @@
   <div class="module-status-bar {% if module.enabled %}status-on{% endif %}" id="status-bar">
     <div class="status-left">
       <span class="status-circle {% if module.enabled %}on{% endif %}" id="status-circle"></span>
-      <span id="status-text">{{ 'Módulo activo' if module.enabled else 'Módulo inactivo' }}</span>
+      <span id="status-text">{{ 'Module active' if module.enabled else 'Module inactive' }}</span>
     </div>
     {% if access.access_type == 'full' %}
     <label class="toggle">
@@ -32,7 +32,7 @@
         {% if func.locked or access.access_type != 'full' %}
         <span class="func-locked-badge">
           <svg viewBox="0 0 24 24" style="width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          {% if func.enabled %}Activo{% else %}Inactivo{% endif %}
+          {% if func.enabled %}Active{% else %}Inactive{% endif %}
         </span>
         {% else %}
         <label class="toggle">
@@ -47,7 +47,7 @@
 
       <div class="func-badge-row">
         <span class="badge badge-status {% if func.enabled %}badge-on{% endif %}" id="badge-{{ module_id }}-{{ func_id }}">
-          {{ 'Activa' if func.enabled else 'Inactiva' }}
+          {{ 'Active' if func.enabled else 'Inactive' }}
         </span>
       </div>
     </div>
@@ -59,12 +59,12 @@
     <div class="sources-header">
       <h3 class="sources-title">
         <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-        Fuentes de video
+        Video sources
       </h3>
       {% if access.access_type == 'full' %}
       <button class="btn-add-source" data-module="{{ module_id }}" id="btn-add-source-module">
         <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Añadir fuente
+        Add source
       </button>
       {% endif %}
     </div>
@@ -89,13 +89,13 @@
         <span class="source-type-badge {{ src.type }}">{{ src.type }}</span>
         <a class="btn-launch" href="/module/{{ module_id }}/live/{{ src.id }}" onclick="event.stopPropagation()">
           <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          Iniciar
+          Start
         </a>
         {% if access.access_type == 'full' %}
-        <button class="source-delete" data-id="{{ src.id }}" title="Eliminar" onclick="event.stopPropagation(); deleteSource({{ src.id }})">
+        <button class="source-delete" data-id="{{ src.id }}" title="Delete" onclick="event.stopPropagation(); deleteSource({{ src.id }})">
           <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
         </button>
-        <button class="source-edit" data-id="{{ src.id }}" data-name="{{ src.name }}" title="Editar nombre" onclick="event.stopPropagation(); openEditModal('{{ src.id }}', '{{ src.name | replace("'", "\\'") }}')">
+        <button class="source-edit" data-id="{{ src.id }}" data-name="{{ src.name }}" title="Edit name" onclick="event.stopPropagation(); openEditModal('{{ src.id }}', '{{ src.name | replace("'", "\\'") }}')">
           <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>
         {% endif %}
@@ -105,8 +105,8 @@
     {% else %}
     <div class="sources-empty" id="sources-empty">
       <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-      <p>No hay fuentes registradas para este módulo</p>
-      <span>Usa "Añadir fuente" para registrar un video o stream</span>
+      <p>No sources registered for this module</p>
+      <span>Use "Add source" to register a video or stream</span>
     </div>
     <ul class="sources-list" id="sources-list" style="display:none"></ul>
     {% endif %}
@@ -126,14 +126,14 @@
 <div class="modal-backdrop" id="modal-source" hidden>
   <div class="modal">
     <div class="modal-header">
-      <h3>Añadir fuente de video</h3>
+      <h3>Add video source</h3>
       <button class="modal-close" id="modal-close">
         <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
     <div class="modal-body">
       <div class="modal-field">
-        <label class="modal-label">Tipo de recurso</label>
+        <label class="modal-label">Resource type</label>
         <div class="type-toggle">
           <button class="type-btn active" data-type="video">
             <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
@@ -146,16 +146,16 @@
         </div>
       </div>
       <div class="modal-field">
-        <label class="modal-label">Nombre</label>
-        <input class="modal-input" id="src-name" type="text" placeholder="Ej: Cámara entrada 1"/>
+        <label class="modal-label">Name</label>
+        <input class="modal-input" id="src-name" type="text" placeholder="E.g. Entrance camera 1"/>
       </div>
       <!-- Video: file picker -->
       <div class="modal-field" id="field-file">
-        <label class="modal-label">Archivo de video</label>
+        <label class="modal-label">Video file</label>
         <label class="upload-area" id="upload-area">
           <input type="file" id="src-file" accept=".mp4,.avi,.mov,.mkv,.webm,.m4v,.ts,.flv" style="display:none"/>
           <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <span id="upload-label">Haz clic o arrastra un video aquí</span>
+          <span id="upload-label">Click or drag a video here</span>
         </label>
         <div class="upload-progress" id="upload-progress" hidden>
           <div class="upload-progress-bar" id="upload-progress-bar"></div>
@@ -169,8 +169,8 @@
       <div class="modal-error" id="modal-error" hidden></div>
     </div>
     <div class="modal-footer">
-      <button class="btn-cancel" id="btn-cancel">Cancelar</button>
-      <button class="btn-confirm" id="btn-confirm">Registrar</button>
+      <button class="btn-cancel" id="btn-cancel">Cancel</button>
+      <button class="btn-confirm" id="btn-confirm">Register</button>
     </div>
   </div>
 </div>
@@ -179,21 +179,21 @@
 <div class="modal-backdrop" id="modal-edit" hidden>
   <div class="modal">
     <div class="modal-header">
-      <h3>Editar fuente</h3>
+      <h3>Edit source</h3>
       <button class="modal-close" id="edit-modal-close">
         <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
     <div class="modal-body">
       <div class="modal-field">
-        <label class="modal-label">Nombre</label>
+        <label class="modal-label">Name</label>
         <input class="modal-input" id="edit-name" type="text"/>
       </div>
       <div class="modal-error" id="edit-error" hidden></div>
     </div>
     <div class="modal-footer">
-      <button class="btn-cancel" id="edit-cancel">Cancelar</button>
-      <button class="btn-confirm" id="edit-confirm">Guardar</button>
+      <button class="btn-cancel" id="edit-cancel">Cancel</button>
+      <button class="btn-confirm" id="edit-confirm">Save</button>
     </div>
   </div>
 </div>
@@ -205,10 +205,10 @@
 window.CURRENT_MODULE = "{{ module_id }}";
 {% if access.access_type == 'limited' %}
 // Limited users: override sensitive functions
-function deleteSource(id) { alert('No tienes permiso para eliminar fuentes'); }
-function openEditModal(id, name) { alert('No tienes permiso para editar fuentes'); }
+function deleteSource(id) { alert("You don't have permission to delete sources"); }
+function openEditModal(id, name) { alert("You don't have permission to edit sources"); }
 var _btnAdd = document.getElementById('btn-add-source-module');
-if (_btnAdd) _btnAdd.addEventListener('click', function(e) { e.preventDefault(); alert('No tienes permiso para añadir fuentes'); });
+if (_btnAdd) _btnAdd.addEventListener('click', function(e) { e.preventDefault(); alert("You don't have permission to add sources"); });
 {% endif %}
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -217,15 +217,15 @@ const videoIcon  = `<svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height
 
 function launchBtn(id) {
   return `<a class="btn-launch" href="/module/${window.CURRENT_MODULE}/live/${id}" onclick="event.stopPropagation()">
-    <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>Iniciar</a>`;
+    <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>Start</a>`;
 }
 
 function deleteBtnHtml(id, name) {
   const safeName = name.replace(/'/g, "\\'");
-  return `<button class="source-delete" data-id="${id}" title="Eliminar" onclick="event.stopPropagation(); deleteSource(${id})">
+  return `<button class="source-delete" data-id="${id}" title="Delete" onclick="event.stopPropagation(); deleteSource(${id})">
     <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
   </button>
-  <button class="source-edit" data-id="${id}" data-name="${name}" title="Editar nombre" onclick="event.stopPropagation(); openEditModal('${id}', '${safeName}')">
+  <button class="source-edit" data-id="${id}" data-name="${name}" title="Edit name" onclick="event.stopPropagation(); openEditModal('${id}', '${safeName}')">
     <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
   </button>`;
 }
@@ -246,7 +246,7 @@ let uploadedPath = "";
 document.getElementById("btn-add-source-module").addEventListener("click", () => {
   errorBox.hidden = true;
   uploadedPath = "";
-  uploadLabel.textContent = "Haz clic o arrastra un video aquí";
+  uploadLabel.textContent = "Click or drag a video here";
   progressWrap.hidden = true;
   progressBar.style.width = "0%";
   document.getElementById("src-name").value = "";
@@ -280,7 +280,7 @@ uploadArea.addEventListener("drop", e => {
 fileInput.addEventListener("change", () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
 
 function handleFile(file) {
-  uploadLabel.textContent = `Subiendo: ${file.name}…`;
+  uploadLabel.textContent = `Uploading: ${file.name}…`;
   progressWrap.hidden = false;
   progressBar.style.width = "0%";
   uploadedPath = "";
@@ -300,26 +300,26 @@ function handleFile(file) {
       progressBar.style.width = "100%";
       uploadLabel.textContent = `✓ ${file.name}`;
     } else {
-      uploadLabel.textContent = "Error al subir el archivo";
+      uploadLabel.textContent = "Error uploading file";
       progressWrap.hidden = true;
-      showError("No se pudo subir el archivo. Intenta de nuevo.");
+      showError("The file could not be uploaded. Try again.");
     }
   };
-  xhr.onerror = () => { uploadLabel.textContent = "Error de red"; showError("Error de red."); };
+  xhr.onerror = () => { uploadLabel.textContent = "Network error"; showError("Network error."); };
   xhr.send(fd);
 }
 
 document.getElementById("btn-confirm").addEventListener("click", async () => {
   const name = document.getElementById("src-name").value.trim();
-  if (!name) { showError("Escribe un nombre para la fuente."); return; }
+  if (!name) { showError("Enter a name for the source."); return; }
 
   let path = "";
   if (selectedType === "video") {
-    if (!uploadedPath) { showError("Sube un archivo de video primero."); return; }
+    if (!uploadedPath) { showError("Upload a video file first."); return; }
     path = uploadedPath;
   } else {
     path = document.getElementById("src-url").value.trim();
-    if (!path) { showError("Introduce la URL o ruta RTSP."); return; }
+    if (!path) { showError("Enter the URL or RTSP path."); return; }
   }
 
   const res  = await fetch("/api/sources", {
@@ -363,7 +363,7 @@ function addSourceToList(src) {
 }
 
 async function deleteSource(id) {
-  if (!confirm("¿Eliminar esta fuente?")) return;
+  if (!confirm("Delete this source?")) return;
   const res = await fetch(`/api/sources/${id}`, { method: "DELETE" });
   if (res.ok) {
     document.getElementById(`source-${id}`)?.remove();
@@ -394,22 +394,22 @@ editModal.addEventListener("click", e => { if (e.target === editModal) editModal
 async function seedTanquesGas() {
   const btn = document.getElementById('btn-seed-tanques');
   const status = document.getElementById('seed-status');
-  if (!confirm('¿Estás seguro? Esto reemplazará TODOS los datos existentes del módulo Tanques de Gas con nuevos datos de prueba (29 días).')) return;
+  if (!confirm('Are you sure? This will replace ALL existing Gas Tanks module data with new test data (29 days).')) return;
   btn.disabled = true;
-  status.textContent = 'Generando datos...';
+  status.textContent = 'Generating data...';
   try {
     const r = await fetch('/api/analytics/tanques_gas/seed', { method: 'POST' });
     const d = await r.json();
     if (!r.ok) {
       status.textContent = '❌ ' + (d.error || 'Error');
-      showToast('Error: ' + (d.error || 'No se pudieron generar los datos'), true);
+      showToast('Error: ' + (d.error || 'Data could not be generated'), true);
     } else {
-      status.textContent = '✅ ' + (d.message || 'Datos generados');
+      status.textContent = '✅ ' + (d.message || 'Data generated');
       showToast('✅ ' + d.message);
     }
   } catch (e) {
-    status.textContent = '❌ Error de conexión';
-    showToast('Error de conexión al generar datos', true);
+    status.textContent = '❌ Connection error';
+    showToast('Connection error while generating data', true);
   }
   btn.disabled = false;
   setTimeout(() => { if (status) status.textContent = ''; }, 5000);
@@ -417,18 +417,18 @@ async function seedTanquesGas() {
 
 async function clearTanquesGas() {
   const status = document.getElementById('seed-status');
-  if (!confirm('¿Eliminar todos los eventos y contadores del módulo Tanques de Gas?')) return;
-  status.textContent = 'Limpiando...';
+  if (!confirm('Delete all events and counters from the Gas Tanks module?')) return;
+  status.textContent = 'Clearing...';
   try {
     const r = await fetch('/api/analytics/tanques_gas/clear', { method: 'POST' });
     const d = await r.json();
     if (!r.ok) {
       status.textContent = '❌ Error';
     } else {
-      status.textContent = '✅ ' + (d.message || 'Datos eliminados');
+      status.textContent = '✅ ' + (d.message || 'Data deleted');
     }
   } catch (e) {
-    status.textContent = '❌ Error de conexión';
+    status.textContent = '❌ Connection error';
   }
   setTimeout(() => { if (status) status.textContent = ''; }, 5000);
 }
@@ -445,7 +445,7 @@ function showToast(msg, isError) {
 
 document.getElementById("edit-confirm").addEventListener("click", async () => {
   const name = document.getElementById("edit-name").value.trim();
-  if (!name) { editError.textContent = "El nombre no puede estar vacío."; editError.hidden = false; return; }
+  if (!name) { editError.textContent = "The name cannot be empty."; editError.hidden = false; return; }
 
   const res  = await fetch(`/api/sources/${editingId}`, {
     method: "PUT",

@@ -43,7 +43,7 @@ document.addEventListener("change", async (e) => {
         const circle = document.getElementById("status-circle");
         const text   = document.getElementById("status-text");
         if (circle) circle.classList.toggle("on", enabled);
-        if (text)   text.textContent = enabled ? "Módulo activo" : "Módulo inactivo";
+        if (text)   text.textContent = enabled ? "Module active" : "Module inactive";
       }
 
       // Deshabilitar/habilitar funciones según estado del módulo
@@ -79,7 +79,7 @@ document.addEventListener("change", async (e) => {
       const badge = document.getElementById(`badge-${moduleId}-${funcId}`);
       if (badge) {
         badge.classList.toggle("badge-on", enabled);
-        badge.textContent = enabled ? "Activa" : "Inactiva";
+        badge.textContent = enabled ? "Active" : "Inactive";
       }
 
     } catch (err) {

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -25,7 +25,7 @@
   <nav class="sidebar-nav">
     <a href="{{ url_for('index') }}" class="nav-item {% if request.endpoint == 'index' %}active{% endif %}">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/><path d="M13 7h-2v5l4.25 2.52.75-1.23-3.5-2.08V7z"/></svg>
-      Sesiones
+      Sessions
     </a>
 
     <a href="{{ url_for('analytics_view') }}"
@@ -34,7 +34,7 @@
       <span>Analytics</span>
     </a>
 
-    <div class="nav-section-label">Módulos</div>
+    <div class="nav-section-label">Modules</div>
 
     {% set order_raw = settings.get('modules_order', '') %}
     {% if order_raw %}
@@ -72,14 +72,14 @@
     {% endfor %}
   </nav>
 
-  <!-- Sistema — separado al fondo -->
+  <!-- System — separated at the bottom -->
   {% if access.access_type == 'full' or not access.authenticated %}
   <div class="sidebar-sistema">
-    <div class="nav-section-label">Sistema</div>
+    <div class="nav-section-label">System</div>
     <a href="{{ url_for('settings_view') }}"
        class="nav-item {% if request.endpoint == 'settings_view' %}active{% endif %}">
       <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      Configuración
+      Settings
     </a>
   </div>
   {% endif %}
@@ -87,7 +87,7 @@
   <div class="sidebar-footer">
     
     <div class="footer-version">
-      Sistema &nbsp;<strong>{{ settings.version }}</strong>
+      System &nbsp;<strong>{{ settings.version }}</strong>
     </div>
   </div>
 </aside>
@@ -98,20 +98,20 @@
     <h1 class="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
     <div class="topbar-right">
       <div class="session-popup-container" id="session-popup-container">
-        <button class="session-history-btn" id="btn-session-history" title="Historial de sesiones">
+        <button class="session-history-btn" id="btn-session-history" title="Session history">
           <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          <span>Historial</span>
+          <span>History</span>
           <span class="session-count-badge" id="session-count-badge">0</span>
         </button>
         <div class="session-dropdown" id="session-dropdown" hidden>
           <div class="session-dropdown-header">
-            <span>Sesiones</span>
-            <button class="session-new-btn" id="btn-new-session">+ Nueva</button>
+            <span>Sessions</span>
+            <button class="session-new-btn" id="btn-new-session">+ New</button>
           </div>
           <div class="session-list" id="session-list"></div>
         </div>
       </div>
-      <span class="online-badge">En línea</span>
+      <span class="online-badge">Online</span>
     </div>
   </header>
 
@@ -136,12 +136,12 @@
       {% endif %}
     </div>
     <h2>{{ settings.system_name }}</h2>
-    <p>Identifícate para acceder al sistema</p>
+    <p>Identify yourself to access the system</p>
     <form id="access-form" autocomplete="off">
-      <input type="email" id="access-email" placeholder="Correo electrónico" required autofocus/>
-      <input type="password" id="access-password" placeholder="Clave" required/>
-      <div class="access-location-status" id="access-location-status">Solicitando ubicación...</div>
-      <button type="submit" id="access-login-btn">Ingresar</button>
+      <input type="email" id="access-email" placeholder="Email address" required autofocus/>
+      <input type="password" id="access-password" placeholder="Password" required/>
+      <div class="access-location-status" id="access-location-status">Requesting location...</div>
+      <button type="submit" id="access-login-btn">Sign in</button>
       <div class="access-error" id="access-error"></div>
     </form>
   </div>
@@ -162,14 +162,14 @@
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(function(pos) {
       locationData = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      locStatus.textContent = '✓ Ubicación obtenida';
+      locStatus.textContent = '✓ Location obtained';
       locStatus.className = 'access-location-status ok';
     }, function() {
-      locStatus.textContent = '⚠ No se pudo obtener ubicación (no obligatorio)';
+      locStatus.textContent = '⚠ Could not obtain location (not required)';
       locStatus.className = 'access-location-status err';
     }, { timeout: 8000 });
   } else {
-    locStatus.textContent = '⚠ Geolocalización no disponible';
+    locStatus.textContent = '⚠ Geolocation not available';
     locStatus.className = 'access-location-status err';
   }
 
@@ -178,12 +178,12 @@
     var email = emailInput.value.trim();
     var pass = passInput.value.trim();
     if (!email || !pass) {
-      errorEl.textContent = 'Completa todos los campos';
+      errorEl.textContent = 'Fill in all fields';
       errorEl.className = 'access-error show';
       return;
     }
     btn.disabled = true;
-    btn.textContent = 'Ingresando...';
+    btn.textContent = 'Signing in...';
     errorEl.className = 'access-error';
 
     fetch('/api/access/login', {
@@ -196,17 +196,17 @@
       if (res.status === 200 && res.data.success) {
         window.location.reload();
       } else {
-        errorEl.textContent = res.data.error || 'Error al iniciar sesión';
+        errorEl.textContent = res.data.error || 'Error signing in';
         errorEl.className = 'access-error show';
         btn.disabled = false;
-        btn.textContent = 'Ingresar';
+        btn.textContent = 'Sign in';
       }
     })
     .catch(function() {
-      errorEl.textContent = 'Error de conexión';
+      errorEl.textContent = 'Connection error';
       errorEl.className = 'access-error show';
       btn.disabled = false;
-      btn.textContent = 'Ingresar';
+      btn.textContent = 'Sign in';
     });
   });
 

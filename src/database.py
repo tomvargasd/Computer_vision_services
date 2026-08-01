@@ -7,94 +7,94 @@ from src.config import DB_PATH, APP_VERSION
 
 MODULES_META = {
     "personas": {
-        "label": "Detección de Personas",
+        "label": "People Detection",
         "functions": {
-            "conteo":      {"label": "Conteo de personas",       "description": "Cuenta el número total de personas en escena"},
-            "permanencia": {"label": "Tiempo de permanencia",    "description": "Mide el tiempo que cada persona permanece en zona"},
-            "heatmap":     {"label": "Mapa de calor",            "description": "Genera mapa de densidad de movimiento"},
+            "conteo":      {"label": "People count",      "description": "Counts the total number of people in the scene"},
+            "permanencia": {"label": "Dwell time",        "description": "Measures how long each person stays in the area"},
+            "heatmap":     {"label": "Heatmap",           "description": "Generates a motion density map"},
         },
     },
     "armas": {
-        "label": "Detección de Armas",
+        "label": "Weapon Detection",
         "functions": {
-            "deteccion_arma": {"label": "Detección de arma",             "description": "Detecta presencia de armas en escena"},
-            "captura_rostro": {"label": "Captura automática de rostro",  "description": "Captura y guarda foto del portador del arma"},
-            "tipo_arma":      {"label": "Clasificar tipo de arma",       "description": "Clasifica entre arma blanca o arma de fuego", "locked": True},
+            "deteccion_arma": {"label": "Weapon detection",            "description": "Detects the presence of weapons in the scene"},
+            "captura_rostro": {"label": "Automatic face capture",      "description": "Captures and saves a photo of the weapon carrier"},
+            "tipo_arma":      {"label": "Classify weapon type",        "description": "Classifies between a bladed weapon or a firearm", "locked": True},
         },
     },
     "acciones": {
-        "label": "Detección de Acciones",
+        "label": "Action Detection",
         "functions": {
-            "deteccion_acciones":  {"label": "Detección de acciones",        "description": "Dibuja esqueleto de pose COCO-17 sobre cada persona"},
-            "deteccion_violencia": {"label": "Alertas de violencia",         "description": "Detecta golpes, patadas y agresión física"},
-            "deteccion_robo":      {"label": "Alertas de robo / amenaza",   "description": "Detecta brazo apuntando y posturas de amenaza"},
-            "deteccion_sospechosa":{"label": "Actividad sospechosa",        "description": "Detecta agachado, rastreo y movimientos furtivos"},
-            "deteccion_celular":  {"label": "Uso de celular",            "description": "Detecta personas usando teléfono (llamando o texteando)"},
-            "deteccion_caida":    {"label": "Detección de caídas",       "description": "Detecta caídas parciales (tropiezo/arrodillado) y completas"},
+            "deteccion_acciones":  {"label": "Action detection",         "description": "Draws a COCO-17 pose skeleton over each person"},
+            "deteccion_violencia": {"label": "Violence alerts",          "description": "Detects punches, kicks and physical aggression"},
+            "deteccion_robo":      {"label": "Theft / threat alerts",   "description": "Detects pointing arms and threatening postures"},
+            "deteccion_sospechosa":{"label": "Suspicious activity",     "description": "Detects crouching, stalking and furtive movements"},
+            "deteccion_celular":   {"label": "Cell phone use",          "description": "Detects people using a phone (calling or texting)"},
+            "deteccion_caida":     {"label": "Fall detection",          "description": "Detects partial (stumble/kneel) and complete falls"},
         },
     },
     "troncos": {
-        "label": "Conteo de Troncos",
+        "label": "Log Counting",
         "functions": {
-            "conteo": {"label": "Conteo de troncos", "description": "Cuenta troncos que cruzan la línea vertical"},
+            "conteo": {"label": "Log count", "description": "Counts logs crossing the vertical line"},
         },
     },
     "pallets": {
-        "label": "Conteo de Pallets",
+        "label": "Pallet Counting",
         "functions": {
-            "conteo": {"label": "Conteo de pallets", "description": "Cuenta pallets dentro del área de reconocimiento"},
+            "conteo": {"label": "Pallet count", "description": "Counts pallets within the detection area"},
         },
     },
     "cajas": {
-        "label": "Conteo de Cajas",
+        "label": "Box Counting",
         "functions": {
-            "conteo": {"label": "Conteo de cajas", "description": "Cuenta cajas que cruzan la línea horizontal"},
+            "conteo": {"label": "Box count", "description": "Counts boxes crossing the horizontal line"},
         },
     },
     "reglamento": {
-        "label": "Detección de Reglamento",
+        "label": "Compliance Detection",
         "functions": {
-            "deteccion_botas": {"label": "Detección de botas",  "description": "Detecta si las personas usan botas dentro del área"},
-            "conteo_tiempo":   {"label": "Conteo de tiempo",    "description": "Mide el tiempo de permanencia en el área"},
-            "alertas":         {"label": "Alertas",             "description": "Genera alertas visuales por incumplimiento"},
-            "analytics":       {"label": "Analytics",           "description": "Estadísticas y gráficos del módulo"},
+            "deteccion_botas": {"label": "Boot detection",  "description": "Detects whether people are wearing boots within the area"},
+            "conteo_tiempo":   {"label": "Time count",      "description": "Measures dwell time in the area"},
+            "alertas":         {"label": "Alerts",          "description": "Generates visual alerts for non-compliance"},
+            "analytics":       {"label": "Analytics",       "description": "Module statistics and charts"},
         },
     },
     "epp": {
-        "label": "Detección de EPP",
+        "label": "PPE Detection",
         "functions": {
-            "deteccion_epp": {"label": "Detección de EPP",       "description": "Detecta equipo de protección personal en personas"},
-            "alertas":       {"label": "Alertas sin EPP",        "description": "Captura y alerta cuando una persona no tiene EPP completo"},
-            "analytics":     {"label": "Analytics",              "description": "Ranking de EPP más usado y estadísticas"},
+            "deteccion_epp": {"label": "PPE detection",        "description": "Detects personal protective equipment on people"},
+            "alertas":       {"label": "Missing PPE alerts",   "description": "Captures and alerts when a person lacks full PPE"},
+            "analytics":     {"label": "Analytics",            "description": "Ranking of most used PPE and statistics"},
         },
     },
     "carga_descarga": {
-        "label": "Detección de Carga y Descarga",
+        "label": "Loading/Unloading Detection",
         "functions": {
-            "conteo":   {"label": "Conteo de carga/descarga", "description": "Cuenta objetos que cruzan la línea de conteo"},
-            "analytics":{"label": "Analytics",                "description": "Estadísticas y gráficos del módulo"},
+            "conteo":   {"label": "Load/unload count", "description": "Counts objects crossing the counting line"},
+            "analytics":{"label": "Analytics",         "description": "Module statistics and charts"},
         },
     },
     "smoke": {
-        "label": "Detección de Humo/Fuego",
+        "label": "Smoke/Fire Detection",
         "functions": {
-            "deteccion_humo": {"label": "Detección de humo/fuego", "description": "Detecta presencia de humo o fuego en escena"},
+            "deteccion_humo": {"label": "Smoke/fire detection", "description": "Detects the presence of smoke or fire in the scene"},
         },
     },
     "vehiculos": {
-        "label": "Reconocimiento de Vehículos",
+        "label": "Vehicle Recognition",
         "functions": {
-            "conteo":           {"label": "Conteo de vehículos",     "description": "Cuenta vehículos que cruzan la línea de conteo"},
-            "deteccion_placas": {"label": "Detección de placas",    "description": "Reconoce placas en vehículos detectados"},
+            "conteo":           {"label": "Vehicle count",            "description": "Counts vehicles crossing the counting line"},
+            "deteccion_placas": {"label": "License plate detection",  "description": "Recognizes plates on detected vehicles"},
         },
     },
     "tanques_gas": {
-        "label": "Tanques de Gas",
+        "label": "Gas Tanks",
         "functions": {
-            "conteo":              {"label": "Conteo de tanques",               "description": "Cuenta tanques que cruzan línea o ingresan a área"},
-            "deteccion_acciones":  {"label": "Detección de acciones",           "description": "Detección de acciones con sistema de enseñanza"},
-            "deteccion_humo":      {"label": "Detección de humo/fuego",         "description": "Detecta presencia de humo o fuego en escena"},
-            "areas_restringidas":  {"label": "Áreas restringidas",              "description": "Define áreas prohibidas para personas o tanques"},
+            "conteo":              {"label": "Tank count",                "description": "Counts tanks crossing the line or entering the area"},
+            "deteccion_acciones":  {"label": "Action detection",          "description": "Action detection with teaching system"},
+            "deteccion_humo":      {"label": "Smoke/fire detection",      "description": "Detects the presence of smoke or fire in the scene"},
+            "areas_restringidas":  {"label": "Restricted areas",          "description": "Defines prohibited areas for people or tanks"},
         },
     },
 }
@@ -257,7 +257,7 @@ def init_db():
 
             CREATE TABLE IF NOT EXISTS chat_sessions (
                 id TEXT PRIMARY KEY,
-                title TEXT NOT NULL DEFAULT 'Nueva sesión',
+                title TEXT NOT NULL DEFAULT 'New session',
                 created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
             );
@@ -689,6 +689,28 @@ def get_module_analytics(module_id: str, source_id: int = None, days: int = 7) -
     }
 
 
+def get_module_analytics_daily(module_id: str, source_id: int = None, days: int = 7) -> list:
+    """Eventos diarios desglosados por fuente y tipo (para dashboards analíticos).
+
+    Devuelve filas {day, source_id, event_type, count} para el módulo dado,
+    opcionalmente filtrado por fuente y rango de días.
+    """
+    with get_conn() as conn:
+        params = [module_id, f'-{days} days']
+        src_filter = " AND source_id=?" if source_id is not None else ""
+        if source_id is not None:
+            params.insert(1, source_id)
+        rows = conn.execute(
+            f"""SELECT DATE(created_at) as day, source_id, event_type, COUNT(*) as count
+                FROM module_events
+                WHERE module_id=?{src_filter} AND created_at >= datetime('now', ?)
+                GROUP BY DATE(created_at), source_id, event_type
+                ORDER BY day ASC, source_id ASC""",
+            params,
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
 # ── Source Config (Configuración por fuente v3.0) ──────────────────────────
 
 def save_source_config(source_id: int, key: str, value: str) -> None:
@@ -725,7 +747,7 @@ def delete_source_config(source_id: int) -> None:
 
 import uuid
 
-def create_chat_session(title: str = "Nueva sesión") -> str:
+def create_chat_session(title: str = "New session") -> str:
     session_id = str(uuid.uuid4())
     with get_conn() as conn:
         conn.execute(

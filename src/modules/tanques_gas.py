@@ -214,12 +214,12 @@ class TanquesGasPipeline(BasePersistPipeline):
     def _make_error_frame(self, msg: str) -> np.ndarray:
         h, w = 480, 640
         frame = np.zeros((h, w, 3), dtype=np.uint8)
-        cv2.putText(frame, "ERROR DE FUENTE", (int(w * 0.25), h // 2 - 30),
+        cv2.putText(frame, "SOURCE ERROR", (int(w * 0.25), h // 2 - 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.9, (85, 42, 24), 2, cv2.LINE_AA)
         for i, part in enumerate([msg[j:j+55] for j in range(0, min(len(msg), 165), 55)]):
             cv2.putText(frame, part, (20, h // 2 + 10 + i * 28),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.55, (200, 200, 200), 1, cv2.LINE_AA)
-        cv2.putText(frame, "Verifica la ruta o permisos de la fuente", (20, h - 28),
+        cv2.putText(frame, "Check the source path or permissions", (20, h - 28),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.48, (120, 120, 120), 1, cv2.LINE_AA)
         return frame
 
@@ -337,7 +337,7 @@ class TanquesGasPipeline(BasePersistPipeline):
 
         # ── HUD ──
         if self._teach_mode:
-            cv2.putText(annotated, "MODO ENSEÑAR - Haga clic en una persona", (12, 60),
+            cv2.putText(annotated, "TEACH MODE - Click on a person", (12, 60),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, MAGENTA, 2, cv2.LINE_AA)
 
         return annotated
@@ -388,13 +388,13 @@ class TanquesGasPipeline(BasePersistPipeline):
                     self.total_in += 1
                     self._counted_tracks.add(tid)
                     insert_module_event("tanques_gas", self.source_id,
-                                        "entry", f"Tanque ID {tid}")
+                                        "entry", f"Tank ID {tid}")
                 # Check exit
                 if tid in self._counted_tracks and not inside:
                     if self._cross_state.get(tid) == "inside":
                         self.total_out += 1
                         insert_module_event("tanques_gas", self.source_id,
-                                            "exit", f"Tanque ID {tid}")
+                                            "exit", f"Tank ID {tid}")
                     self._cross_state[tid] = "outside"
 
                 if inside:
@@ -433,11 +433,11 @@ class TanquesGasPipeline(BasePersistPipeline):
                     if direction == "in":
                         self.total_in += 1
                         insert_module_event("tanques_gas", self.source_id,
-                                            "entry", f"Tanque ID {tid}")
+                                            "entry", f"Tank ID {tid}")
                     else:
                         self.total_out += 1
                         insert_module_event("tanques_gas", self.source_id,
-                                            "exit", f"Tanque ID {tid}")
+                                            "exit", f"Tank ID {tid}")
 
             # ── Custom line counting ──
             elif self.line_mode == "custom_line":
@@ -463,30 +463,30 @@ class TanquesGasPipeline(BasePersistPipeline):
                     if s2 > 0:
                         self.total_in += 1
                         insert_module_event("tanques_gas", self.source_id,
-                                            "entry", f"Tanque ID {tid}")
+                                            "entry", f"Tank ID {tid}")
                     else:
                         self.total_out += 1
                         insert_module_event("tanques_gas", self.source_id,
-                                            "exit", f"Tanque ID {tid}")
+                                            "exit", f"Tank ID {tid}")
 
         # Draw counting overlays
         if self.line_mode == "horizontal":
             cv2.line(frame, draw_p1, draw_p2, PURPLE, 2)
-            cv2.putText(frame, f"Linea Horizontal  Entrada {self.total_in}  Salida {self.total_out}",
+            cv2.putText(frame, f"Horizontal Line  In {self.total_in}  Out {self.total_out}",
                         (12, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.6, YELLOW, 2, cv2.LINE_AA)
         elif self.line_mode == "vertical":
             cv2.line(frame, draw_p1, draw_p2, PURPLE, 2)
-            cv2.putText(frame, f"Linea Vertical  Entrada {self.total_in}  Salida {self.total_out}",
+            cv2.putText(frame, f"Vertical Line  In {self.total_in}  Out {self.total_out}",
                         (12, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.6, YELLOW, 2, cv2.LINE_AA)
         elif self.line_mode == "rectangle":
             cv2.rectangle(frame, (x1, y1), (x2, y2), PURPLE, 2)
-            cv2.putText(frame, f"Area  Entrada {self.total_in}  Salida {self.total_out}",
+            cv2.putText(frame, f"Area  In {self.total_in}  Out {self.total_out}",
                         (12, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.6, YELLOW, 2, cv2.LINE_AA)
         elif self.line_mode == "custom_line":
             cv2.line(frame, draw_p1, draw_p2, PURPLE, 2)
             cv2.circle(frame, draw_p1, 6, GREEN, -1)
             cv2.circle(frame, draw_p2, 6, GREEN, -1)
-            cv2.putText(frame, f"Custom Line  Entrada {self.total_in}  Salida {self.total_out}",
+            cv2.putText(frame, f"Custom Line  In {self.total_in}  Out {self.total_out}",
                         (12, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.6, YELLOW, 2, cv2.LINE_AA)
         elif self.line_mode == "custom_rect":
             pts = []
@@ -498,7 +498,7 @@ class TanquesGasPipeline(BasePersistPipeline):
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, WHITE, 2, cv2.LINE_AA)
             if len(pts) == 4:
                 cv2.polylines(frame, [np.array(pts)], True, PURPLE, 2)
-            cv2.putText(frame, f"Custom Rect  Entrada {self.total_in}  Salida {self.total_out}",
+            cv2.putText(frame, f"Custom Rect  In {self.total_in}  Out {self.total_out}",
                         (12, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.6, YELLOW, 2, cv2.LINE_AA)
 
         # Cleanup stale tracks
@@ -551,7 +551,7 @@ class TanquesGasPipeline(BasePersistPipeline):
 
                 if should_alert and _point_in_polygon((cx, cy), pts_px):
                     cv2.rectangle(frame, (x1b, y1b), (x2b, y2b), RED, 3)
-                    cv2.putText(frame, "RESTRINGIDO", (x1b, y1b - 24),
+                    cv2.putText(frame, "RESTRICTED", (x1b, y1b - 24),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, RED, 2, cv2.LINE_AA)
 
         return frame
@@ -680,7 +680,7 @@ class TanquesGasPipeline(BasePersistPipeline):
                     cooldowns[detected_action] = now
                     self._action_count[detected_action] = self._action_count.get(detected_action, 0) + 1
                     insert_module_event("tanques_gas", self.source_id,
-                                        detected_action, f"Accion ID {tid}: {detected_action}")
+                                        detected_action, f"Action ID {tid}: {detected_action}")
                     per_p = self._per_person_action_count.setdefault(detected_action, {})
                     per_p[tid] = per_p.get(tid, 0) + 1
                     self._action_detected_log.append({
@@ -702,7 +702,7 @@ class TanquesGasPipeline(BasePersistPipeline):
         recent = [e for e in self._action_detected_log if now - e["ts"] <= 10]
         y_offset = 60
         for entry in reversed(recent[-5:]):
-            lbl = f"Persona ID {entry['tid']} : {entry['action']}"
+            lbl = f"Person ID {entry['tid']} : {entry['action']}"
             cv2.putText(frame, lbl, (w - 320, y_offset),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.45, MAGENTA, 1, cv2.LINE_AA)
             y_offset += 18
@@ -768,14 +768,14 @@ class TanquesGasPipeline(BasePersistPipeline):
                     self._evidence_saved = True
                     cap_path = self._save_evidence(frame)
                     insert_module_event("tanques_gas", self.source_id,
-                                        "smoke_detected", "Humo/fuego detectado en tanques",
+                                        "smoke_detected", "Smoke/fire detected in tanks",
                                         capture_path=cap_path)
 
         if self.smoke_detected:
-            cv2.putText(frame, "!!! HUMO / FUEGO DETECTADO !!!",
+            cv2.putText(frame, "!!! SMOKE / FIRE DETECTED !!!",
                         (12, h - 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, RED, 2, cv2.LINE_AA)
             if self.first_detection_time:
-                cv2.putText(frame, f"Desde: {self.first_detection_time}",
+                cv2.putText(frame, f"Since: {self.first_detection_time}",
                             (12, h - 38), cv2.FONT_HERSHEY_SIMPLEX, 0.5, ORANGE, 1, cv2.LINE_AA)
 
         return frame

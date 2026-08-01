@@ -78,12 +78,12 @@ class TroncosPipeline(BasePersistPipeline):
     def _make_error_frame(self, msg: str) -> np.ndarray:
         h, w = 480, 640
         frame = np.zeros((h, w, 3), dtype=np.uint8)
-        cv2.putText(frame, "ERROR DE FUENTE", (int(w * 0.25), h // 2 - 30),
+        cv2.putText(frame, "SOURCE ERROR", (int(w * 0.25), h // 2 - 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.9, (85, 42, 24), 2, cv2.LINE_AA)
         for i, part in enumerate([msg[j:j+55] for j in range(0, min(len(msg), 165), 55)]):
             cv2.putText(frame, part, (20, h // 2 + 10 + i * 28),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.55, (200, 200, 200), 1, cv2.LINE_AA)
-        cv2.putText(frame, "Verifica la ruta o permisos de la fuente", (20, h - 28),
+        cv2.putText(frame, "Check the source path or permissions", (20, h - 28),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.48, (120, 120, 120), 1, cv2.LINE_AA)
         return frame
 
@@ -171,7 +171,7 @@ class TroncosPipeline(BasePersistPipeline):
                             self._cross_state[tid] = "inside"
                             insert_module_event("troncos", self._source_id,
                                                 "tronco_crossing",
-                                                f"Tronco ID[{tid}] cruzó línea")
+                                                f"Log ID[{tid}] crossed line")
                     elif crossed_right:
                         if state in ("none", "inside"):
                             self._cross_state[tid] = "done"

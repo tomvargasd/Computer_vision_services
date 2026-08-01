@@ -965,54 +965,54 @@ class AccionesPipeline(BasePersistPipeline):
                 fall_trigger = False  # caída → body
 
                 if violencia_on and smooth[_K_VIOLENCIA] >= _RULES[_K_VIOLENCIA]["threshold"]:
-                    active.append(("VIOLENCIA",    _CLR_V, smooth[_K_VIOLENCIA]))
+                    active.append(("VIOLENCE",    _CLR_V, smooth[_K_VIOLENCIA]))
                     new_pdata[-1]["alert_active"][_K_VIOLENCIA] = True
                     if not prev_alert[_K_VIOLENCIA]:
                         self.total_alerts[_K_VIOLENCIA] += 1
                         insert_module_event("acciones", self.source_id,
-                                            "violencia", f"Violencia ID {tid}")
+                                            "violencia", f"Violence ID {tid}")
                     cap_trigger = True
 
                 if robo_on and smooth[_K_ROBO] >= _RULES[_K_ROBO]["threshold"]:
-                    active.append(("ROBO/AMENAZA", _CLR_R, smooth[_K_ROBO]))
+                    active.append(("THEFT/THREAT", _CLR_R, smooth[_K_ROBO]))
                     new_pdata[-1]["alert_active"][_K_ROBO] = True
                     if not prev_alert[_K_ROBO]:
                         self.total_alerts[_K_ROBO] += 1
                         insert_module_event("acciones", self.source_id,
-                                            "robo", f"Robo/amenaza ID {tid}")
+                                            "robo", f"Theft/threat ID {tid}")
                     cap_trigger = True
 
                 if sospechoso_on and smooth[_K_SOSPECHOSO] >= _RULES[_K_SOSPECHOSO]["threshold"]:
-                    active.append(("SOSPECHOSO",   _CLR_S, smooth[_K_SOSPECHOSO]))
+                    active.append(("SUSPICIOUS",   _CLR_S, smooth[_K_SOSPECHOSO]))
                     new_pdata[-1]["alert_active"][_K_SOSPECHOSO] = True
                     if not prev_alert[_K_SOSPECHOSO]:
                         self.total_alerts[_K_SOSPECHOSO] += 1
                         insert_module_event("acciones", self.source_id,
-                                            "sospechoso", f"Sospechoso ID {tid}")
+                                            "sospechoso", f"Suspicious ID {tid}")
 
                 if celular_on and smooth[_K_CELULAR] >= _RULES[_K_CELULAR]["threshold"]:
-                    active.append(("USO CELULAR",  _CLR_PH, smooth[_K_CELULAR]))
+                    active.append(("PHONE USE",  _CLR_PH, smooth[_K_CELULAR]))
                     new_pdata[-1]["alert_active"][_K_CELULAR] = True
                     if not prev_alert[_K_CELULAR]:
                         self.total_alerts[_K_CELULAR] += 1
                         insert_module_event("acciones", self.source_id,
-                                            "celular", f"Celular ID {tid}")
+                                            "celular", f"Phone use ID {tid}")
                     cap_trigger = True
 
                 if caida_on and smooth[_K_CAIDA] >= _RULES[_K_CAIDA]["threshold"]:
                     subtype = fall_state.get("subtype", "")
                     if subtype == "completa":
-                        lbl, clr = "CAIDA COMPLETA", _CLR_FC
+                        lbl, clr = "FULL FALL", _CLR_FC
                     elif subtype == "parcial":
-                        lbl, clr = "CAIDA PARCIAL", _CLR_FP
+                        lbl, clr = "PARTIAL FALL", _CLR_FP
                     else:
-                        lbl, clr = "CAIDA", _CLR_FP
+                        lbl, clr = "FALL", _CLR_FP
                     active.append((lbl, clr, smooth[_K_CAIDA]))
                     new_pdata[-1]["alert_active"][_K_CAIDA] = True
                     if not prev_alert[_K_CAIDA]:
                         self.total_alerts[_K_CAIDA] += 1
                         insert_module_event("acciones", self.source_id,
-                                            "caida", f"Caida ID {tid}")
+                                            "caida", f"Fall ID {tid}")
                     fall_trigger = True
 
                 # ── Bounding box
@@ -1095,7 +1095,7 @@ class AccionesPipeline(BasePersistPipeline):
 
         # ── HUD inferior izquierdo
         cv2.putText(
-            annotated, f"Personas: {persons}",
+            annotated, f"People: {persons}",
             (12, h - 14), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (255, 255, 255), 2, cv2.LINE_AA,
         )
 

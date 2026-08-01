@@ -1,34 +1,34 @@
 {% extends "base.html" %}
-{% block title %}Analytics · Humo/Fuego{% endblock %}
+{% block title %}Analytics · Smoke/Fire{% endblock %}
 {% block page_title %}Analytics · {{ module.label }}{% endblock %}
 {% block content %}
 <div class="analytics-dashboard">
   <div class="analytics-kpi-row">
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M12 2L9.5 6.5 12 10 9.5 13.5 12 17l-2.5 3.5"/><path d="M12 2l2.5 4.5L12 10l2.5 3.5L12 17l2.5 3.5"/></svg> Estado</span><span class="analytics-kpi-value" id="kpi-status">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3 8 12 13 21 8"/></svg> Total detecciones</span><span class="analytics-kpi-value" id="kpi-total">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Hoy</span><span class="analytics-kpi-value" id="kpi-today">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M12 2L9.5 6.5 12 10 9.5 13.5 12 17l-2.5 3.5"/><path d="M12 2l2.5 4.5L12 10l2.5 3.5L12 17l2.5 3.5"/></svg> Status</span><span class="analytics-kpi-value" id="kpi-status">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3 8 12 13 21 8"/></svg> Total detections</span><span class="analytics-kpi-value" id="kpi-total">—</span></div>
+    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Today</span><span class="analytics-kpi-value" id="kpi-today">—</span></div>
   </div>
 
   <div class="analytics-info-row">
     <div class="analytics-info-card">
-      <h4>Última detección</h4>
+      <h4>Last detection</h4>
       <div id="last-detection" class="analytics-info-content">—</div>
     </div>
   </div>
 
   <div class="analytics-chart-row">
     <div class="analytics-chart-card">
-      <h4>Timeline de detecciones</h4>
+      <h4>Detection timeline</h4>
       <canvas id="chart-timeline"></canvas>
     </div>
     <div class="analytics-chart-card">
-      <h4>Por fuente</h4>
+      <h4>By source</h4>
       <div id="per-source-table" class="analytics-per-source"></div>
     </div>
   </div>
 
   <div class="analytics-events">
-    <h4>Todas las detecciones</h4>
+    <h4>All detections</h4>
     <div id="events-list" class="analytics-events-list"></div>
   </div>
 </div>
@@ -67,13 +67,13 @@ async function loadKPIs() {
     if (!lastEvent || e.created_at > lastEvent.time) lastEvent = { source_id: e.source_id, time: e.created_at, label: e.label };
   });
 
-  setText('kpi-status', isActive ? '🔥 Detectado' : '✅ Monitoreando');
+  setText('kpi-status', isActive ? '🔥 Detected' : '✅ Monitoring');
   setText('kpi-total', totalVal > 0 ? totalVal : '—');
   setText('kpi-today', todayVal > 0 ? todayVal : '—');
 
   const ldEl = document.getElementById('last-detection');
   if (lastEvent) {
-    const sid = lastEvent.source_id ? `Fuente ${lastEvent.source_id}` : '';
+    const sid = lastEvent.source_id ? `Source ${lastEvent.source_id}` : '';
     ldEl.innerHTML = `<strong>${sid ? sid + ' · ' : ''}${lastEvent.time || ''}</strong>${lastEvent.label ? '<br>' + lastEvent.label : ''}`;
   }
 
@@ -81,11 +81,11 @@ async function loadKPIs() {
   if (sources.length > 0) {
     const srcCounts = {};
     (d.events || []).forEach(e => { const s = e.source_id; srcCounts[s] = (srcCounts[s] || 0) + 1; });
-    psEl.innerHTML = '<table class="ps-table"><tr><th>Fuente</th><th>Detecciones</th><th>Estado</th></tr>' +
-      sources.map(sid => `<tr><td>Fuente ${sid}</td><td>${srcCounts[sid] ?? (counters[sid]?.smoke_detected ? 1 : 0)}</td><td>${counters[sid]?.smoke_detected ? '🔥' : '—'}</td></tr>`).join('') +
+    psEl.innerHTML = '<table class="ps-table"><tr><th>Source</th><th>Detections</th><th>Status</th></tr>' +
+      sources.map(sid => `<tr><td>Source ${sid}</td><td>${srcCounts[sid] ?? (counters[sid]?.smoke_detected ? 1 : 0)}</td><td>${counters[sid]?.smoke_detected ? '🔥' : '—'}</td></tr>`).join('') +
       '</table>';
   } else {
-    psEl.innerHTML = '<p class="text-muted">Sin datos de fuentes</p>';
+    psEl.innerHTML = '<p class="text-muted">No source data</p>';
   }
 }
 
@@ -103,7 +103,7 @@ async function loadTimeline() {
   if (timelineChart) timelineChart.destroy();
   timelineChart = new Chart(ctx, {
     type: 'bar',
-    data: { labels, datasets: [{ label: 'Detecciones', data, backgroundColor: '#EF4444' }] },
+    data: { labels, datasets: [{ label: 'Detections', data, backgroundColor: '#EF4444' }] },
     options: { responsive: true, plugins: { legend: { display: false } },
       scales: { x: { ticks: { color: '#9D9FA2' } }, y: { ticks: { color: '#9D9FA2', stepSize: 1 } } } },
   });
@@ -118,7 +118,7 @@ async function loadEvents() {
     `<div class="analytics-event-item">
       <span class="analytics-event-time">${e.created_at || ''}</span>
       <span class="analytics-event-type">${e.event_type}</span>
-      <span class="analytics-event-label">${e.label}${e.source_id ? ' · Fuente ' + e.source_id : ''}</span>
+      <span class="analytics-event-label">${e.label}${e.source_id ? ' · Source ' + e.source_id : ''}</span>
       ${e.capture_path ? `<button class="ev-btn-view" onclick="openEvidence('${MODULE_ID}', ${e.id})"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>` : ''}
     </div>`
   ).join('');
