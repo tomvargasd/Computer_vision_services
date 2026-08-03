@@ -402,10 +402,40 @@ def api_upload(field):
     dest = os.path.join(dest_dir, fname)
     f.save(dest)
     if field == "logo":
+        logos = _logos_list()
+        if fname not in logos:
+            logos.append(fname)
+        _save_logos(logos)
         set_setting("logo", fname)
         return jsonify({"path": fname})
     rel = os.path.join("static", "uploads", field + "s" if field != "logo" else "uploads", fname)
     return jsonify({"path": rel})
+
+
+def _logos_list():
+    raw = get_settings().get("logos", "[]")
+    try:
+        return json.loads(raw)
+    except Exception:
+        return []
+
+
+def _save_logos(logos):
+    set_setting("logos", json.dumps(list(dict.fromkeys(logos))))
+
+
+def _logos_payload():
+    active = get_settings().get("logo", "")
+    logos = _logos_list()
+    if active and active not in logos:
+        logos.insert(0, active)
+        _save_logos(logos)
+    return {"logos": logos, "active": active}
+
+
+@app.route("/api/settings/logos", methods=["GET"])
+def api_logos():
+    return jsonify(_logos_payload())
 
 
 @app.route("/api/settings/logo", methods=["POST"])
@@ -420,8 +450,45 @@ def api_upload_logo():
         return jsonify({"error": "Format not allowed"}), 400
     fname = secure_filename(f.filename)
     f.save(os.path.join(UPLOAD_FOLDER, fname))
+
+    logos = _logos_list()
+    if fname not in logos:
+        logos.append(fname)
+    _save_logos(logos)
+
     set_setting("logo", fname)
-    return jsonify({"logo": fname})
+    payload = {"logo": fname, **_logos_payload()}
+    return jsonify(payload)
+
+
+@app.route("/api/settings/logo/active", methods=["POST"])
+def api_set_active_logo():
+    data = request.get_json(silent=True) or {}
+    fname = (data.get("filename") or "").strip()
+    if not fname:
+        return jsonify({"error": "Filename required"}), 400
+    logos = _logos_list()
+    if fname not in logos:
+        return jsonify({"error": "Logo not found"}), 404
+    set_setting("logo", fname)
+    return jsonify(_logos_payload())
+
+
+@app.route("/api/settings/logo/delete", methods=["POST"])
+def api_delete_logo():
+    data = request.get_json(silent=True) or {}
+    fname = (data.get("filename") or "").strip()
+    if not fname:
+        return jsonify({"error": "Filename required"}), 400
+    logos = [x for x in _logos_list() if x != fname]
+    _save_logos(logos)
+    try:
+        os.remove(os.path.join(UPLOAD_FOLDER, fname))
+    except OSError:
+        pass
+    if get_settings().get("logo") == fname:
+        set_setting("logo", logos[0] if logos else "")
+    return jsonify(_logos_payload())
 
 
 @app.route("/api/<module_id>/upload-model", methods=["POST"])

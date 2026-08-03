@@ -42,6 +42,7 @@
             <div class="settings-toast" id="logo-toast">✓ Logo updated successfully</div>
           </div>
         </div>
+        <div class="logos-gallery" id="logos-gallery"></div>
       </div>
     </div>
 
@@ -602,6 +603,103 @@ document.querySelectorAll(".settings-subtab").forEach(tab => {
 });
 
 // ── Logo upload ───────────────────────────────────────────────────
+let savedLogos = [];
+let activeLogo = "{{ settings.logo or '' }}";
+
+function renderLogoGallery() {
+  const gallery = document.getElementById("logos-gallery");
+  if (!gallery) return;
+  if (!savedLogos.length) {
+    gallery.innerHTML = '<p class="logo-gallery-empty">No logos uploaded yet.</p>';
+    return;
+  }
+  gallery.innerHTML = savedLogos.map((fname) => {
+    const isActive = fname === activeLogo;
+    const url = `/static/uploads/${encodeURIComponent(fname)}`;
+    return `
+      <div class="logo-item ${isActive ? "active" : ""}" data-filename="${fname}"
+           title="${isActive ? "Active logo" : "Click to use this logo"}">
+        <img src="${url}" alt="${fname}" loading="lazy"/>
+        ${isActive ? '<div class="logo-item-check">✓</div>' : ""}
+        <button class="logo-item-del" data-del="${fname}" title="Delete logo">✕</button>
+      </div>`;
+  }).join("");
+}
+
+function updateLogoPreview(fname) {
+  const box = document.getElementById("logo-preview-box");
+  if (!fname) {
+    box.innerHTML = '<svg id="logo-preview-placeholder" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>';
+  } else {
+    const url = `/static/uploads/${encodeURIComponent(fname)}`;
+    box.innerHTML = `<img id="logo-preview-img" src="${url}" alt="Logo"/>`;
+  }
+  const sidebarLogoWrap = document.querySelector(".sidebar .logo");
+  if (sidebarLogoWrap) {
+    const existing = sidebarLogoWrap.querySelector(".logo-img, .logo-icon");
+    if (fname) {
+      const url = `/static/uploads/${encodeURIComponent(fname)}`;
+      if (existing) existing.outerHTML = `<img class="logo-img" src="${url}" alt="Logo"/>`;
+    } else if (existing) {
+      existing.outerHTML = '<span class="logo-icon">◈</span>';
+    }
+  }
+}
+
+async function loadLogos() {
+  try {
+    const res = await fetch("/api/settings/logos");
+    if (!res.ok) return;
+    const data = await res.json();
+    savedLogos = data.logos || [];
+    activeLogo = data.active || "";
+    renderLogoGallery();
+    updateLogoPreview(activeLogo);
+  } catch (err) { console.error(err); }
+}
+
+async function setActiveLogo(fname) {
+  if (fname === activeLogo) return;
+  try {
+    const res = await fetch("/api/settings/logo/active", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename: fname }),
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || "Error switching logo"); return; }
+    savedLogos = data.logos || savedLogos;
+    activeLogo = data.active || "";
+    renderLogoGallery();
+    updateLogoPreview(activeLogo);
+    showToast("logo-toast");
+  } catch (err) { console.error(err); }
+}
+
+async function deleteLogo(fname) {
+  if (!confirm("Delete this logo?")) return;
+  try {
+    const res = await fetch("/api/settings/logo/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename: fname }),
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || "Error deleting logo"); return; }
+    savedLogos = data.logos || [];
+    activeLogo = data.active || "";
+    renderLogoGallery();
+    updateLogoPreview(activeLogo);
+  } catch (err) { console.error(err); }
+}
+
+document.getElementById("logos-gallery").addEventListener("click", (e) => {
+  const del = e.target.closest(".logo-item-del");
+  if (del) { e.stopPropagation(); deleteLogo(del.dataset.del); return; }
+  const item = e.target.closest(".logo-item");
+  if (item) setActiveLogo(item.dataset.filename);
+});
+
 document.getElementById("logo-file-input").addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (!file) return;
@@ -611,21 +709,15 @@ document.getElementById("logo-file-input").addEventListener("change", async (e) 
     const res  = await fetch("/api/settings/logo", { method: "POST", body: form });
     const data = await res.json();
     if (!res.ok) { alert(data.error || "Error uploading logo"); return; }
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const box = document.getElementById("logo-preview-box");
-      box.innerHTML = `<img id="logo-preview-img" src="${ev.target.result}" alt="Logo"/>`;
-    };
-    reader.readAsDataURL(file);
-    const sidebarLogoWrap = document.querySelector(".sidebar .logo");
-    if (sidebarLogoWrap) {
-      const url = `/static/uploads/${data.logo}`;
-      const existing = sidebarLogoWrap.querySelector(".logo-img, .logo-icon");
-      if (existing) existing.outerHTML = `<img class="logo-img" src="${url}" alt="Logo"/>`;
-    }
+    savedLogos = data.logos || [];
+    activeLogo = data.active || "";
+    renderLogoGallery();
+    updateLogoPreview(activeLogo);
     showToast("logo-toast");
   } catch (err) { console.error(err); }
 });
+
+loadLogos();
 
 // ── Guardar nombre ────────────────────────────────────────────────
 document.getElementById("save-name-btn").addEventListener("click", async () => {
