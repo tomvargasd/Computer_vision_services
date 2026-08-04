@@ -103,6 +103,7 @@
       width: 14px; height: 14px; border-radius: 50%; border: none; background: #C800C8; cursor: pointer;
     }
     .lv-line-val { font-size: 0.82rem; font-weight: 700; color: #182A55; min-width: 42px; text-align: right; font-variant-numeric: tabular-nums; }
+    .lv-opt-help { font-size: 0.7rem; color: #9D9FA2; margin-top: 8px; line-height: 1.35; }
     .lv-inout { display: flex; gap: 10px; }
     .lv-inout-card {
       flex: 1; background: #F0F1F3; border: 1px solid #D8DCE3;
@@ -112,6 +113,15 @@
     .lv-inout-card.in  .lv-inout-val { color: #22C55E; }
     .lv-inout-card.out .lv-inout-val { color: #EF4444; }
     .lv-inout-lbl { font-size: 0.65rem; text-transform: uppercase; letter-spacing: .08em; color: #9D9FA2; margin-top: 3px; }
+    .lv-cats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .lv-cat-card {
+      background: #F0F1F3; border: 1px solid #D8DCE3; border-radius: 9px;
+      padding: 8px 6px; text-align: center;
+    }
+    .lv-cat-lbl { display: block; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #9D9FA2; }
+    .lv-cat-val { display: block; font-size: 1.15rem; font-weight: 700; color: #182A55; font-variant-numeric: tabular-nums; margin-top: 2px; }
+    .lv-cat-card.exc { background: #F1F5F9; border-color: #CBD5E1; }
+    .lv-cat-card.exc .lv-cat-lbl { color: #64748B; }
     .lv-info-row {
       display: flex; align-items: center; justify-content: space-between;
       font-size: 0.72rem; color: #9D9FA2;
@@ -173,6 +183,30 @@
         </div>
       </div>
     </div>
+    <div class="lv-section">
+      <div class="lv-section-title">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+        Diameter categories
+      </div>
+      <div class="lv-cats">
+        <div class="lv-cat-card"><span class="lv-cat-lbl">Cat 0</span><span class="lv-cat-val" id="cnt-cat-0">0</span></div>
+        <div class="lv-cat-card"><span class="lv-cat-lbl">Cat 1</span><span class="lv-cat-val" id="cnt-cat-1">0</span></div>
+        <div class="lv-cat-card"><span class="lv-cat-lbl">Cat 2</span><span class="lv-cat-val" id="cnt-cat-2">0</span></div>
+        <div class="lv-cat-card"><span class="lv-cat-lbl">Cat 3</span><span class="lv-cat-val" id="cnt-cat-3">0</span></div>
+        <div class="lv-cat-card"><span class="lv-cat-lbl">Cat 4</span><span class="lv-cat-val" id="cnt-cat-4">0</span></div>
+        <div class="lv-cat-card"><span class="lv-cat-lbl">Cat 5</span><span class="lv-cat-val" id="cnt-cat-5">0</span></div>
+        <div class="lv-cat-card exc"><span class="lv-cat-lbl">Exc</span><span class="lv-cat-val" id="cnt-cat-6">0</span></div>
+      </div>
+      <div class="lv-line-config">
+        <div class="lv-line-lbl">Calibration (px per unit)</div>
+        <div class="lv-line-row">
+          <input type="range" id="ppu-slider" min="0.1" max="10" step="0.1" value="{{ settings.get('troncos_pixels_per_unit', '1.0') }}">
+          <span class="lv-line-val" id="ppu-val">{{ settings.get('troncos_pixels_per_unit', '1.0') }}</span>
+        </div>
+        <div class="lv-opt-help">Diámetro = ancho del box ÷ factor. Bájalo para que boxes grandes suban de clase.</div>
+      </div>
+      <button type="button" class="lv-btn-reset" id="btn-ppu-reset" style="margin-top:12px">Reset (1.0)</button>
+    </div>
     <div class="lv-info-row">
       <span>Source #<span class="lv-info-id">{{ source.id }}</span></span>
       <span id="lv-fps">— fps</span>
@@ -221,6 +255,11 @@ function startPoll() {
     const d = await r.json();
     const totalEl = document.getElementById("cnt-total");
     if (totalEl) totalEl.textContent = d.total_count;
+    const counts = d.counts || {};
+    for (let c = 0; c <= 6; c++) {
+      const el = document.getElementById(`cnt-cat-${c}`);
+      if (el) el.textContent = counts[c] ?? 0;
+    }
     document.getElementById("lv-ts").textContent =
       new Date().toLocaleTimeString("en-US", { hour12: false });
   }, 1500);
@@ -251,12 +290,42 @@ if (lineSlider) {
   });
 }
 
+const ppuSlider = document.getElementById("ppu-slider");
+const ppuVal    = document.getElementById("ppu-val");
+function sendPpu(value) {
+  return fetch("/api/troncos/settings/pixels-per-unit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ value: parseFloat(value) }),
+  });
+}
+if (ppuSlider) {
+  let ppuDebounce;
+  ppuSlider.addEventListener("input", () => {
+    ppuVal.textContent = ppuSlider.value;
+    clearTimeout(ppuDebounce);
+    ppuDebounce = setTimeout(() => sendPpu(ppuSlider.value), 250);
+  });
+}
+const btnPpuReset = document.getElementById("btn-ppu-reset");
+if (btnPpuReset) {
+  btnPpuReset.addEventListener("click", async () => {
+    ppuSlider.value = "1.0";
+    ppuVal.textContent = "1.0";
+    await sendPpu(1.0);
+  });
+}
+
 document.getElementById("btn-reset").addEventListener("click", async () => {
   await fetch(`/api/troncos/sources/${SOURCE_ID}/reset`, { method: "POST" });
   ["cnt-total"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.textContent = "0";
   });
+  for (let c = 0; c <= 6; c++) {
+    const el = document.getElementById(`cnt-cat-${c}`);
+    if (el) el.textContent = "0";
+  }
 });
 
 document.getElementById("btn-stop").addEventListener("click", async () => {

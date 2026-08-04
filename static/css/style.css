@@ -1912,6 +1912,35 @@ input:disabled + .slider { opacity: .4; cursor: not-allowed; }
 .tg-kpi-card.cyan::before { background: #06B6D4; }
 .tg-kpi-card.red::before { background: var(--danger); }
 
+/* ── Category strip (Logs diameter classification) ── */
+.tg-kpi-strip#cat-strip { margin-bottom: 4px; }
+.tg-cat-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px;
+  display: flex; flex-direction: column; gap: 4px;
+  position: relative; overflow: hidden;
+}
+.tg-cat-card::before {
+  content: ''; position: absolute; top: 0; left: 0;
+  width: 3px; height: 100%;
+}
+.tg-cat-card.c0::before { background: #3B82F6; }
+.tg-cat-card.c1::before { background: #22C55E; }
+.tg-cat-card.c2::before { background: #F59E0B; }
+.tg-cat-card.c3::before { background: #8B5CF6; }
+.tg-cat-card.c4::before { background: #EC4899; }
+.tg-cat-card.c5::before { background: #EF4444; }
+.tg-cat-card.c6::before { background: #64748B; }
+.tg-kpi-strip#cat-strip { grid-template-columns: repeat(7, 1fr); }
+.tg-cat-label {
+  font-size: 0.6rem; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .05em;
+}
+.tg-cat-value {
+  font-size: 1.45rem; font-weight: 700; font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
 .tg-kpi-label {
   font-size: 0.65rem; color: var(--muted);
   text-transform: uppercase; letter-spacing: .06em;

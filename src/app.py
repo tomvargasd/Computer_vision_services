@@ -849,6 +849,20 @@ def troncos_line_x(source_id):
     return jsonify({"line_x_pct": pct})
 
 
+@app.route("/api/troncos/settings/pixels-per-unit", methods=["POST"])
+def troncos_pixels_per_unit():
+    data = request.get_json(silent=True) or {}
+    try:
+        value = float(data.get("value"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Valor inválido"}), 400
+    if not (0 < value <= 1000):
+        return jsonify({"error": "El factor debe estar entre 0 y 1000"}), 400
+    set_setting("troncos_pixels_per_unit", f"{value:.6f}".rstrip("0").rstrip("."))
+    TroncosManager.get().set_pixels_per_unit(value)
+    return jsonify({"pixels_per_unit": value})
+
+
 # ─────────────────────────────────────────────
 # API Pallets
 # ─────────────────────────────────────────────
@@ -1617,6 +1631,147 @@ def api_analytics_timeline(module_id):
     source_id = request.args.get("source_id", None, type=int)
     data = get_module_analytics(module_id, source_id, days)
     return jsonify({"data": data["daily"]})
+
+
+# ─────────────────────────────────────────────
+# API Troncos — Dashboard Analítico (v3.0)
+# ─────────────────────────────────────────────
+
+CAT_CLASSES = (0, 1, 2, 3, 4, 5)
+EXCEPTION_CATEGORY = 6
+CAT_NAMES_TYPES_LOOKUP = {f"cat_{c}": c for c in CAT_CLASSES}
+CAT_NAMES_TYPES_LOOKUP["cat_exceptions"] = EXCEPTION_CATEGORY
+ALL_CATEGORIES = CAT_CLASSES + (EXCEPTION_CATEGORY,)
+
+
+@app.route("/api/analytics/troncos/comprehensive")
+def api_troncos_comprehensive():
+    days = request.args.get("days", 29, type=int)
+    days = max(1, min(days, 3650))
+    source_id = request.args.get("source_id", None, type=int)
+
+    all_sources = get_sources("troncos")
+    sources = all_sources
+    if source_id is not None:
+        sources = [s for s in sources if s["id"] == source_id]
+    if not sources:
+        return jsonify({
+            "kpis": {}, "counts": {}, "sources": [], "dailyTimeline": [],
+            "categoryDistribution": {}, "recentEvents": [],
+            "availableSources": [{"id": s["id"], "name": s["name"]} for s in all_sources],
+            "empty": True,
+        })
+
+    source_ids = [s["id"] for s in sources]
+    source_map = {s["id"]: s for s in sources}
+    today_str = datetime.now().strftime("%Y-%m-%d")
+
+    daily_raw = get_module_analytics_daily("troncos", source_id, days)
+
+    cat_total = {c: 0 for c in ALL_CATEGORIES}
+    src_cat = {sid: {c: 0 for c in ALL_CATEGORIES} for sid in source_ids}
+    daily_agg = {}
+
+    for d in daily_raw:
+        cat = CAT_NAMES_TYPES_LOOKUP.get(d["event_type"])
+        if cat is None:
+            continue
+        sid = d["source_id"]
+        if sid not in src_cat:
+            continue
+        cnt = d["count"]
+        day = d["day"]
+
+        cat_total[cat] += cnt
+        src_cat[sid][cat] += cnt
+        if day not in daily_agg:
+            daily_agg[day] = {c: 0 for c in ALL_CATEGORIES}
+        daily_agg[day][cat] += cnt
+
+    daily_timeline = []
+    for day, cats in sorted(daily_agg.items()):
+        daily_timeline.append({"day": day, "total": sum(cats.values()), "counts": cats})
+
+    total_count = sum(cat_total.values())
+    today_total = 0
+    for r in daily_timeline:
+        if r["day"] == today_str:
+            today_total = r["total"]
+            break
+
+    daily_totals = [r["total"] for r in daily_timeline if r["total"] > 0]
+    promedio_diario = round(sum(daily_totals) / len(daily_totals), 1) if daily_totals else 0
+    pico_diario = max(daily_totals) if daily_totals else 0
+    pico_dia = ""
+    for r in daily_timeline:
+        if r["total"] == pico_diario:
+            pico_dia = r["day"]
+            break
+
+    # Eventos recientes (con diámetro para promediar)
+    raw_events = get_module_events("troncos", source_id, days=days, limit=500)
+    recent_events = []
+    diam_sum = 0
+    diam_count = 0
+    for e in raw_events:
+        cat = CAT_NAMES_TYPES_LOOKUP.get(e["event_type"])
+        if cat is None:
+            continue
+        if e["source_id"] not in source_map:
+            continue
+        event_data = e.get("event_data") or {}
+        diameter = event_data.get("diameter") if isinstance(event_data, dict) else None
+        recent_events.append({
+            "id": e["id"],
+            "source_id": e["source_id"],
+            "source_name": source_map.get(e["source_id"], {}).get("name", f"Source {e['source_id']}"),
+            "event_type": e["event_type"],
+            "category": cat,
+            "label": e.get("label", ""),
+            "created_at": e.get("created_at", ""),
+            "has_capture": bool(e.get("capture_path")),
+            "diameter": diameter,
+        })
+        if cat in CAT_CLASSES and isinstance(diameter, (int, float)) and diameter > 0:
+            diam_sum += diameter
+            diam_count += 1
+
+    avg_diameter = round(diam_sum / diam_count, 1) if diam_count else None
+
+    # Desglose por fuente
+    source_list = []
+    for sid in source_ids:
+        src_total_cur = sum(src_cat[sid].values())
+        contrib = round((src_total_cur / total_count * 100), 1) if total_count > 0 else 0
+        source_list.append({
+            "id": sid,
+            "name": source_map[sid]["name"],
+            "total": src_total_cur,
+            "counts": src_cat[sid],
+            "contribucion": contrib,
+        })
+    source_list.sort(key=lambda x: x["total"], reverse=True)
+
+    kpis = {
+        "totalCount": total_count,
+        "today": today_total,
+        "promedioDiario": promedio_diario,
+        "picoDiario": pico_diario,
+        "picoDia": pico_dia,
+        "totalEventos": total_count,
+        "avgDiameter": avg_diameter,
+    }
+
+    return jsonify({
+        "kpis": kpis,
+        "counts": cat_total,
+        "sources": source_list,
+        "dailyTimeline": daily_timeline,
+        "categoryDistribution": cat_total,
+        "recentEvents": recent_events,
+        "availableSources": [{"id": s["id"], "name": s["name"]} for s in all_sources],
+        "empty": False,
+    })
 
 
 # ─────────────────────────────────────────────

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import cv2
 import time
+import json
 import threading
 import numpy as np
 from typing import Optional, Dict
@@ -11,7 +12,14 @@ import torch
 from src.utils import get_device
 from src.modules.base import multi_acquire, multi_release, is_multi_enabled, BasePersistPipeline
 import logging
-from src.database import save_module_counters, reset_module_counters, insert_module_event
+from src.database import save_module_counters, reset_module_counters, insert_module_event, get_settings
+from src.modules.log_detection import process_log_detection
+from src.modules.log_config import (
+    VALID_CATEGORIES,
+    ALL_COUNT_CATEGORIES,
+    EXCEPTION_CATEGORY,
+    get_pixels_per_unit,
+)
 
 logger = logging.getLogger("vision.troncos")
 
@@ -23,6 +31,11 @@ JPEG_Q      = 72
 PURPLE = (200, 0, 200)
 YELLOW = (0, 255, 255)
 WHITE  = (255, 255, 255)
+ORANGE = (0, 165, 255)
+GREEN  = (0, 200, 0)
+
+# Contadores por categoría, inicializados en cero (incluye Excepciones).
+CLASS_COUNTS_INIT = {c: 0 for c in ALL_COUNT_CATEGORIES}
 
 
 class TroncosPipeline(BasePersistPipeline):
@@ -47,6 +60,8 @@ class TroncosPipeline(BasePersistPipeline):
         self._thread: Optional[threading.Thread] = None
 
         self.total_in   = 0
+        self.counts     = dict(CLASS_COUNTS_INIT)
+        self._pixels_per_unit = None
         self._prev_cx: Dict[int, int] = {}
         self._cross_state: Dict[int, str] = {}
         self._h = 0
@@ -55,7 +70,22 @@ class TroncosPipeline(BasePersistPipeline):
     def start(self) -> None:
         saved = self._load_counters()
         if saved:
-            self.total_in = saved.get("total_count", saved.get("total_in", 0))
+            raw_counts = saved.get("class_counts")
+            if isinstance(raw_counts, str):
+                try:
+                    raw_counts = json.loads(raw_counts)
+                except (ValueError, TypeError):
+                    raw_counts = None
+            if isinstance(raw_counts, dict):
+                for k, v in raw_counts.items():
+                    try:
+                        cat = int(k)
+                    except (ValueError, TypeError):
+                        continue
+                    if cat in ALL_COUNT_CATEGORIES:
+                        self.counts[cat] = int(v)
+            self.total_in = int(saved.get("total_count", saved.get("total_in", sum(self.counts.values()))))
+        self._pixels_per_unit = get_pixels_per_unit(get_settings())
         self._stop.clear()
         self._thread = threading.Thread(
             target=self._run, daemon=True,
@@ -68,7 +98,7 @@ class TroncosPipeline(BasePersistPipeline):
         if self._thread:
             self._thread.join(timeout=5)
         self._thread = None
-        save_module_counters(self._module_id, self._source_id, {"total_count": self.total_in})
+        save_module_counters(self._module_id, self._source_id, self._counters_payload())
         del self.model
         torch.cuda.empty_cache()
 
@@ -124,14 +154,14 @@ class TroncosPipeline(BasePersistPipeline):
                 annotated = self._process(frame)
                 with self._lock:
                     self._frame = annotated
-                self._persist_counters({"total_in": self.total_in})
+                self._persist_counters(self._counters_payload())
                 time.sleep(self.fps_limit)
 
-            save_module_counters(self._module_id, self._source_id, {"total_count": self.total_in})
+            save_module_counters(self._module_id, self._source_id, self._counters_payload())
             cap.release()
         except Exception:
             logger.exception("Fatal error in %s %s pipeline", self._module_id, self._source_id)
-            save_module_counters(self._module_id, self._source_id, {"total_count": self.total_in})
+            save_module_counters(self._module_id, self._source_id, self._counters_payload())
             self._stop.set()
 
     def _process(self, frame: np.ndarray) -> np.ndarray:
@@ -149,6 +179,9 @@ class TroncosPipeline(BasePersistPipeline):
         boxes      = r.boxes if r.boxes is not None else []
         active_ids = set()
 
+        with self._lock:
+            ppu = self._pixels_per_unit
+
         for box in boxes:
             if box.id is None:
                 continue
@@ -157,6 +190,12 @@ class TroncosPipeline(BasePersistPipeline):
             x1, y1, x2, y2 = map(int, box.xyxy[0])
             cx = (x1 + x2) // 2
             active_ids.add(tid)
+
+            # Clasificación de diámetro — siempre activa, en cada frame.
+            mask, d_real, category = process_log_detection(
+                frame, (x1, y1, x2, y2), pixels_per_unit=ppu,
+            )
+            self._draw_log_overlay(annotated, x1, y1, x2, y2, mask, d_real, category, conf)
 
             if self.func_state.get("conteo"):
                 prev = self._prev_cx.get(tid)
@@ -168,21 +207,13 @@ class TroncosPipeline(BasePersistPipeline):
                     if crossed_left:
                         if state == "none":
                             self.total_in += 1
+                            self._record_classification(category, d_real, tid)
                             self._cross_state[tid] = "inside"
-                            insert_module_event("troncos", self._source_id,
-                                                "tronco_crossing",
-                                                f"Log ID[{tid}] crossed line")
                     elif crossed_right:
                         if state in ("none", "inside"):
                             self._cross_state[tid] = "done"
 
                 self._prev_cx[tid] = cx
-
-            cv2.rectangle(annotated, (x1, y1), (x2, y2), YELLOW, 2)
-            label = f"ID[{tid}] - conf. {int(conf * 100)}%"
-            ty = y1 - 8 if y1 > 20 else y2 + 18
-            cv2.putText(annotated, label, (x1, ty),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.52, YELLOW, 2, cv2.LINE_AA)
 
         gone = set(self._prev_cx.keys()) - active_ids
         for tid in gone:
@@ -192,8 +223,57 @@ class TroncosPipeline(BasePersistPipeline):
             cv2.line(annotated, (line_x, 0), (line_x, h), PURPLE, 2)
             cv2.putText(annotated, f"Total: {self.total_in}",
                         (12, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.8, YELLOW, 2, cv2.LINE_AA)
+            cats_text = "  ".join(f"C{c}:{self.counts.get(c, 0)}" for c in VALID_CATEGORIES)
+            cats_text += f"  Exc:{self.counts.get(EXCEPTION_CATEGORY, 0)}"
+            cv2.putText(annotated, cats_text,
+                        (12, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.55, WHITE, 1, cv2.LINE_AA)
+            cv2.putText(annotated, f"Cal: {ppu:.2f}",
+                        (w - 8, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, ORANGE, 2, cv2.LINE_AA)
 
         return annotated
+
+    # ── Clasificación de diámetro (siempre activa) ───────────────────────
+
+    def _draw_log_overlay(self, annotated, x1, y1, x2, y2,
+                          mask, d_real, category, conf) -> None:
+        """Dibuja el bounding box, la máscara segmentada y la etiqueta de clase."""
+        cv2.rectangle(annotated, (x1, y1), (x2, y2), YELLOW, 2)
+        if mask is not None:
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            for c in contours:
+                cv2.drawContours(annotated, [c], -1, ORANGE, 2)
+
+        cat_str = f"{category}" if category >= 0 else "-"
+        label = f"CLS[{cat_str}] conf {int(conf * 100)}%"
+        ty = y1 - 8 if y1 > 20 else y2 + 18
+        cv2.putText(annotated, label, (x1, ty),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.52, YELLOW, 2, cv2.LINE_AA)
+        if d_real is not None:
+            cv2.putText(annotated, f"D: {d_real:.1f}", (x1, ty + 18),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, GREEN, 1, cv2.LINE_AA)
+
+    def _record_classification(self, category: int, d_real, tid: int) -> None:
+        """Registra el cruce: cuenta la categoría (o Excepciones) y persiste.
+
+        Las excepciones (d_real por debajo del mínimo) se cuentan en el
+        contador de Excepciones y también se registran como evento.
+        """
+        if category < 0:
+            cat_key = EXCEPTION_CATEGORY
+            ev_type = "cat_exceptions"
+            label = "Exceptions"
+        else:
+            cat_key = category
+            ev_type = f"cat_{category}"
+            label = f"CLS[{category}]"
+        self.counts[cat_key] = self.counts.get(cat_key, 0) + 1
+        if d_real is not None:
+            label = f"{label} | D: {d_real:.1f}"
+        insert_module_event(
+            "troncos", self._source_id, ev_type,
+            label, "",
+            event_data={"diameter": d_real, "category": category, "track_id": tid},
+        )
 
     def get_frame_jpeg(self) -> Optional[bytes]:
         with self._lock:
@@ -207,13 +287,33 @@ class TroncosPipeline(BasePersistPipeline):
         return {
             "source_id":       self.source_id,
             "total_count":     self.total_in,
+            "counts":          dict(self.counts),
+        }
+
+    def _counters_payload(self) -> dict:
+        """Estado de contadores para persistencia (total + desglose por clase)."""
+        return {
+            "total_count":  self.total_in,
+            "class_counts": json.dumps(self.counts),
         }
 
     def set_line_x(self, pct: int) -> None:
         self.line_x_pct = max(0, min(100, pct))
 
+    def set_pixels_per_unit(self, value: float) -> None:
+        """Actualiza el factor de calibración en caliente (sin reiniciar).
+
+        El próximo frame reclasifica usando el nuevo valor.
+        """
+        value = float(value)
+        if value <= 0:
+            value = 1e-4
+        with self._lock:
+            self._pixels_per_unit = value
+
     def _on_daily_reset(self):
         self.total_in  = 0
+        self.counts    = dict(CLASS_COUNTS_INIT)
         self._prev_cx.clear()
         self._cross_state.clear()
 
@@ -297,6 +397,12 @@ class TroncosManager:
             p = self.pipelines.get(source_id)
         if p:
             p.set_line_x(pct)
+
+    def set_pixels_per_unit(self, value: float) -> None:
+        with self._lock:
+            pipelines = list(self.pipelines.values())
+        for p in pipelines:
+            p.set_pixels_per_unit(value)
 
     def reset(self, source_id: int) -> None:
         with self._lock:

@@ -37,6 +37,7 @@ MODULES_META = {
         "label": "Log Counting",
         "functions": {
             "conteo": {"label": "Log count", "description": "Counts logs crossing the vertical line"},
+            "diametro": {"label": "Diameter classification", "description": "Estimates the real diameter of each counted log and classifies it (categories 0-5). Always active.", "locked": True},
         },
     },
     "pallets": {
@@ -130,6 +131,7 @@ DEFAULT_SETTINGS = [
     ("troncos_half", "0"), ("pallets_half", "0"), ("cajas_half", "0"),
     ("reglamento_half", "0"),
     ("personas_line_y", "85"), ("troncos_line_x", "50"),
+    ("troncos_pixels_per_unit", "1.0"),
     ("pallets_area_x1", "25"), ("pallets_area_y1", "25"),
     ("pallets_area_x2", "75"), ("pallets_area_y2", "75"),
     ("pallets_classes", "0,1,2,3"),
@@ -323,6 +325,12 @@ def init_db():
 
         for k, v in DEFAULT_SETTINGS:
             conn.execute("INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)", (k, v))
+
+        # Migración: el ancho del bbox se toma como diámetro real (factor 1.0).
+        conn.execute(
+            "UPDATE settings SET value='1.0' "
+            "WHERE key='troncos_pixels_per_unit' AND value='15.0'"
+        )
 
         for mod_id, meta in MODULES_META.items():
             conn.execute("INSERT OR IGNORE INTO modules(module_id,enabled) VALUES(?,0)", (mod_id,))

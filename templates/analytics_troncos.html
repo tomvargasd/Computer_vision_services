@@ -1,161 +1,717 @@
 {% extends "base.html" %}
-{% block title %}Analytics · Logs{% endblock %}
-{% block page_title %}Analytics · {{ module.label }}{% endblock %}
+{% block title %}Dashboard · Logs{% endblock %}
+{% block page_title %}Analytics Dashboard · {{ module.label }}{% endblock %}
 {% block content %}
-<div class="analytics-dashboard">
-  <div class="analytics-kpi-row">
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg> Total count</span><span class="analytics-kpi-value" id="kpi-total">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Today</span><span class="analytics-kpi-value" id="kpi-today">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> Daily average</span><span class="analytics-kpi-value" id="kpi-daily-avg">—</span></div>
-    <div class="analytics-kpi-card"><span class="analytics-kpi-label"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Sources</span><span class="analytics-kpi-value" id="kpi-sources">—</span></div>
+<div class="tg-dashboard" id="dashboard-container">
+
+  <!-- Toolbar -->
+  <div class="tg-toolbar">
+    <div class="tg-toolbar-group">
+      <label style="font-size:0.72rem;color:var(--muted)">Source:</label>
+      <select class="tg-filter-select" id="filter-source">
+        <option value="all">All sources</option>
+      </select>
+    </div>
+    <div class="tg-toolbar-group">
+      <label style="font-size:0.72rem;color:var(--muted)">Range:</label>
+      <select class="tg-filter-select" id="filter-range">
+        <option value="7">7 days</option>
+        <option value="15">15 days</option>
+        <option value="29" selected>29 days</option>
+        <option value="60">60 days</option>
+        <option value="365">All</option>
+      </select>
+    </div>
+    <button class="tg-btn tg-btn-refresh" id="btn-refresh" title="Refresh">↻</button>
+    <div class="tg-toolbar-group" style="margin-left:auto">
+      <div class="tg-btn tg-btn-pdf" tabindex="0">
+        📄 Export PDF
+        <div class="tg-pdf-dropdown">
+          <button class="tg-pdf-dropdown-item" onclick="exportPDF('todo')">All (complete)</button>
+          <button class="tg-pdf-dropdown-item" onclick="exportPDF('resumen')">Executive summary</button>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <div class="analytics-chart-row">
-    <div class="analytics-chart-card">
-      <h4>Daily history</h4>
-      <canvas id="chart-troncos-daily"></canvas>
+  <!-- KPI Global Strip (max 6) -->
+  <div class="tg-kpi-strip" id="kpi-strip">
+    <div class="tg-kpi-card blue"><div class="tg-kpi-label">Total Logs</div><div class="tg-kpi-value" id="kpi-total">—</div><div class="tg-kpi-sub">classified</div></div>
+    <div class="tg-kpi-card cyan"><div class="tg-kpi-label">Today</div><div class="tg-kpi-value" id="kpi-hoy">—</div><div class="tg-kpi-sub">logs today</div></div>
+    <div class="tg-kpi-card orange"><div class="tg-kpi-label">Daily Average</div><div class="tg-kpi-value" id="kpi-promedio">—</div><div class="tg-kpi-sub">logs/day</div></div>
+    <div class="tg-kpi-card purple"><div class="tg-kpi-label">Daily Peak</div><div class="tg-kpi-value" id="kpi-pico">—</div><div class="tg-kpi-sub" id="kpi-pico-sub">—</div></div>
+    <div class="tg-kpi-card green"><div class="tg-kpi-label">Avg Diameter</div><div class="tg-kpi-value" id="kpi-diam">—</div><div class="tg-kpi-sub">real units</div></div>
+    <div class="tg-kpi-card red"><div class="tg-kpi-label">Total Events</div><div class="tg-kpi-value" id="kpi-eventos">—</div><div class="tg-kpi-sub">in the period</div></div>
+  </div>
+
+  <!-- Category Strip: contadores por clase (KPI focal de la clasificación) -->
+  <div class="tg-kpi-strip" id="cat-strip">
+    <div class="tg-cat-card c0"><div class="tg-cat-label">Cat 0 · 14.0–15.9</div><div class="tg-cat-value" id="cat-0">—</div></div>
+    <div class="tg-cat-card c1"><div class="tg-cat-label">Cat 1 · 16.0–22.9</div><div class="tg-cat-value" id="cat-1">—</div></div>
+    <div class="tg-cat-card c2"><div class="tg-cat-label">Cat 2 · 23.0–27.9</div><div class="tg-cat-value" id="cat-2">—</div></div>
+    <div class="tg-cat-card c3"><div class="tg-cat-label">Cat 3 · 28.0–33.9</div><div class="tg-cat-value" id="cat-3">—</div></div>
+    <div class="tg-cat-card c4"><div class="tg-cat-label">Cat 4 · 34.0–37.9</div><div class="tg-cat-value" id="cat-4">—</div></div>
+    <div class="tg-cat-card c5"><div class="tg-cat-label">Cat 5 · ≥38.0</div><div class="tg-cat-value" id="cat-5">—</div></div>
+    <div class="tg-cat-card c6"><div class="tg-cat-label">Exc · &lt;14.0</div><div class="tg-cat-value" id="cat-6">—</div></div>
+  </div>
+
+  <!-- Charts Row 1: Doughnut categoría + Timeline -->
+  <div class="tg-chart-pair">
+    <div class="tg-chart-card">
+      <h4>🎯 Distribution by diameter category</h4>
+      <canvas id="chart-pie-categorias"></canvas>
     </div>
-    <div class="analytics-chart-card">
-      <h4>Hourly activity (today)</h4>
-      <canvas id="chart-troncos-heatmap"></canvas>
+    <div class="tg-chart-card">
+      <h4 id="timeline-title">📈 Timeline 29 days</h4>
+      <canvas id="chart-timeline"></canvas>
     </div>
   </div>
 
-  <div class="analytics-chart-row">
-    <div class="analytics-chart-card">
-      <h4>By source</h4>
-      <div id="per-source-table" class="analytics-per-source"></div>
+  <!-- Charts Row 2: Bar ranking fuente + Polar categorías -->
+  <div class="tg-chart-pair">
+    <div class="tg-chart-card">
+      <h4>📊 Source ranking</h4>
+      <canvas id="chart-bar-fuentes"></canvas>
+    </div>
+    <div class="tg-chart-card">
+      <h4>🔵 Category polar</h4>
+      <canvas id="chart-polar"></canvas>
     </div>
   </div>
 
-  <div class="analytics-events">
-    <h4>Recent crossings</h4>
-    <div id="events-list" class="analytics-events-list"></div>
+  <!-- Source Table -->
+  <div class="tg-table-container">
+    <h4>📋 Detail by source</h4>
+    <input class="tg-table-search" id="source-search" type="text" placeholder="Search source..." oninput="filterSourceTable()">
+    <table class="tg-table" id="source-table">
+      <thead>
+        <tr>
+          <th onclick="sortSourceTable(0)" data-col="0"># <span class="sort-icon">↕</span></th>
+          <th onclick="sortSourceTable(1)" data-col="1">Source <span class="sort-icon">↕</span></th>
+          <th onclick="sortSourceTable(2)" data-col="2" class="sort-desc">Total <span class="sort-icon">↕</span></th>
+          <th onclick="sortSourceTable(3)" data-col="3">C0 <span class="sort-icon">↕</span></th>
+          <th onclick="sortSourceTable(4)" data-col="4">C1 <span class="sort-icon">↕</span></th>
+          <th onclick="sortSourceTable(5)" data-col="5">C2 <span class="sort-icon">↕</span></th>
+          <th onclick="sortSourceTable(6)" data-col="6">C3 <span class="sort-icon">↕</span></th>
+          <th onclick="sortSourceTable(7)" data-col="7">C4 <span class="sort-icon">↕</span></th>
+          <th onclick="sortSourceTable(8)" data-col="8">C5 <span class="sort-icon">↕</span></th>
+          <th onclick="sortSourceTable(9)" data-col="9">Exc <span class="sort-icon">↕</span></th>
+          <th onclick="sortSourceTable(10)" data-col="10">% Contribution <span class="sort-icon">↕</span></th>
+        </tr>
+      </thead>
+      <tbody id="source-table-body"></tbody>
+    </table>
   </div>
+
+  <!-- Events List -->
+  <div class="tg-events-container">
+    <h4>📜 Crossings history</h4>
+    <div class="tg-event-filters">
+      <button class="tg-event-chip active" data-type="all" onclick="filterEvents('all')">All</button>
+      <button class="tg-event-chip" data-type="0" onclick="filterEvents('0')">Cat 0</button>
+      <button class="tg-event-chip" data-type="1" onclick="filterEvents('1')">Cat 1</button>
+      <button class="tg-event-chip" data-type="2" onclick="filterEvents('2')">Cat 2</button>
+      <button class="tg-event-chip" data-type="3" onclick="filterEvents('3')">Cat 3</button>
+      <button class="tg-event-chip" data-type="4" onclick="filterEvents('4')">Cat 4</button>
+      <button class="tg-event-chip" data-type="5" onclick="filterEvents('5')">Cat 5</button>
+      <button class="tg-event-chip" data-type="6" onclick="filterEvents('6')">Exc</button>
+      <span style="color:var(--muted);font-size:0.72rem;margin:0 4px">|</span>
+      <label style="font-size:0.72rem;color:var(--muted)">From:</label>
+      <input class="tg-event-date-input" type="date" id="filter-date-from" onchange="applyEventFilters()">
+      <label style="font-size:0.72rem;color:var(--muted)">To:</label>
+      <input class="tg-event-date-input" type="date" id="filter-date-to" onchange="applyEventFilters()">
+      <input class="tg-event-search" type="text" id="filter-event-search" placeholder="Search in events..." oninput="applyEventFilters()">
+    </div>
+    <div class="tg-event-list" id="event-list"></div>
+    <div class="tg-pagination" id="event-pagination"></div>
+  </div>
+
 </div>
+
 {% include "components/evidence_modal.html" %}
 {% endblock %}
+
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
 <script>
 const MODULE_ID = 'troncos';
-function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
+let allData = null;
+let charts = {};
+let eventData = [];
+let eventFiltered = [];
+let eventPage = 0;
+const EVENT_PAGE_SIZE = 25;
 
-async function loadKPIs() {
-  const r = await fetch(`/api/analytics/${MODULE_ID}/summary`);
-  if (!r.ok) return;
-  const d = await r.json();
-  const counters = d.counters || {};
-  const sources = Object.keys(counters);
-  setText('kpi-sources', sources.length > 0 ? sources.length + (d.active ? ' active' : '') : '—');
+// ── Color palette por categoría ──
+const CAT_COLORS = ['#3B82F6','#22C55E','#F59E0B','#8B5CF6','#EC4899','#EF4444','#64748B'];
+const SOURCE_COLORS = ['#3B82F6','#22C55E','#F59E0B','#8B5CF6','#EC4899','#06B6D4','#6366F1','#14B8A6'];
+const CAT_LABELS = ['Cat 0','Cat 1','Cat 2','Cat 3','Cat 4','Cat 5','Exc'];
+const CAT_RANGES = ['14.0–15.9','16.0–22.9','23.0–27.9','28.0–33.9','34.0–37.9','≥38.0','<14.0'];
+const LAST_CAT = 6;
 
-  let totalVal = 0, todayVal = 0;
-  const todayStr = new Date().toISOString().slice(0, 10);
-  sources.forEach(sid => { const c = counters[sid]; if (c) totalVal += (c.total_count ?? 0); });
-  (d.daily || []).forEach(item => { if (item.day === todayStr) todayVal += item.count; });
-  if (totalVal > 0) setText('kpi-total', totalVal);
-  else if (d.event_counts) setText('kpi-total', Object.values(d.event_counts).reduce((a, b) => a + b, 0) || '—');
-  setText('kpi-today', todayVal > 0 ? todayVal : '—');
+// ── Helpers ──
+function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val ?? '—'; }
 
-  const days = [...new Set((d.daily || []).map(x => x.day))];
-  if (days.length > 0) {
-    const sum = days.reduce((a, day) => a + (d.daily.filter(x => x.day === day).reduce((s, x) => s + x.count, 0)), 0);
-    setText('kpi-daily-avg', Math.round(sum / days.length));
-  }
-
-  const psEl = document.getElementById('per-source-table');
-  if (sources.length > 0) {
-    psEl.innerHTML = '<table class="ps-table"><tr><th>Source</th><th>Count</th></tr>' +
-      sources.map(sid => `<tr><td>Source ${sid}</td><td>${counters[sid]?.total_count ?? '—'}</td></tr>`).join('') +
-      '</table>';
-  } else {
-    psEl.innerHTML = '<p class="text-muted">No source data</p>';
-  }
+function formatNumber(n) {
+  if (n === null || n === undefined || n === '—') return '—';
+  return Number(n).toLocaleString();
 }
 
-let dailyChart = null;
-async function loadTimeline() {
-  const r = await fetch(`/api/analytics/${MODULE_ID}/timeline`);
-  if (!r.ok) return;
-  const d = await r.json();
-  const ctx = document.getElementById('chart-troncos-daily');
-  if (!ctx) return;
-  const grouped = {};
-  (d.data || []).forEach(item => { grouped[item.day] = (grouped[item.day] || 0) + item.count; });
-  const labels = Object.keys(grouped);
-  const values = labels.map(d => grouped[d]);
-  if (dailyChart) dailyChart.destroy();
-  dailyChart = new Chart(ctx, {
-    type: 'bar',
-    data: { labels, datasets: [{ label: 'Crossings', data: values, backgroundColor: 'rgba(139, 92, 246, 0.6)', borderColor: '#8B5CF6', borderWidth: 1, borderRadius: 4 }] },
-    options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#9D9FA2' } }, y: { ticks: { color: '#9D9FA2' }, beginAtZero: true } } },
-  });
-  buildHourly(d.events || []);
+function showToast(msg, isError) {
+  const existing = document.querySelector('.seed-toast');
+  if (existing) existing.remove();
+  const t = document.createElement('div');
+  t.className = 'seed-toast' + (isError ? ' error' : '');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
 }
 
-let hourlyChart = null;
-function buildHourly(events) {
-  const ctx = document.getElementById('chart-troncos-heatmap');
-  if (!ctx) return;
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const hourly = Array.from({ length: 24 }, () => 0);
-  (events || []).forEach(e => {
-    if (e.created_at && e.created_at.startsWith(todayStr)) {
-      const hour = parseInt(e.created_at.slice(11, 13), 10);
-      if (!isNaN(hour)) hourly[hour] = (hourly[hour] || 0) + 1;
+// ── Load comprehensive data ──
+async function loadData() {
+  const refreshBtn = document.getElementById('btn-refresh');
+  refreshBtn.classList.add('spin');
+
+  try {
+    const days = document.getElementById('filter-range').value;
+    const srcFilter = document.getElementById('filter-source').value;
+    const params = new URLSearchParams();
+    params.set('days', days);
+    if (srcFilter !== 'all') params.set('source_id', srcFilter);
+
+    const r = await fetch(`/api/analytics/${MODULE_ID}/comprehensive?${params.toString()}`);
+    if (!r.ok) throw new Error('Error loading data');
+    allData = await r.json();
+
+    populateSourceFilter(allData.availableSources);
+
+    if (allData.empty) {
+      showEmptyState();
+      return;
+    }
+
+    renderKPIs(allData.kpis);
+    renderCategories(allData.counts);
+    renderCharts(allData);
+    renderSourceTable(allData.sources);
+    eventData = allData.recentEvents || [];
+    applyEventFilters();
+    updateTimelineTitle();
+  } catch (e) {
+    console.error(e);
+    showToast('Error loading dashboard data', true);
+  }
+
+  refreshBtn.classList.remove('spin');
+}
+
+function populateSourceFilter(available) {
+  if (!available || available.length === 0) return;
+  const sel = document.getElementById('filter-source');
+  const existing = new Set([...sel.options].map(o => o.value));
+  available.forEach(s => {
+    const v = String(s.id);
+    if (!existing.has(v)) {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = s.name;
+      sel.appendChild(opt);
+      existing.add(v);
+    } else {
+      const opt = sel.querySelector(`option[value="${v}"]`);
+      if (opt) opt.textContent = s.name;
     }
   });
-  if (hourlyChart) hourlyChart.destroy();
-  hourlyChart = new Chart(ctx, {
-    type: 'bar',
-    data: { labels: Array.from({ length: 24 }, (_, h) => `${h}:00`), datasets: [{ label: 'Events', data: hourly, backgroundColor: 'rgba(59, 130, 246, 0.5)', borderColor: '#3B82F6', borderWidth: 1, borderRadius: 3 }] },
-    options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#9D9FA2', maxTicksLimit: 12 } }, y: { ticks: { color: '#9D9FA2' }, beginAtZero: true } } },
+}
+
+function updateTimelineTitle() {
+  const sel = document.getElementById('filter-range');
+  const el = document.getElementById('timeline-title');
+  if (sel && el) el.textContent = `📈 Timeline ${sel.selectedOptions[0]?.textContent || ''}`;
+}
+
+function setEventDateRange() {
+  const days = parseInt(document.getElementById('filter-range').value, 10) || 29;
+  const toDate = new Date();
+  const fromDate = new Date(toDate);
+  fromDate.setDate(toDate.getDate() - (days - 1));
+  document.getElementById('filter-date-from').value = fmtDate(fromDate);
+  document.getElementById('filter-date-to').value = fmtDate(toDate);
+  applyEventFilters();
+}
+
+function fmtDate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+}
+
+function showEmptyState() {
+  document.querySelectorAll('.tg-kpi-card .tg-kpi-value').forEach(el => el.textContent = '—');
+  document.querySelectorAll('.tg-cat-card .tg-cat-value').forEach(el => el.textContent = '—');
+  document.querySelectorAll('.tg-kpi-sub').forEach(el => el.textContent = '—');
+  document.getElementById('kpi-pico-sub').textContent = '—';
+  document.getElementById('source-table-body').innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px;color:var(--muted)">No data yet — logs are classified as they cross the counting line</td></tr>';
+  document.getElementById('event-list').innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">No crossings recorded</div>';
+  document.getElementById('event-pagination').innerHTML = '';
+  Object.values(charts).forEach(c => { if (c) c.destroy(); });
+  charts = {};
+}
+
+// ── Render KPIs ──
+function renderKPIs(kpis) {
+  if (!kpis) return;
+  setText('kpi-total', formatNumber(kpis.totalCount));
+  setText('kpi-hoy', formatNumber(kpis.today));
+  setText('kpi-promedio', kpis.promedioDiario != null ? kpis.promedioDiario : '—');
+  setText('kpi-pico', formatNumber(kpis.picoDiario));
+  setText('kpi-pico-sub', kpis.picoDia || '—');
+  setText('kpi-diam', kpis.avgDiameter != null ? kpis.avgDiameter : '—');
+  setText('kpi-eventos', formatNumber(kpis.totalEventos));
+}
+
+// ── Render categorías ──
+function renderCategories(counts) {
+  if (!counts) return;
+  for (let c = 0; c <= LAST_CAT; c++) {
+    setText(`cat-${c}`, formatNumber(counts[c]));
+  }
+}
+
+// ── Charts ──
+function renderCharts(data) {
+  Object.values(charts).forEach(c => { if (c) { try { c.destroy(); } catch(e) {} } });
+  charts = {};
+
+  if (!data.sources || data.sources.length === 0) return;
+
+  // 1. Doughnut: distribución por categoría
+  const pieCtx = document.getElementById('chart-pie-categorias');
+  if (pieCtx) {
+    const dist = data.categoryDistribution || {};
+    const labels = [];
+    const values = [];
+    const colors = [];
+    for (let c = 0; c <= LAST_CAT; c++) {
+      const v = dist[c] || 0;
+      if (v > 0) { labels.push(`${CAT_LABELS[c]} (${CAT_RANGES[c]})`); values.push(v); colors.push(CAT_COLORS[c]); }
+    }
+    if (labels.length > 0) {
+      charts.pie = new Chart(pieCtx, {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 1, borderColor: '#fff' }] },
+        options: {
+          responsive: true, maintainAspectRatio: true,
+          plugins: {
+            legend: { position: 'right', labels: { boxWidth: 12, padding: 8, font: { size: 10 }, color: '#182A55' } },
+            tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.raw.toLocaleString()}` } }
+          },
+          cutout: '55%',
+        }
+      });
+    } else {
+      charts.pie = new Chart(pieCtx, {
+        type: 'doughnut',
+        data: { labels: ['No data'], datasets: [{ data: [1], backgroundColor: ['#E5E7EB'] }] },
+        options: { responsive: true, plugins: { legend: { display: false } } }
+      });
+    }
+  }
+
+  // 2. Line: Timeline con las 6 categorías
+  const lineCtx = document.getElementById('chart-timeline');
+  if (lineCtx && data.dailyTimeline && data.dailyTimeline.length > 0) {
+    const labels = data.dailyTimeline.map(d => {
+      const parts = d.day.split('-');
+      return `${parts[2]}/${parts[1]}`;
+    });
+    const datasets = [];
+    for (let c = 0; c <= LAST_CAT; c++) {
+      datasets.push({
+        label: CAT_LABELS[c],
+        data: data.dailyTimeline.map(d => (d.counts || {})[c] || 0),
+        borderColor: CAT_COLORS[c],
+        backgroundColor: CAT_COLORS[c] + '22',
+        fill: false, tension: 0.3, pointRadius: 1.5, borderWidth: 1.5,
+      });
+    }
+    charts.line = new Chart(lineCtx, {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: true,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { labels: { boxWidth: 12, padding: 8, font: { size: 10 }, color: '#182A55' } } },
+        scales: {
+          x: { ticks: { font: { size: 9 }, color: '#9D9FA2', maxTicksLimit: 15 } },
+          y: { beginAtZero: true, ticks: { font: { size: 9 }, color: '#9D9FA2', stepSize: 1 } }
+        }
+      }
+    });
+  }
+
+  // 3. Bar: ranking de fuentes (total)
+  const barCtx = document.getElementById('chart-bar-fuentes');
+  if (barCtx) {
+    const sorted = [...data.sources].sort((a, b) => b.total - a.total);
+    const labels = sorted.map(s => s.name);
+    const values = sorted.map(s => s.total);
+    charts.bar = new Chart(barCtx, {
+      type: 'bar',
+      data: { labels, datasets: [{ label: 'Logs', data: values, backgroundColor: '#3B82F6', borderRadius: 4 }] },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { beginAtZero: true, ticks: { font: { size: 9 }, color: '#9D9FA2', stepSize: 1 } },
+          y: { ticks: { font: { size: 10 }, color: '#182A55' } }
+        }
+      }
+    });
+  }
+
+  // 4. Polar: categorías
+  const polarCtx = document.getElementById('chart-polar');
+  if (polarCtx) {
+    const dist = data.categoryDistribution || {};
+    const labels = [];
+    const values = [];
+    const colors = [];
+    for (let c = 0; c <= LAST_CAT; c++) {
+      const v = dist[c] || 0;
+      if (v > 0) { labels.push(CAT_LABELS[c]); values.push(v); colors.push(CAT_COLORS[c] + '99'); }
+    }
+    if (labels.length > 0) {
+      charts.polar = new Chart(polarCtx, {
+        type: 'polarArea',
+        data: { labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 1, borderColor: '#fff' }] },
+        options: {
+          responsive: true, maintainAspectRatio: true,
+          plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 8, font: { size: 10 }, color: '#182A55' } } },
+          scales: { r: { ticks: { font: { size: 9 }, color: '#9D9FA2' }, grid: { color: 'rgba(0,0,0,0.06)' } } }
+        }
+      });
+    }
+  }
+}
+
+// ── Source Table ──
+let sourceSortCol = 2;
+let sourceSortDir = 'desc';
+let sourceSearchText = '';
+
+function renderSourceTable(sources) {
+  const tbody = document.getElementById('source-table-body');
+  if (!sources || sources.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px;color:var(--muted)">No sources registered</td></tr>';
+    return;
+  }
+
+  let filtered = [...sources];
+  if (sourceSearchText) {
+    const q = sourceSearchText.toLowerCase();
+    filtered = filtered.filter(s => s.name.toLowerCase().includes(q));
+  }
+
+  filtered.sort((a, b) => {
+    const getVal = (s, col) => {
+      if (col === 0) return s.id;
+      if (col === 1) return s.name;
+      if (col === 2) return s.total;
+      if (col >= 3 && col <= 8) return (s.counts || {})[col - 3] || 0;
+      if (col === 9) return (s.counts || {})[6] || 0;
+      return s.contribucion;
+    };
+    let va = getVal(a, sourceSortCol);
+    let vb = getVal(b, sourceSortCol);
+    if (typeof va === 'string') va = va.toLowerCase();
+    if (typeof vb === 'string') vb = vb.toLowerCase();
+    if (va < vb) return sourceSortDir === 'asc' ? -1 : 1;
+    if (va > vb) return sourceSortDir === 'asc' ? 1 : -1;
+    return 0;
   });
+
+  tbody.innerHTML = filtered.map((s, i) => {
+    const idx = i + 1;
+    const colorIdx = (s.id - 1) % SOURCE_COLORS.length;
+    const counts = s.counts || {};
+    const cells = [];
+    for (let c = 0; c <= LAST_CAT; c++) {
+      cells.push(`<td style="color:${CAT_COLORS[c]}">${counts[c] || 0}</td>`);
+    }
+    return `<tr>
+      <td>${idx}</td>
+      <td><span class="tg-source-badge s${colorIdx + 1}">${s.name}</span></td>
+      <td><strong>${s.total}</strong></td>
+      ${cells.join('')}
+      <td>${s.contribucion}%</td>
+    </tr>`;
+  }).join('');
 }
 
-async function loadTimelineData() {
-  const r = await fetch(`/api/analytics/${MODULE_ID}/timeline`);
-  if (!r.ok) return;
-  const d = await r.json();
-  const ctx = document.getElementById('chart-troncos-daily');
-  if (!ctx) return;
-  const grouped = {};
-  (d.data || []).forEach(item => { grouped[item.day] = (grouped[item.day] || 0) + item.count; });
-  const labels = Object.keys(grouped);
-  const values = labels.map(d => grouped[d]);
-  if (dailyChart) dailyChart.destroy();
-  dailyChart = new Chart(ctx, {
-    type: 'bar',
-    data: { labels, datasets: [{ label: 'Crossings', data: values, backgroundColor: 'rgba(139, 92, 246, 0.6)', borderColor: '#8B5CF6', borderWidth: 1, borderRadius: 4 }] },
-    options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#9D9FA2' } }, y: { ticks: { color: '#9D9FA2' }, beginAtZero: true } } },
+function sortSourceTable(col) {
+  if (sourceSortCol === col) {
+    sourceSortDir = sourceSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    sourceSortCol = col;
+    sourceSortDir = col === 2 ? 'desc' : 'asc';
+  }
+  document.querySelectorAll('#source-table th').forEach(th => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (parseInt(th.dataset.col) === col) th.classList.add(sourceSortDir === 'asc' ? 'sort-asc' : 'sort-desc');
   });
+  if (allData && allData.sources) renderSourceTable(allData.sources);
 }
 
-async function loadHourly() {
-  const r = await fetch(`/api/analytics/${MODULE_ID}/events?limit=500`);
-  if (!r.ok) return;
-  const d = await r.json();
-  buildHourly(d.events);
+function filterSourceTable() {
+  sourceSearchText = document.getElementById('source-search').value;
+  if (allData && allData.sources) renderSourceTable(allData.sources);
 }
 
-async function loadEvents() {
-  const r = await fetch(`/api/analytics/${MODULE_ID}/events?limit=50`);
-  if (!r.ok) return;
-  const d = await r.json();
-  const list = document.getElementById('events-list');
-  list.innerHTML = (d.events || []).map(e =>
-    `<div class="analytics-event-item">
-      <span class="analytics-event-time">${e.created_at || ''}</span>
-      <span class="analytics-event-type">${e.event_type}</span>
-      <span class="analytics-event-label">${e.label}</span>
-      ${e.capture_path ? `<button class="ev-btn-view" onclick="openEvidence('${MODULE_ID}', ${e.id})"><svg class="analytics-kpi-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>` : ''}
-    </div>`
-  ).join('');
+// ── Events ──
+let eventTypeFilter = 'all';
+
+function filterEvents(type) {
+  eventTypeFilter = type;
+  eventPage = 0;
+  document.querySelectorAll('.tg-event-chip').forEach(chip => {
+    chip.classList.toggle('active', chip.dataset.type === type);
+  });
+  applyEventFilters();
 }
 
-loadKPIs(); loadTimelineData(); loadEvents(); loadHourly();
-setInterval(loadKPIs, 5000);
-setInterval(loadHourly, 30000);
+function applyEventFilters() {
+  let filtered = [...eventData];
+
+  if (eventTypeFilter !== 'all') {
+    const cat = parseInt(eventTypeFilter, 10);
+    filtered = filtered.filter(e => e.category === cat);
+  }
+
+  const fromStr = document.getElementById('filter-date-from').value;
+  const toStr = document.getElementById('filter-date-to').value;
+  if (fromStr) filtered = filtered.filter(e => (e.created_at || '').slice(0, 10) >= fromStr);
+  if (toStr) filtered = filtered.filter(e => (e.created_at || '').slice(0, 10) <= toStr);
+
+  const searchText = document.getElementById('filter-event-search').value.toLowerCase();
+  if (searchText) {
+    filtered = filtered.filter(e =>
+      (e.label || '').toLowerCase().includes(searchText) ||
+      (e.source_name || '').toLowerCase().includes(searchText) ||
+      (e.event_type || '').toLowerCase().includes(searchText)
+    );
+  }
+
+  eventFiltered = filtered;
+  renderEvents();
+}
+
+function renderEvents() {
+  const list = document.getElementById('event-list');
+  const pagination = document.getElementById('event-pagination');
+  const totalPages = Math.ceil(eventFiltered.length / EVENT_PAGE_SIZE) || 1;
+
+  if (eventPage >= totalPages) eventPage = totalPages - 1;
+  if (eventPage < 0) eventPage = 0;
+
+  const start = eventPage * EVENT_PAGE_SIZE;
+  const pageItems = eventFiltered.slice(start, start + EVENT_PAGE_SIZE);
+
+  if (pageItems.length === 0) {
+    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">No crossings found</div>';
+    pagination.innerHTML = '';
+    return;
+  }
+
+  list.innerHTML = pageItems.map(e => {
+    const cat = e.category;
+    const sourceName = e.source_name || `Source ${e.source_id}`;
+    const dStr = e.diameter != null ? ` · D: ${e.diameter}` : '';
+    return `<div class="tg-event-item">
+      <span class="tg-event-time">${e.created_at || ''}</span>
+      <span class="tg-event-source">${sourceName}</span>
+      <span class="tg-event-type-badge cat-${cat}" style="background:${CAT_COLORS[cat]}22;color:${CAT_COLORS[cat]}">${CAT_LABELS[cat]}</span>
+      <span class="tg-event-label">${e.label || ''}${dStr}</span>
+      ${e.has_capture ? `<button class="tg-event-capture" onclick="openEvidence('${MODULE_ID}', ${e.id})" title="View evidence">📷</button>` : '<span></span>'}
+    </div>`;
+  }).join('');
+
+  const pageBtns = [];
+  if (totalPages > 1) {
+    pageBtns.push(`<button class="tg-page-btn" onclick="changePage(${eventPage - 1})" ${eventPage === 0 ? 'disabled' : ''}>‹</button>`);
+    const startP = Math.max(0, Math.min(eventPage - 2, totalPages - 5));
+    const endP = Math.min(totalPages, startP + 5);
+    for (let i = startP; i < endP; i++) {
+      pageBtns.push(`<button class="tg-page-btn ${i === eventPage ? 'active' : ''}" onclick="changePage(${i})">${i + 1}</button>`);
+    }
+    pageBtns.push(`<button class="tg-page-btn" onclick="changePage(${eventPage + 1})" ${eventPage >= totalPages - 1 ? 'disabled' : ''}>›</button>`);
+    pageBtns.push(`<span class="tg-page-info">${eventPage * EVENT_PAGE_SIZE + 1}–${Math.min((eventPage + 1) * EVENT_PAGE_SIZE, eventFiltered.length)} of ${eventFiltered.length}</span>`);
+  }
+  pagination.innerHTML = pageBtns.join('');
+}
+
+function changePage(page) {
+  eventPage = page;
+  renderEvents();
+}
+
+// ── PDF Export ──
+async function exportPDF(mode) {
+  const btn = document.querySelector('.tg-btn-pdf');
+  const origText = btn.innerHTML;
+  btn.innerHTML = '⏳ Generating PDF...';
+  btn.style.opacity = '0.6';
+
+  try {
+    const container = document.getElementById('dashboard-container');
+
+    const hideEls = container.querySelectorAll('.tg-event-capture, .tg-pagination, .tg-btn-refresh, .tg-btn-pdf');
+    const chips = container.querySelectorAll('.tg-event-chip');
+    const pagers = container.querySelectorAll('.tg-page-btn, .tg-page-info');
+    const hidden = [];
+    hideEls.forEach(el => { if (el.style.display !== 'none') { hidden.push(el); el.style.display = 'none'; } });
+    const chipOrig = [];
+    chips.forEach(c => { chipOrig.push(c.style.pointerEvents); c.style.pointerEvents = 'none'; });
+    const pagerOrig = [];
+    pagers.forEach(p => { if (p.style.display !== 'none') { pagerOrig.push(p); p.style.display = 'none'; } });
+
+    const { jsPDF } = window.jspdf;
+    let pdf;
+    try {
+      if (mode === 'todo') {
+        const canvas = await html2canvas(container, {
+          scale: 2.5,
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#F4F5F7',
+          width: container.scrollWidth,
+          height: container.scrollHeight,
+          windowWidth: container.scrollWidth,
+          windowHeight: container.scrollHeight,
+        });
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        const totalW = canvas.width / 2.5;
+        const totalH = canvas.height / 2.5;
+        const mmW = totalW * 0.2646;
+        const mmH = totalH * 0.2646;
+
+        pdf = new jsPDF({ orientation: mmW >= mmH ? 'l' : 'p', unit: 'mm', format: [mmW, mmH] });
+        pdf.addImage(imgData, 'JPEG', 0, 0, mmW, mmH);
+      } else {
+        pdf = new jsPDF('l', 'mm', 'a4');
+        const pageW = 297;
+        const pageH = 210;
+        const margin = 12;
+        const usableW = pageW - margin * 2;
+        const usableH = pageH - margin * 2;
+
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'position:fixed;left:-9999px;top:0;width:1100px;z-index:-1';
+        wrap.id = 'pdf-export-wrap';
+        document.body.appendChild(wrap);
+
+        const exportEl = document.createElement('div');
+        exportEl.style.cssText = 'padding:16px;width:1060px;margin:0 auto;background:#F4F5F7';
+
+        const hdr = document.createElement('div');
+        hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#182A55;color:#fff;border-radius:10px;margin-bottom:16px';
+        const dt = new Date();
+        const ds = dt.toISOString().slice(0,10) + ' ' + dt.toTimeString().slice(0,5);
+        const rt = document.getElementById('filter-range').selectedOptions[0].text;
+        hdr.innerHTML = `<div><strong style="font-size:16px">Logs · Diameter Summary</strong></div><div style="font-size:11px;opacity:0.8">${ds} · Range: ${rt}</div>`;
+        exportEl.appendChild(hdr);
+
+        function cloneForPDF(selector) {
+          const src = document.querySelector(selector);
+          if (!src) return null;
+          const cl = src.cloneNode(true);
+          cl.querySelectorAll('canvas').forEach(c => {
+            try {
+              const img = document.createElement('img');
+              img.src = c.toDataURL('image/png');
+              img.style.cssText = 'width:100%;height:auto;max-height:280px;object-fit:contain';
+              c.parentNode.replaceChild(img, c);
+            } catch(e) {}
+          });
+          return cl;
+        }
+
+        const kpiClone = cloneForPDF('#kpi-strip');
+        if (kpiClone) exportEl.appendChild(kpiClone);
+
+        const catClone = cloneForPDF('#cat-strip');
+        if (catClone) exportEl.appendChild(catClone);
+
+        const tableClone = cloneForPDF('.tg-table-container');
+        if (tableClone) {
+          tableClone.querySelectorAll('.tg-table-search').forEach(el => el.remove());
+          exportEl.appendChild(tableClone);
+        }
+
+        wrap.appendChild(exportEl);
+        await new Promise(r => setTimeout(r, 400));
+
+        const rCanvas = await html2canvas(exportEl, {
+          scale: 2.5, useCORS: true, logging: false, backgroundColor: '#F4F5F7',
+          width: exportEl.scrollWidth, height: exportEl.scrollHeight,
+          windowWidth: exportEl.scrollWidth, windowHeight: exportEl.scrollHeight,
+        });
+        const rImg = rCanvas.toDataURL('image/jpeg', 0.95);
+        const rTotalW = rCanvas.width / 2.5;
+        const rTotalH = rCanvas.height / 2.5;
+        const rMmW = rTotalW * 0.2646;
+        const rMmH = rTotalH * 0.2646;
+        const rScaleX = usableW / rMmW;
+        let rRemH = rMmH * rScaleX;
+        let rOff = 0;
+        let rPage = 0;
+        while (rRemH > 0.5) {
+          if (rPage > 0) pdf.addPage();
+          const rPH = Math.min(usableH, rRemH);
+          const rSrcY = (rOff / 0.2646) / rScaleX;
+          const rSrcH = (rPH / usableW) * rTotalW;
+          pdf.addImage(rImg, 'JPEG', margin, margin, usableW, rPH, null, null, 0, 0, rTotalW, rSrcY, rTotalW, rSrcH);
+          rRemH -= rPH;
+          rOff += rPH;
+          rPage++;
+        }
+
+        document.getElementById('pdf-export-wrap')?.remove();
+      }
+    } finally {
+      hidden.forEach(el => el.style.display = '');
+      chips.forEach((c, i) => c.style.pointerEvents = chipOrig[i] || '');
+      pagerOrig.forEach(p => p.style.display = '');
+    }
+
+    pdf.save(`troncos_dashboard_${new Date().toISOString().slice(0, 10)}.pdf`);
+    showToast('PDF exported successfully');
+  } catch (e) {
+    console.error('PDF error:', e);
+    showToast('Error generating PDF', true);
+  }
+
+  btn.innerHTML = origText;
+  btn.style.opacity = '1';
+}
+
+// ── Source filter ──
+document.getElementById('filter-source').addEventListener('change', loadData);
+document.getElementById('filter-range').addEventListener('change', () => { loadData(); setEventDateRange(); });
+document.getElementById('btn-refresh').addEventListener('click', loadData);
+
+// ── Init ──
+async function init() {
+  setEventDateRange();
+  await loadData();
+  setInterval(loadData, 5000);
+}
+
+document.addEventListener('DOMContentLoaded', init);
 </script>
 {% endblock %}
