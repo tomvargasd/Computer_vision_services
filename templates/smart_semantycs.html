@@ -9,17 +9,15 @@
   <!-- ░░ Columna principal: contadores / video / logs ░░ -->
   <div class="ss-main">
     <div class="ss-toolbar">
-
       <div class="ss-session">
-        <button class="ss-new-session" id="btn-new-session" title="Nueva sesión semántica">+ Nueva</button>
         <div class="ss-session-chip">
           <span class="ss-dot"></span>
-          <span id="session-label">Sesión</span>
+          <span id="session-label">Session</span>
         </div>
       </div>
 
       <div class="ss-source">
-        <button class="ss-btn ss-btn-primary" id="btn-load-video">📁 Cargar video</button>
+        <button class="ss-btn ss-btn-primary" id="btn-load-video">📁 Load video</button>
         <input type="file" id="file-video" accept="video/*" hidden>
         <span id="source-chip" hidden></span>
       </div>
@@ -29,54 +27,62 @@
       </div>
     </div>
 
-    <!-- Contadores -->
+    <!-- Counters -->
     <div class="ss-counters" id="ss-counters">
-      <div class="ss-counters-empty">Sin contadores</div>
+      <div class="ss-counters-empty">No counters</div>
     </div>
 
     <!-- Video -->
     <div class="ss-video" id="ss-video">
       <div class="ss-video-empty" id="video-empty">
-        <p id="video-empty-text">Sube o vincula un video o stream para comenzar.</p>
+        <p id="video-empty-text">Load a video to begin.</p>
       </div>
-      <img id="video-frame" alt="semantycs stream" hidden>
+      <img id="video-frame" alt="Smart Semantycs stream" hidden>
 
-      <div class="ss-video-overlay" id="video-overlay" hidden>
-        <button class="ss-btn ss-btn-ghost" id="btn-pause" title="Pausar">⏸</button>
-        <button class="ss-btn ss-btn-ghost" id="btn-resume" title="Reanudar" hidden>▶</button>
-        <button class="ss-btn ss-btn-ghost" id="btn-reset" title="Reset (confirmación)">⟲ Reset</button>
-        <button class="ss-btn ss-btn-stop" id="btn-stop" title="Detener">■ Stop</button>
+      <div class="ss-video-controls" id="video-controls" hidden>
+        <button class="ss-btn ss-btn-ctr" id="btn-toggle" title="Play / Pause">▶ Play</button>
+        <button class="ss-btn ss-btn-ctr" id="btn-reset" title="Reset detection">⟲ Reset</button>
+        <button class="ss-btn ss-btn-stop" id="btn-stop" title="Stop">■ Stop</button>
       </div>
 
       <div class="ss-video-prompt" id="video-prompt" hidden></div>
     </div>
 
-    <!-- Logs -->
+    <!-- Events log -->
     <div class="ss-logs" id="ss-logs">
-      <div class="ss-logs-header">Logs</div>
+      <div class="ss-logs-header">Events log</div>
       <div class="ss-logs-body" id="ss-logs-body">
-        <div class="ss-logs-empty">Sin eventos</div>
+        <div class="ss-logs-empty">No events</div>
       </div>
     </div>
   </div>
 
-  <!-- ░░ Columna derecha: chat / interpretación ░░ -->
+  <!-- ░░ Right column: sessions + chat ░░ -->
   <div class="ss-chat">
     <div class="ss-chat-head">
-      <span>Asistente de detección</span>
+      <span>Detection Assistant</span>
+      <button class="ss-btn ss-btn-new" id="btn-new-session" title="New session">+ New</button>
     </div>
+
+    <!-- Session history -->
+    <div class="ss-sessions" id="ss-sessions">
+      <div class="ss-sessions-title">Sessions</div>
+      <div class="ss-sessions-list" id="ss-sessions-list">
+        <div class="ss-sessions-empty">No sessions yet</div>
+      </div>
+    </div>
+
     <div class="chat-messages ss-chat-messages" id="chat-messages">
       <div class="chat-welcome" id="chat-welcome">
         <div class="welcome-icon">◈</div>
-        <h2>Describe qué detectar</h2>
-        <p>Escribe un prompt, por ejemplo «detecta y cuenta personas en bicicleta». Se interpretará y configurará la detección.</p>
+        <h2>Describe what to detect</h2>
+        <p>Type a prompt, for example <em>detect and count people on bicycles</em>. It will be interpreted and the detection configured.</p>
       </div>
     </div>
     <div class="ss-chat-input">
-      <textarea id="chat-input" rows="1" placeholder="Describe qué detectar y/o contar..."></textarea>
+      <textarea id="chat-input" rows="1" placeholder="Describe what to detect and/or count..."></textarea>
       <div class="ss-chat-actions">
-        <button class="ss-btn ss-btn-primary" id="chat-send-btn" disabled>Interpretar</button>
-        <button class="ss-btn ss-btn-start" id="btn-start" disabled hidden>▶ Iniciar</button>
+        <button class="ss-btn ss-btn-primary" id="chat-send-btn" disabled>Interpret</button>
       </div>
     </div>
   </div>

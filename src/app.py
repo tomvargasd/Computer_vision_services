@@ -3000,7 +3000,7 @@ def api_semantycs_start(session_id):
     s = get_semantycs_session(session_id)
     if not s:
         return jsonify({"error": "Session not found"}), 404
-    if s["state"] != "prompted":
+    if s["state"] not in ("prompted", "stopped"):
         return jsonify({"error": "La sesión no está lista para iniciar."}), 400
     if not (s.get("video_path") or ""):
         return jsonify({"error": "No hay video vinculado."}), 400

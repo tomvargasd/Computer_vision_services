@@ -2,14 +2,12 @@
   'use strict';
 
   var currentSessionId = null;
-  var pollTimer = null;
 
   var $ = function (id) { return document.getElementById(id); };
   var chatMessages = $('chat-messages');
   var chatWelcome = $('chat-welcome');
   var chatInput = $('chat-input');
   var chatSendBtn = $('chat-send-btn');
-  var btnStart = $('btn-start');
   var btnLoadVideo = $('btn-load-video');
   var fileVideo = $('file-video');
   var sourceChip = $('source-chip');
@@ -19,15 +17,24 @@
   var videoFrame = $('video-frame');
   var videoEmpty = $('video-empty');
   var videoEmptyText = $('video-empty-text');
-  var videoOverlay = $('video-overlay');
+  var videoControls = $('video-controls');
   var videoPrompt = $('video-prompt');
-  var btnPause = $('btn-pause');
-  var btnResume = $('btn-resume');
+  var btnToggle = $('btn-toggle');
   var btnReset = $('btn-reset');
   var btnStop = $('btn-stop');
+  var btnNew = $('btn-new-session');
   var sessionLabel = $('session-label');
+  var sessionsList = $('ss-sessions-list');
 
   var typingBubble = null;
+
+  var STATE_UI = {
+    no_video: 'No video',
+    video: 'Video',
+    prompted: 'Ready',
+    running: 'Running',
+    stopped: 'Stopped'
+  };
 
   function autoResize() {
     chatInput.style.height = 'auto';
@@ -47,7 +54,7 @@
 
   function escapeHtml(text) {
     var div = document.createElement('div');
-    div.textContent = text || '';
+    div.textContent = (text == null ? '' : String(text));
     return div.innerHTML;
   }
 
@@ -55,17 +62,19 @@
     return id ? id.slice(0, 8) : '';
   }
 
-  // ── Mensajes del chat ────────────────────────────────────────────────
-  function addMessage(role, content, kind) {
+  function hasState(state) {
+    return state === 'prompted' || state === 'running' || state === 'stopped';
+  }
+
+  // ── Messages ─────────────────────────────────────────────────────
+  function addMessage(content, role, kind) {
     chatWelcome.style.display = 'none';
     var div = document.createElement('div');
     div.className = 'message ' + (role === 'model' ? 'assistant' : 'user');
-
     var avatar = document.createElement('div');
     avatar.className = 'message-avatar';
     avatar.textContent = role === 'user' ? 'U' : '\u2728';
     div.appendChild(avatar);
-
     var bubble = document.createElement('div');
     bubble.className = 'message-bubble';
     if (role === 'model' && kind === 'skill') {
@@ -91,14 +100,14 @@
     var dots = document.createElement('div');
     dots.className = 'typing-dots';
     for (var i = 0; i < 3; i++) {
-      var d = document.createElement('span');
-      d.className = 'typing-dot';
-      dots.appendChild(d);
+      var s = document.createElement('span');
+      s.className = 'typing-dot';
+      dots.appendChild(s);
     }
     bubble.appendChild(dots);
     var label = document.createElement('span');
     label.className = 'typing-label';
-    label.textContent = 'Interpretando...';
+    label.textContent = 'Interpreting...';
     bubble.appendChild(label);
     typingBubble.appendChild(bubble);
     chatMessages.appendChild(typingBubble);
@@ -112,52 +121,109 @@
     }
   }
 
-  function clearMessages() {
+  function clearChat() {
     while (chatMessages.firstChild) chatMessages.removeChild(chatMessages.firstChild);
     chatWelcome.style.display = 'flex';
+    removeTypingBubble();
   }
 
   function loadMessages(sessionId) {
     api('/api/semantycs/sessions/' + sessionId).then(function (res) {
       if (res.status !== 200) return;
-      clearMessages();
+      clearChat();
       (res.data.session.messages || []).forEach(function (m) {
-        addMessage(m.role, m.content, m.kind);
+        addMessage(m.content, m.role, m.kind);
       });
-      applyStateHint(res.data.session);
     });
   }
 
-  // ── Sesión ──────────────────────────────────────────────────────────
+  // ── Sessions history ─────────────────────────────────────────────
+  function renderSessions(sessions) {
+    if (!sessions || sessions.length === 0) {
+      sessionsList.innerHTML = '<div class="ss-sessions-empty">No sessions yet</div>';
+      return;
+    }
+    sessionsList.innerHTML = sessions.map(function (s) {
+      var active = s.id === currentSessionId ? ' ss-session-active' : '';
+      var title = s.prompt || s.title || ('Session ' + shortId(s.id));
+      var time = (s.updated_at || '').split(' ')[1] || '';
+      var dot = ((s.id === currentSessionId && s.state === 'running') ? 'running' : 'off');
+      return '<div class="ss-session-item' + active + '" data-sid="' + s.id + '">' +
+        '<span class="ss-session-dot ' + escapeHtml(dot) + '"></span>' +
+        '<span class="ss-session-item-title">' + escapeHtml(title) + '</span>' +
+        '<span class="ss-session-item-time">' + escapeHtml(time) + '</span>' +
+        '</div>';
+    }).join('');
+    sessionsList.querySelectorAll('.ss-session-item').forEach(function (row) {
+      row.addEventListener('click', function () { openSession(row.dataset.sid); });
+    });
+  }
+
+  function refreshSessions() {
+    return api('/api/semantycs/sessions').then(function (res) {
+      if (res.status !== 200) return;
+      renderSessions(res.data.sessions || []);
+    });
+  }
+
+  function openSession(sessionId) {
+    currentSessionId = sessionId;
+    sessionLabel.textContent = 'Session ' + shortId(sessionId);
+    loadMessages(sessionId);
+    refreshSessions();
+    refreshState();
+  }
+
+  function resetView() {
+    sessionLabel.textContent = 'Session';
+    stateBadge.textContent = '';
+    stateBadge.className = 'ss-state-badge';
+    sourceChip.hidden = true;
+    videoFrame.hidden = true;
+    videoFrame.removeAttribute('src');
+    videoControls.hidden = true;
+    videoPrompt.hidden = true;
+    videoEmpty.hidden = false;
+    videoEmptyText.textContent = 'Load a video to begin.';
+    countersEl.innerHTML = '<div class="ss-counters-empty">No counters</div>';
+    logsBody.innerHTML = '<div class="ss-logs-empty">No events</div>';
+    btnToggle.textContent = '▶ Play';
+    btnStop.disabled = true;
+    btnReset.disabled = true;
+  }
+
   function newSession() {
     api('/api/semantycs/sessions', { method: 'POST' }).then(function (res) {
-      if (res.status === 201) {
-        currentSessionId = res.data.session_id;
-        sessionLabel.textContent = 'Sesión ' + shortId(currentSessionId);
-        clearMessages();
-        chatInput.value = '';
-        autoResize();
-        refreshState();
-      }
+      if (res.status !== 201) return;
+      currentSessionId = res.data.session_id;
+      sessionLabel.textContent = 'Session ' + shortId(currentSessionId);
+      resetView();
+      chatInput.value = '';
+      chatInput.disabled = false;
+      autoResize();
+      refreshSessions();
+      refreshState();
     });
   }
 
-  function boot() {
+  function initialize() {
     api('/api/semantycs/sessions').then(function (res) {
-      if (res.status !== 200) return;
-      var sessions = res.data.sessions || [];
+      var sessions = (res.status === 200 && res.data.sessions) ? res.data.sessions : [];
+      renderSessions(sessions);
       if (sessions.length) {
-        currentSessionId = sessions[0].id;
-        sessionLabel.textContent = 'Sesión ' + shortId(currentSessionId);
-        loadMessages(currentSessionId);
-        refreshState();
+        openSession(sessions[0].id);
       } else {
         newSession();
       }
     });
   }
 
-  // ── Video ───────────────────────────────────────────────────────────
+  // ── New session button ───────────────────────────────────────────
+  btnNew.addEventListener('click', function () {
+    newSession();
+  });
+
+  // ── Video source ────────────────────────────────────────────────
   btnLoadVideo.addEventListener('click', function () { fileVideo.click(); });
 
   fileVideo.addEventListener('change', function () {
@@ -168,24 +234,25 @@
     fetch('/api/sources/upload-video', { method: 'POST', body: fd })
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        if (!d.path) { alert(d.error || 'Upload failed'); return; }
+        if (!d.path) { alert(d.error || 'Upload failed'); return null; }
         return api('/api/semantycs/sessions/' + currentSessionId + '/video', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: d.path, type: 'video' }),
+          body: JSON.stringify({ path: d.path, type: 'video' })
         });
       })
-      .then(function () { refreshState(); });
+      .then(function () { refreshState(); refreshSessions(); })
+      .catch(function () { alert('Upload failed'); });
   });
 
-  // ── Interpretar ─────────────────────────────────────────────────────
+  // ── Interpret (with auto-start) ─────────────────────────────────
   function interpret() {
     var prompt = chatInput.value.trim();
     if (!prompt || !currentSessionId || chatInput.disabled) return;
 
     chatInput.value = '';
     autoResize();
-    addMessage('user', prompt);
+    addMessage(prompt, 'user');
     showTypingBubble();
     chatInput.disabled = true;
     updateSendBtn();
@@ -193,21 +260,30 @@
     api('/api/semantycs/sessions/' + currentSessionId + '/interpret', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: prompt }),
+      body: JSON.stringify({ prompt: prompt })
     }).then(function (res) {
       removeTypingBubble();
       chatInput.disabled = false;
       if (res.status === 429) {
-        addMessage('model', '\u23F1\uFE0F ' + (res.data.error || 'Espera un momento.'));
+        addMessage('\u23F1\uFE0F ' + (res.data.error || 'Wait a moment.'), 'model');
       } else if (res.status !== 200) {
-        addMessage('model', '\u26A0\uFE0F ' + (res.data.error || 'Error'));
+        addMessage('\u26A0\uFE0F ' + (res.data.error || 'Error'), 'model');
       }
-      loadMessages(currentSessionId);
-      refreshState();
+      return refreshState();
+    }).then(function (st) {
+      if (st && st.state === 'prompted') {
+        // Auto-start: begin detection as soon as the skill is ready.
+        api('/api/semantycs/sessions/' + currentSessionId + '/start', { method: 'POST' })
+          .then(function (rs) {
+            if (rs.status !== 200) { alert(rs.data.error || 'Error starting'); return; }
+            refreshState();
+          })
+          .then(refreshSessions);
+      }
     }).catch(function () {
       removeTypingBubble();
       chatInput.disabled = false;
-      addMessage('model', '\u26A0\uFE0F Error de conexión.');
+      addMessage('\u26A0\uFE0F Connection error.', 'model');
     }).finally(function () {
       updateSendBtn();
     });
@@ -215,63 +291,44 @@
 
   chatSendBtn.addEventListener('click', interpret);
   chatInput.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      interpret();
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); interpret(); }
   });
   chatInput.addEventListener('input', autoResize);
 
-  // ── Controles ───────────────────────────────────────────────────────
-  btnStart.addEventListener('click', function () {
+  // ── Controls ─────────────────────────────────────────────────────
+  btnToggle.addEventListener('click', function () {
     if (!currentSessionId) return;
-    api('/api/semantycs/sessions/' + currentSessionId + '/start', { method: 'POST' })
-      .then(function (res) {
-        if (res.status !== 200) { alert(res.data.error || 'Error al iniciar'); return; }
-        refreshState();
-      });
-  });
-
-  btnPause.addEventListener('click', function () {
-    api('/api/semantycs/sessions/' + currentSessionId + '/pause', { method: 'POST' })
-      .then(refreshState);
-  });
-
-  btnResume.addEventListener('click', function () {
-    api('/api/semantycs/sessions/' + currentSessionId + '/resume', { method: 'POST' })
-      .then(refreshState);
+    api('/api/semantycs/sessions/' + currentSessionId + '/state').then(function (res) {
+      if (res.status !== 200) return;
+      var st = res.data;
+      var op = st.running ? (st.paused ? 'resume' : 'pause') : 'start';
+      api('/api/semantycs/sessions/' + currentSessionId + '/' + op, { method: 'POST' })
+        .then(function (r) {
+          if (r.status !== 200) { alert(r.data.error || 'Error'); return; }
+          if (op === 'start') refreshSessions();
+          refreshState();
+        });
+    });
   });
 
   btnReset.addEventListener('click', function () {
-    if (!confirm('¿Reiniciar la detección? Se limpiarán contadores, logs y capturas de esta sesión.')) return;
+    if (!currentSessionId) return;
+    if (!confirm('Reset detection? Counters, logs and captures of this session will be cleared.')) return;
     api('/api/semantycs/sessions/' + currentSessionId + '/reset', { method: 'POST' })
       .then(refreshState);
   });
 
   btnStop.addEventListener('click', function () {
+    if (!currentSessionId) return;
+    if (!confirm('Stop detection? You can press Play to run it again from the start.')) return;
     api('/api/semantycs/sessions/' + currentSessionId + '/stop', { method: 'POST' })
-      .then(refreshState);
+      .then(function () { refreshState(); refreshSessions(); });
   });
 
-  document.getElementById('btn-new-session').addEventListener('click', function () {
-    if (confirm('¿Iniciar una nueva sesión? La sesión actual se conservará en el historial.')) {
-      newSession();
-    }
-  });
-
-  // ── Render de estado ────────────────────────────────────────────────
-  function applyStateHint(session) {
-    var state = session.state;
-    var locked = state === 'running';
-    chatInput.disabled = locked;
-    updateSendBtn();
-    btnStart.hidden = state !== 'prompted';
-    btnLoadVideo.hidden = locked || state !== 'no_video';
-  }
-
+  // ── Render ───────────────────────────────────────────────────────
   function renderCounters(counters) {
     if (!counters || counters.length === 0) {
-      countersEl.innerHTML = '<div class="ss-counters-empty">Sin contadores</div>';
+      countersEl.innerHTML = '<div class="ss-counters-empty">No counters</div>';
       return;
     }
     countersEl.innerHTML = counters.map(function (c) {
@@ -284,12 +341,11 @@
 
   function renderLogs(logs) {
     if (!logs || logs.length === 0) {
-      logsBody.innerHTML = '<div class="ss-logs-empty">Sin eventos</div>';
+      logsBody.innerHTML = '<div class="ss-logs-empty">No events</div>';
       return;
     }
     logsBody.innerHTML = logs.map(function (l) {
-      var t = l.created_at || '';
-      var time = t.split(' ')[1] || t;
+      var time = (l.created_at || '').split(' ')[1] || '';
       return '<div class="ss-log-row" data-log-id="' + l.id + '">' +
         '<span class="ss-log-prio ' + escapeHtml(l.priority) + '"></span>' +
         '<span class="ss-log-time">' + escapeHtml(time) + '</span>' +
@@ -308,9 +364,9 @@
       .then(function (res) {
         if (res.status !== 200) return;
         var log = res.data.log;
-        document.getElementById('ev-title').textContent = 'Smart Semantycs · Evidencia';
+        document.getElementById('ev-title').textContent = 'Smart Semantycs · Evidence';
         var cap = log.capture_path || '';
-        if (cap && cap.indexOf('static/') === 0) cap = '/' + cap;
+        if (cap.indexOf('static/') === 0) cap = '/' + cap;
         document.getElementById('ev-image').src = cap;
         document.getElementById('ev-module').textContent = 'Smart Semantycs';
         document.getElementById('ev-source').textContent = shortId(currentSessionId);
@@ -325,20 +381,28 @@
       });
   }
 
+  function setToggleUI(st) {
+    videoControls.hidden = !hasState(st.state);
+    if (st.running) {
+      btnToggle.textContent = st.paused ? '▶ Play' : '⏸ Pause';
+      btnToggle.title = st.paused ? 'Resume' : 'Pause';
+    } else {
+      btnToggle.textContent = '▶ Play';
+      btnToggle.title = 'Play';
+    }
+    btnStop.disabled = !st.running;
+    btnReset.disabled = !st.running;
+  }
+
   function refreshState() {
-    if (!currentSessionId) return;
-    api('/api/semantycs/sessions/' + currentSessionId + '/state').then(function (res) {
-      if (res.status !== 200) return;
+    if (!currentSessionId) return Promise.resolve(null);
+    return api('/api/semantycs/sessions/' + currentSessionId + '/state').then(function (res) {
+      if (res.status !== 200) return null;
       var st = res.data;
-
-      stateBadge.textContent = st.state;
+      stateBadge.textContent = STATE_UI[st.state] || st.state;
       stateBadge.className = 'ss-state-badge ' + (st.state || '');
-
-      var locked = st.state === 'running';
-      chatInput.disabled = locked;
+      chatInput.disabled = st.state === 'running';
       updateSendBtn();
-      btnStart.hidden = st.state !== 'prompted';
-      btnLoadVideo.hidden = locked || st.state !== 'no_video';
 
       if (st.video_path) {
         sourceChip.hidden = false;
@@ -348,41 +412,39 @@
         sourceChip.hidden = true;
       }
 
-      // Video
       if (st.running) {
         videoEmpty.hidden = true;
         videoFrame.hidden = false;
         videoFrame.src = '/api/semantycs/sessions/' + currentSessionId + '/stream';
-        videoOverlay.hidden = false;
-        btnPause.hidden = !!st.paused;
-        btnResume.hidden = !st.paused;
-        videoPrompt.hidden = false;
-        videoPrompt.textContent = st.prompt || '';
       } else {
         videoFrame.hidden = true;
         videoFrame.removeAttribute('src');
-        videoOverlay.hidden = true;
-        videoPrompt.hidden = true;
         videoEmpty.hidden = false;
         if (st.state === 'no_video') {
-          videoEmptyText.textContent = 'Sube o vincula un video o stream para comenzar.';
+          videoEmptyText.textContent = 'Load a video to begin.';
         } else if (st.state === 'video') {
-          videoEmptyText.textContent = 'Video vinculado. Escribe un prompt para configurar la detección.';
+          videoEmptyText.textContent = 'Video linked. Type a prompt to configure detection.';
         } else if (st.state === 'prompted') {
-          videoEmptyText.textContent = 'Detección lista. Pulsa Iniciar.';
+          videoEmptyText.textContent = 'Detection ready. Press Play.';
         } else if (st.state === 'stopped') {
-          videoEmptyText.textContent = 'Detección detenida. Crea una nueva sesión si deseas continuar.';
+          videoEmptyText.textContent = 'Detection stopped. Press Play to run it again from the start.';
         }
       }
 
+      setToggleUI(st);
+
+      videoPrompt.hidden = !st.prompt;
+      if (st.prompt) videoPrompt.textContent = st.prompt;
+
       renderCounters(st.counters);
       renderLogs(st.logs);
+      return st;
     });
   }
 
-  // ── Polling ─────────────────────────────────────────────────────────
-  setInterval(refreshState, 1500);
+  // ── Polling ──────────────────────────────────────────────────────
+  setInterval(function () { refreshState(); }, 1500);
+  setInterval(function () { refreshSessions(); }, 5000);
 
-  chatInput.addEventListener('focus', function () {});
-  boot();
+  initialize();
 })();
