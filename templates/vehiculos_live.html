@@ -365,6 +365,22 @@
 
     </div><!-- /panel-placas -->
 
+    <!-- ── Timesleep (per source) ──────────────────────────── -->
+    <div class="lv-section">
+      <div class="lv-section-title">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        Timesleep
+      </div>
+      <div class="lv-line-config" style="border:none;padding-top:0;margin-top:0">
+        <div class="lv-line-lbl">Pause between frames (seconds)</div>
+        <div class="lv-line-row">
+          <input type="range" id="fps-limit-slider" min="0" max="1" step="0.005"
+                 value="{{ source.fps_limit if source.fps_limit != '' else ('0.2' if source.type == 'video' else '0') }}">
+          <span class="lv-line-val" id="fps-limit-val">{{ source.fps_limit if source.fps_limit != '' else ('0.2' if source.type == 'video' else '0') }}s</span>
+        </div>
+      </div>
+    </div>
+
     <!-- Info -->
     <div class="lv-info-row">
       <span>Source #<span class="lv-info-id">{{ source.id }}</span></span>
@@ -581,6 +597,24 @@ document.getElementById("toggle-placas").addEventListener("change", async () => 
     body: JSON.stringify({ enabled }),
   });
 });
+
+// ── Timesleep por fuente ────────────────────────────────────────────────────
+const fpsSlider = document.getElementById("fps-limit-slider");
+const fpsVal    = document.getElementById("fps-limit-val");
+if (fpsSlider) {
+  let fpsDebounce;
+  fpsSlider.addEventListener("input", () => {
+    fpsVal.textContent = parseFloat(fpsSlider.value).toFixed(3) + "s";
+    clearTimeout(fpsDebounce);
+    fpsDebounce = setTimeout(async () => {
+      await fetch(`/api/sources/${SOURCE_ID}/fps`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fps_limit: parseFloat(fpsSlider.value) }),
+      });
+    }, 400);
+  });
+}
 
 // ── Reiniciar ─────────────────────────────────────────────────────────────
 document.getElementById("btn-reset").addEventListener("click", async () => {

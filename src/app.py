@@ -19,7 +19,7 @@ from src.config import (
 from src.database import (
     init_db, get_settings, set_setting,
     get_modules_state, db_toggle_module, db_toggle_function,
-    get_sources, get_source, add_source, update_source, delete_source,
+    get_sources, get_source, add_source, update_source, update_source_fps, delete_source,
     MODULES_META,
     save_module_counters, load_module_counters, reset_module_counters,
     insert_module_event, get_module_events, get_module_analytics,
@@ -84,9 +84,14 @@ def _normalize_path(path, src_type):
     return path
 
 
-def _get_fps_limit(module_id, src_type, settings):
-    key = f"{module_id}_fps_limit_{src_type}"
-    return float(settings.get(key, "0.02" if src_type == "video" else "0.0"))
+def _get_fps_limit(source, src_type):
+    fps_str = source.get("fps_limit", "")
+    if fps_str:
+        try:
+            return float(fps_str)
+        except (ValueError, TypeError):
+            pass
+    return 0.2 if src_type == "video" else 0.0
 
 
 app = Flask(__name__, template_folder=os.path.join(BASE_DIR, "templates"),
@@ -535,16 +540,15 @@ def api_set_half(module_id):
     return jsonify({"half": val})
 
 
-@app.route("/api/<module_id>/settings/fps", methods=["POST"])
-def api_set_fps(module_id):
-    if module_id not in MODULES_META:
-        return jsonify({"error": "Module not found"}), 404
+@app.route("/api/sources/<int:source_id>/fps", methods=["POST"])
+def api_set_source_fps(source_id):
+    src = get_source(source_id)
+    if not src:
+        return jsonify({"error": "Source not found"}), 404
     data = request.get_json(silent=True) or {}
-    for src_type in ("video", "stream"):
-        if src_type in data:
-            val = str(float(data[src_type]))
-            set_setting(f"{module_id}_fps_limit_{src_type}", val)
-    return jsonify({"saved": True})
+    fps_limit = str(float(data.get("fps_limit", 0.0)))
+    update_source_fps(source_id, fps_limit)
+    return jsonify({"fps_limit": fps_limit})
 
 
 @app.route("/api/pallets/settings/classes", methods=["POST"])
@@ -698,7 +702,7 @@ def personas_start(source_id):
     if not src:
         return jsonify({"error": "Source not found"}), 404
     s = get_settings()
-    fps_limit = _get_fps_limit("personas", src["type"], s)
+    fps_limit = _get_fps_limit(src, src["type"])
     try:
         PersonasManager.get().start(source_id, src["path"],
             _func_state_for("personas"),
@@ -734,7 +738,7 @@ def armas_start(source_id):
     if not src:
         return jsonify({"error": "Source not found"}), 404
     s = get_settings()
-    fps_limit = _get_fps_limit("armas", src["type"], s)
+    fps_limit = _get_fps_limit(src, src["type"])
     try:
         ArmasManager.get().start(source_id, src["path"],
             _func_state_for("armas"),
@@ -760,7 +764,7 @@ def acciones_start(source_id):
     if not src:
         return jsonify({"error": "Source not found"}), 404
     s = get_settings()
-    fps_limit = _get_fps_limit("acciones", src["type"], s)
+    fps_limit = _get_fps_limit(src, src["type"])
     try:
         AccionesManager.get().start(source_id, src["path"],
             _func_state_for("acciones"),
@@ -826,7 +830,7 @@ def troncos_start(source_id):
     if not src:
         return jsonify({"error": "Source not found"}), 404
     s = get_settings()
-    fps_limit = _get_fps_limit("troncos", src["type"], s)
+    fps_limit = _get_fps_limit(src, src["type"])
     try:
         TroncosManager.get().start(source_id, src["path"],
             _func_state_for("troncos"),
@@ -878,7 +882,7 @@ def pallets_start(source_id):
     s = get_settings()
     classes_str = s.get("pallets_classes", "0,1,2,3")
     classes = [int(c.strip()) for c in classes_str.split(",") if c.strip()]
-    fps_limit = _get_fps_limit("pallets", src["type"], s)
+    fps_limit = _get_fps_limit(src, src["type"])
     try:
         PalletsManager.get().start(source_id, src["path"],
             _func_state_for("pallets"),
@@ -920,7 +924,7 @@ def cajas_start(source_id):
     if not src:
         return jsonify({"error": "Source not found"}), 404
     s = get_settings()
-    fps_limit = _get_fps_limit("cajas", src["type"], s)
+    fps_limit = _get_fps_limit(src, src["type"])
     try:
         CajasManager.get().start(source_id, src["path"],
             _func_state_for("cajas"),
@@ -956,7 +960,7 @@ def reglamento_start(source_id):
     if not src:
         return jsonify({"error": "Source not found"}), 404
     s = get_settings()
-    fps_limit = _get_fps_limit("reglamento", src["type"], s)
+    fps_limit = _get_fps_limit(src, src["type"])
     try:
         ReglamentoManager.get().start(source_id, src["path"],
             _func_state_for("reglamento"),
@@ -1075,7 +1079,7 @@ def carga_descarga_start(source_id):
         model_path = m.get("path")
         cls_str = m.get("classes", "")
         classes = [int(c.strip()) for c in cls_str.split(",") if c.strip()] if cls_str else None
-    fps_limit = _get_fps_limit("carga_descarga", src["type"], s)
+    fps_limit = _get_fps_limit(src, src["type"])
     try:
         CargaDescargaManager.get().start(source_id, src["path"],
             _func_state_for("carga_descarga"),
@@ -1168,7 +1172,7 @@ def epp_start(source_id):
     if not src:
         return jsonify({"error": "Source not found"}), 404
     s = get_settings()
-    fps_limit = _get_fps_limit("epp", src["type"], s)
+    fps_limit = _get_fps_limit(src, src["type"])
     try:
         EppManager.get().start(source_id, src["path"],
             _func_state_for("epp"),
@@ -1210,7 +1214,7 @@ def smoke_start(source_id):
     if not src:
         return jsonify({"error": "Source not found"}), 404
     s = get_settings()
-    fps_limit = _get_fps_limit("smoke", src["type"], s)
+    fps_limit = _get_fps_limit(src, src["type"])
     try:
         SmokeManager.get().start(source_id, src["path"],
             _func_state_for("smoke"),
@@ -1236,7 +1240,7 @@ def vehiculos_start(source_id):
     if not src:
         return jsonify({"error": "Source not found"}), 404
     s = get_settings()
-    fps_limit = _get_fps_limit("vehiculos", src["type"], s)
+    fps_limit = _get_fps_limit(src, src["type"])
     try:
         VehiculosManager.get().start(source_id, src["path"],
             _func_state_for("vehiculos"),
@@ -1309,7 +1313,7 @@ def tanques_gas_start(source_id):
     if not src:
         return jsonify({"error": "Source not found"}), 404
     s = get_settings()
-    fps_limit = _get_fps_limit("tanques_gas", src["type"], s)
+    fps_limit = _get_fps_limit(src, src["type"])
     try:
         TanquesGasManager.get().start(source_id, src["path"],
             _func_state_for("tanques_gas"),

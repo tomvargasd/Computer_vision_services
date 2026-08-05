@@ -392,40 +392,6 @@
         </div>
       </div>
 
-      <!-- Timesleep / FPS -->
-      <div class="settings-section">
-        <div class="settings-section-header">
-          <svg class="settings-section-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          <span class="settings-section-title">Timesleep by source type</span>
-        </div>
-        <div class="settings-section-body">
-          <div class="param-row">
-            <div class="param-info">
-              <span class="param-label">Timesleep · Video</span>
-              <span class="param-desc">Pause between frames for video files (seconds)</span>
-            </div>
-            <div class="param-control">
-              <input type="number" class="fps-input" data-module="{{ mid }}" data-src-type="video"
-                     min="0" max="1" step="0.005"
-                     value="{{ settings.get(mid ~ '_fps_limit_video', '0.02') }}">
-            </div>
-          </div>
-          <div class="param-row">
-            <div class="param-info">
-              <span class="param-label">Timesleep · Stream</span>
-              <span class="param-desc">Pause between frames for live / RTSP sources (seconds)</span>
-            </div>
-            <div class="param-control">
-              <input type="number" class="fps-input" data-module="{{ mid }}" data-src-type="stream"
-                     min="0" max="1" step="0.005"
-                     value="{{ settings.get(mid ~ '_fps_limit_stream', '0.0') }}">
-            </div>
-          </div>
-          <div class="settings-toast" id="fps-toast-{{ mid }}">✓ Timesleep updated</div>
-        </div>
-      </div>
-      </div>
-
       {% if mid == 'pallets' %}
       <!-- Clases a detectar -->
       <div class="settings-section">
@@ -860,32 +826,6 @@ document.querySelectorAll(".half-toggle").forEach(toggle => {
       console.error("Error saving FP16:", e);
       toggle.checked = !toggle.checked;
     }
-  });
-});
-
-// ══ Timesleep / FPS inputs ════════════════════════════════════════
-document.querySelectorAll(".fps-input").forEach(input => {
-  let debounceTimer;
-  input.addEventListener("input", () => {
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(async () => {
-      const mid = input.dataset.module;
-      const srcType = input.dataset.srcType;
-      const val = parseFloat(input.value);
-      if (isNaN(val) || val < 0) return;
-      try {
-        const r = await fetch(`/api/${mid}/settings/fps`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ [srcType]: String(val) }),
-        });
-        if (!r.ok) throw new Error(await r.text());
-        const toast = document.getElementById("fps-toast-" + mid);
-        if (toast) { toast.classList.add("show"); setTimeout(() => toast.classList.remove("show"), 2000); }
-      } catch (e) {
-        console.error("Error saving timesleep:", e);
-      }
-    }, 400);
   });
 });
 

@@ -101,23 +101,9 @@ MODULES_META = {
 }
 
 
-_FPS_MODULES = [
-    "personas", "armas", "acciones", "troncos", "pallets",
-    "cajas", "reglamento", "carga_descarga", "epp", "smoke", "vehiculos",
-    "tanques_gas",
-]
-FPS_DEFAULTS = [
-    (f"{m}_fps_limit_video", "0.02")
-    for m in _FPS_MODULES
-] + [
-    (f"{m}_fps_limit_stream", "0.0")
-    for m in _FPS_MODULES
-]
-
 DEFAULT_SETTINGS = [
     ("system_name", "Computer Vision"), ("version", APP_VERSION), ("logo", ""),
     ("multi_detection", "0"),
-    *FPS_DEFAULTS,
     ("armas_model", ""), ("personas_model", ""), ("acciones_model", ""),
     ("troncos_model", ""), ("pallets_model", ""), ("cajas_model", ""),
     ("reglamento_model", ""),
@@ -203,6 +189,7 @@ def init_db():
                 name       TEXT    NOT NULL,
                 type       TEXT    NOT NULL CHECK(type IN ('video','stream')),
                 path       TEXT    NOT NULL,
+                fps_limit  TEXT    NOT NULL DEFAULT '',
                 created_at TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
             );
 
@@ -320,6 +307,12 @@ def init_db():
             pass
         try:
             conn.execute("ALTER TABLE reglamento_detections ADD COLUMN missing_items TEXT DEFAULT NULL")
+        except Exception:
+            pass
+
+        # Migración: fps_limit por fuente (timesleep individual)
+        try:
+            conn.execute("ALTER TABLE sources ADD COLUMN fps_limit TEXT NOT NULL DEFAULT ''")
         except Exception:
             pass
 
@@ -456,6 +449,14 @@ def update_source(source_id, name=None, path=None):
 
 def get_source(source_id: int) -> dict | None:
     with get_conn() as conn:
+        row = conn.execute("SELECT * FROM sources WHERE id=?", (source_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def update_source_fps(source_id, fps_limit):
+    with get_conn() as conn:
+        conn.execute("UPDATE sources SET fps_limit=? WHERE id=?", (str(fps_limit), source_id))
+        conn.commit()
         row = conn.execute("SELECT * FROM sources WHERE id=?", (source_id,)).fetchone()
     return dict(row) if row else None
 
