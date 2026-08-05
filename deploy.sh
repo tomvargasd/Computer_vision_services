@@ -78,6 +78,7 @@ echo "Selected PyTorch installation target: $CUDA_TAG"
 # CPU  → modelo nano (ligero, viable en CPU)
 # GPU  → modelo XL  (máxima efectividad)
 YOLOE_NANO_URL="https://github.com/ultralytics/assets/releases/download/v8.4.0/yoloe-26n-seg.pt"
+YOLOE_MEDIUM_URL="https://github.com/ultralytics/assets/releases/download/v8.4.0/yoloe-26m-seg.pt"
 YOLOE_XL_URL="https://github.com/ultralytics/assets/releases/download/v8.4.0/yoloe-26x-seg.pt"
 YOLOE_MODELS_DIR="static/uploads/models"
 
@@ -86,9 +87,9 @@ if [ "$CUDA_TAG" = "cpu" ]; then
     YOLOE_MODEL_URL=$YOLOE_NANO_URL
     echo "YOLOE target for CPU: nano ($YOLOE_MODEL_NAME)"
 else
-    YOLOE_MODEL_NAME="yoloe-26x-seg.pt"
-    YOLOE_MODEL_URL=$YOLOE_XL_URL
-    echo "YOLOE target for GPU: XL ($YOLOE_MODEL_NAME)"
+    YOLOE_MODEL_NAME="yoloe-26m-seg.pt"
+    YOLOE_MODEL_URL=$YOLOE_MEDIUM_URL
+    echo "YOLOE target for GPU: medium ($YOLOE_MODEL_NAME)"
 fi
 
 if [ -f "$YOLOE_MODELS_DIR/$YOLOE_MODEL_NAME" ]; then

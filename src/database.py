@@ -156,6 +156,7 @@ DEFAULT_SETTINGS = [
     ("gemini_api_key", ""),
     ("modules_order", ""),
     ("smart_semantycs_model_nano", ""),
+    ("smart_semantycs_model_medium", ""),
     ("smart_semantycs_model_xl", ""),
     ("smart_semantycs_model_auto", "1"),
     ("smart_semantycs_model_fixed", ""),

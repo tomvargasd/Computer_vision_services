@@ -58,10 +58,19 @@ def _matches_condition(cls_name: str, xyxy, boxes, condition: dict) -> bool:
     """Evalúa una condition del contrato de skill sobre una caja dada.
 
     condition = {"detect": [...], "overlap": [...], "min_overlap": 0.3}
+    condition = {"detect": [Y], "missing": [X]}  → Y presente SIN X en el frame
+                                                 (excepción: solo objeto, sin algo).
     """
     detect = condition.get("detect") or []
     if cls_name not in detect:
         return False
+
+    missing = condition.get("missing")
+    if missing:
+        # Válida solo si NINGÚN objeto de las clases "missing" está en el frame.
+        if any(other["cls_name"] in missing for other in boxes):
+            return False
+        return True
 
     overlap = condition.get("overlap")
     if not overlap:

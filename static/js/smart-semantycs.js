@@ -25,6 +25,16 @@
   var btnNew = $('btn-new-session');
   var sessionLabel = $('session-label');
   var sessionsList = $('ss-sessions-list');
+  var sessionsToggle = $('ss-sessions-toggle');
+  var sessionsCaret = $('ss-sessions-caret');
+
+  function toggleSessionsOpen(force) {
+    var open = sessionsList.hidden;
+    if (force === true) open = true;
+    if (force === false) open = false;
+    sessionsList.hidden = !open;
+    sessionsCaret.textContent = open ? '▴' : '▾';
+  }
 
   var typingBubble = null;
 
@@ -172,6 +182,7 @@
     loadMessages(sessionId);
     refreshSessions();
     refreshState();
+    toggleSessionsOpen(false);
   }
 
   function resetView() {
@@ -198,9 +209,11 @@
       currentSessionId = res.data.session_id;
       sessionLabel.textContent = 'Session ' + shortId(currentSessionId);
       resetView();
+      clearChat();
       chatInput.value = '';
       chatInput.disabled = false;
       autoResize();
+      toggleSessionsOpen(false);
       refreshSessions();
       refreshState();
     });
@@ -221,6 +234,10 @@
   // ── New session button ───────────────────────────────────────────
   btnNew.addEventListener('click', function () {
     newSession();
+  });
+
+  sessionsToggle.addEventListener('click', function () {
+    toggleSessionsOpen();
   });
 
   // ── Video source ────────────────────────────────────────────────

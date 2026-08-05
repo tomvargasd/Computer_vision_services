@@ -2723,11 +2723,23 @@ Reglas de salida:
   tecnologías: di que no es posible detectarlo por el momento y que se requeriría
   un entrenamiento especializado.
 - "classes": lista de nombres LVIS exactos (máx 15).
-- Condiciones admitidas:
+
+Patrón "algo que tenga objeto" (X que tiene Y), ej. "autos que tengan ruedas":
+- Contador PRECISO de X con Y: condition {"detect": ["X"], "overlap": ["Y"],
+  "min_overlap": 0.30}  -> cuenta solo cuando X se solapa con Y.
+- Si solo se detecta X sin Y: no marcar (ese contador ya no dispara).
+- Log de ALERTA/EXCEPCIÓN cuando se detecta solo el objeto Y sin el X (algo):
+  condition {"detect": ["Y"], "missing": ["X"]}; label tipo "Se detectó el objeto
+  Y pero no el X (algo)", priority "warning". Este es un caso de excepción a usar
+  en escenarios de este tipo, no para todo.
+
+Condiciones admitidas:
     {"detect": ["cls", ...]}  -> el objeto es de alguna de esas clases.
     {"detect": [...], "overlap": [...], "min_overlap": 0.30} -> el detectado se
        solapa >= 30% con un objeto de las clases "overlap" (ej. persona sobre
-       bicicleta).
+       bicicleta). Usar para contadores precisos de "X que tiene Y".
+    {"detect": ["Y"], "missing": ["X"]} -> Y está presente pero X NO está en el
+       frame. Para log de excepción "solo se detectó el objeto Y, no el X".
 
 VOCABULARIO LVIS DEL PROMPT:
 {vocab}"""
@@ -2849,6 +2861,20 @@ def _normalize_skill(skill: dict) -> dict | None:
                 if canon not in new_detect:
                     new_detect.append(canon)
             new_cond = {"detect": new_detect}
+            missing = cond.get("missing")
+            if missing:
+                if not isinstance(missing, list) or not missing:
+                    return None
+                new_missing = []
+                for m in missing:
+                    if not isinstance(m, str):
+                        return None
+                    canon = _canonical_lvis(m)
+                    if not canon or canon not in class_set:
+                        return None
+                    if canon not in new_missing:
+                        new_missing.append(canon)
+                new_cond["missing"] = new_missing
             overlap = cond.get("overlap")
             if overlap:
                 if not isinstance(overlap, list) or not overlap:
@@ -3135,39 +3161,45 @@ def api_semantycs_model_status():
     use_gpu = device != "cpu"
     auto = settings.get("smart_semantycs_model_auto", "1") == "1"
 
-    nano_file = os.path.join(MODELS_FOLDER, "yoloe-26n-seg.pt")
-    xl_file = os.path.join(MODELS_FOLDER, "yoloe-26x-seg.pt")
-    nano_on_disk = os.path.exists(nano_file)
-    xl_on_disk = os.path.exists(xl_file)
+    SIZES = {
+        "nano":   ("yoloe-26n-seg.pt", "smart_semantycs_model_nano"),
+        "medium": ("yoloe-26m-seg.pt", "smart_semantycs_model_medium"),
+        "xl":     ("yoloe-26x-seg.pt", "smart_semantycs_model_xl"),
+    }
+    on_disk = {}
+    for key, (fname, _skey) in SIZES.items():
+        on_disk[key] = os.path.exists(os.path.join(MODELS_FOLDER, fname))
 
-    def _ready(key, flag, label):
-        path = settings.get(key, "")
-        if not path and flag:
-            path = f"static/uploads/models/{'yoloe-26n-seg.pt' if label == 'nano' else 'yoloe-26x-seg.pt'}"
-        return label, bool(path), path
+    # Selección automática: CPU → nano, GPU → medium (fallback xl).
+    auto_rank = ["nano"] if not use_gpu else ["medium", "xl"]
+    auto_pick = None
+    for key in auto_rank:
+        fname, skey = SIZES[key]
+        if settings.get(skey) or on_disk[key]:
+            auto_pick = key
+            break
 
     if auto:
-        model_path = settings.get("smart_semantycs_model_xl" if use_gpu else "smart_semantycs_model_nano", "")
-        want = "xl" if use_gpu else "nano"
-        on_disk = xl_on_disk if use_gpu else nano_on_disk
-        if not model_path and on_disk:
-            model_path = f"static/uploads/models/{'yoloe-26x-seg.pt' if use_gpu else 'yoloe-26n-seg.pt'}"
-        active = "XL (yoloe-26x-seg.pt)" if (use_gpu and (settings.get('smart_semantycs_model_xl') or xl_on_disk)) else ("Nano (yoloe-26n-seg.pt)" if (not use_gpu and (settings.get('smart_semantycs_model_nano') or nano_on_disk)) else None)
+        pick = auto_pick
     else:
         fixed = settings.get("smart_semantycs_model_fixed", "")
-        if fixed == "nano":
-            model_path = settings.get("smart_semantycs_model_nano", "")
-            if not model_path and nano_on_disk:
-                model_path = "static/uploads/models/yoloe-26n-seg.pt"
-            active = "Nano (yoloe-26n-seg.pt)" if model_path else None
-        elif fixed == "xl":
-            model_path = settings.get("smart_semantycs_model_xl", "")
-            if not model_path and xl_on_disk:
-                model_path = "static/uploads/models/yoloe-26x-seg.pt"
-            active = "XL (yoloe-26x-seg.pt)" if model_path else None
-        else:
-            model_path = ""
-            active = None
+        pick = fixed if fixed in SIZES else None
+
+    if pick:
+        fname, skey = SIZES[pick]
+        model_path = settings.get(skey, "")
+        if not model_path and on_disk[pick]:
+            model_path = f"static/uploads/models/{fname}"
+        active = f"{pick.capitalize()} ({fname})" if model_path else None
+    else:
+        model_path = ""
+        active = None
+
+    paths = {}
+    for key, (fname, skey) in SIZES.items():
+        paths[key + "_path"] = settings.get(skey, "") or (
+            f"static/uploads/models/{fname}" if on_disk[key] else ""
+        )
 
     return jsonify({
         "device": device,
@@ -3175,6 +3207,7 @@ def api_semantycs_model_status():
         "auto": auto,
         "active": active,
         "model_path": model_path,
-        "nano_path": settings.get("smart_semantycs_model_nano", "") or ("static/uploads/models/yoloe-26n-seg.pt" if nano_on_disk else ""),
-        "xl_path": settings.get("smart_semantycs_model_xl", "") or ("static/uploads/models/yoloe-26x-seg.pt" if xl_on_disk else ""),
+        "nano_path": paths["nano_path"],
+        "medium_path": paths["medium_path"],
+        "xl_path": paths["xl_path"],
     })

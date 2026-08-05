@@ -553,7 +553,7 @@
         <span class="settings-section-title">Smart Semantycs models</span>
       </div>
       <div class="settings-section-body">
-        <p class="settings-help">Sube los pesos de YOLOE (.pt). El nombre debe ser <code>yoloe-26n-seg.pt</code> (nano) o <code>yoloe-26x-seg.pt</code> (XL). CPU usa nano; GPU usa XL.</p>
+        <p class="settings-help">Sube los pesos de YOLOE (.pt): <code>yoloe-26n-seg.pt</code> (nano), <code>yoloe-26m-seg.pt</code> (medium) o <code>yoloe-26x-seg.pt</code> (XL). CPU usa nano; GPU usa medium por defecto.</p>
 
         <div class="settings-field">
           <label class="settings-label">Nano model (CPU)</label>
@@ -562,6 +562,16 @@
           <div>
             <button class="settings-save-btn" id="upload-nano-btn">Upload nano .pt</button>
             <input type="file" id="file-nano" accept=".pt" hidden>
+          </div>
+        </div>
+
+        <div class="settings-field">
+          <label class="settings-label">Medium model (GPU default)</label>
+          <input class="settings-input" type="text" id="sem-medium-path" readonly
+                 value="{{ settings.smart_semantycs_model_medium }}" placeholder="Sin archivo"/>
+          <div>
+            <button class="settings-save-btn" id="upload-medium-btn">Upload medium .pt</button>
+            <input type="file" id="file-medium" accept=".pt" hidden>
           </div>
         </div>
 
@@ -579,7 +589,7 @@
           <label class="settings-label">Model selection</label>
           <div class="settings-toggle-row">
             <label><input type="radio" name="sem-model-mode" value="1" {% if settings.smart_semantycs_model_auto == '1' or not settings.smart_semantycs_model_auto %}checked{% endif %}/>
-              Automático (nano en CPU / XL en GPU)</label>
+              Automático (nano en CPU / medium en GPU)</label>
             <label><input type="radio" name="sem-model-mode" value="0" {% if settings.smart_semantycs_model_auto == '0' %}checked{% endif %}>
               Modelo fijo</label>
           </div>
@@ -587,6 +597,7 @@
             <label>Fixed model:
               <select id="sem-fixed" class="settings-input">
                 <option value="nano" {% if settings.smart_semantycs_model_fixed == 'nano' %}selected{% endif %}>Nano</option>
+                <option value="medium" {% if settings.smart_semantycs_model_fixed == 'medium' %}selected{% endif %}>Medium</option>
                 <option value="xl" {% if settings.smart_semantycs_model_fixed == 'xl' %}selected{% endif %}>XL</option>
               </select>
             </label>
@@ -1657,6 +1668,12 @@ document.getElementById('upload-xl-btn').addEventListener('click', function() {
 });
 document.getElementById('file-xl').addEventListener('change', function() {
   uploadSemModel('file-xl', 'smart_semantycs_model_xl');
+});
+document.getElementById('upload-medium-btn').addEventListener('click', function() {
+  document.getElementById('file-medium').click();
+});
+document.getElementById('file-medium').addEventListener('change', function() {
+  uploadSemModel('file-medium', 'smart_semantycs_model_medium');
 });
 
 document.getElementById('save-sem-model-btn').addEventListener('click', function() {

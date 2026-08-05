@@ -64,10 +64,13 @@
       <button class="ss-btn ss-btn-new" id="btn-new-session" title="New session">+ New</button>
     </div>
 
-    <!-- Session history -->
+    <!-- Sessions history (collapsible) -->
     <div class="ss-sessions" id="ss-sessions">
-      <div class="ss-sessions-title">Sessions</div>
-      <div class="ss-sessions-list" id="ss-sessions-list">
+      <button class="ss-sessions-toggle" id="ss-sessions-toggle" type="button">
+        <span class="ss-sessions-title">Sessions</span>
+        <span class="ss-sessions-caret" id="ss-sessions-caret">▾</span>
+      </button>
+      <div class="ss-sessions-list" id="ss-sessions-list" hidden>
         <div class="ss-sessions-empty">No sessions yet</div>
       </div>
     </div>

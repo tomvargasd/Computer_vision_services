@@ -40,16 +40,27 @@
   border-bottom: 1px solid var(--border);
 }
 
-/* Sessions history in the chat column */
+/* Sessions history in the chat column (collapsible) */
 .ss-sessions {
   border-bottom: 1px solid var(--border);
-  max-height: 30%;
   display: flex;
   flex-direction: column;
 }
 
+.ss-sessions-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 8px 16px 8px;
+  text-align: left;
+}
+.ss-sessions-toggle:hover { background: var(--surface2); }
+
 .ss-sessions-title {
-  padding: 8px 16px 4px;
   font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -57,8 +68,14 @@
   color: var(--muted);
 }
 
+.ss-sessions-caret {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
 .ss-sessions-list {
   overflow-y: auto;
+  max-height: 200px;
   padding: 4px 8px 8px;
 }
 
