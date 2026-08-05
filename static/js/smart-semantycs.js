@@ -26,7 +26,7 @@
   var pendingBar = $('ss-pending');
   var btnConfirmStart = $('btn-confirm-start');
   var btnCancelStart = $('btn-cancel-start');
-  var btnNew = $('btn-new-session');
+  var btnNew = $('btn-ss-new');
   var sessionLabel = $('session-label');
   var sessionsList = $('ss-sessions-list');
   var sessionsToggle = $('ss-sessions-toggle');
@@ -214,19 +214,24 @@
   }
 
   function newSession() {
+    console.log('[ss] new session requested');
     // Congela la sesión activa (si la hay) antes de crear una nueva.
-    if (currentSessionId) {
-      api('/api/semantycs/sessions/' + currentSessionId + '/stop', { method: 'POST' });
-    }
-    api('/api/semantycs/sessions', { method: 'POST' }).then(function (res) {
-      if (res.status !== 201) return;
+    var freeze = currentSessionId
+      ? api('/api/semantycs/sessions/' + currentSessionId + '/stop', { method: 'POST' })
+      : Promise.resolve(null);
+    freeze.then(function () {
+      return api('/api/semantycs/sessions', { method: 'POST' });
+    }).then(function (res) {
+      if (res.status !== 201) { console.log('[ss] create failed', res.status, res.data); return; }
       currentSessionId = res.data.session_id;
       sessionLabel.textContent = 'Session ' + shortId(currentSessionId);
       resetView();
       clearChat();
       chatInput.value = '';
       chatInput.disabled = false;
+      btnLoadVideo.hidden = false;
       autoResize();
+      console.log('[ss] session created:', currentSessionId);
       toggleSessionsOpen(false);
       refreshSessions();
       refreshState();
@@ -240,7 +245,10 @@
     clearChat();
     chatInput.disabled = false;
     chatInput.value = '';
+    btnLoadVideo.hidden = true;
+    console.log('[ss] initialized (no session loaded)');
     refreshSessions();
+    refreshState();
   }
 
   // ── New / toggle ─────────────────────────────────────────────────
@@ -252,21 +260,39 @@
 
   fileVideo.addEventListener('change', function () {
     var f = fileVideo.files && fileVideo.files[0];
-    if (!f || !currentSessionId) return;
+    if (!f) return;
+    if (!currentSessionId) {
+      alert('Create a new session first.');
+      fileVideo.value = '';
+      return;
+    }
+    var labelRestore = btnLoadVideo.innerHTML;
+    btnLoadVideo.disabled = true;
+    btnLoadVideo.textContent = '⏳ Uploading...';
+    console.log('[ss] uploading video:', f.name);
     var fd = new FormData();
     fd.append('video', f);
     fetch('/api/sources/upload-video', { method: 'POST', body: fd })
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        if (!d.path) { alert(d.error || 'Upload failed'); return null; }
+        if (!d.path) { throw new Error(d.error || 'Upload failed'); }
         return api('/api/semantycs/sessions/' + currentSessionId + '/video', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ path: d.path, type: 'video' })
         });
       })
-      .then(function () { refreshState(); refreshSessions(); })
-      .catch(function () { alert('Upload failed'); });
+      .then(function (r) {
+        if (r.status !== 200) { throw new Error(r.data.error || 'Failed to link video'); }
+        console.log('[ss] video linked');
+        refreshState(); refreshSessions();
+      })
+      .catch(function (e) { alert(e.message || 'Upload failed'); })
+      .finally(function () {
+        btnLoadVideo.disabled = false;
+        btnLoadVideo.innerHTML = labelRestore;
+      });
+    fileVideo.value = '';
   });
 
   // ── Interpret (without auto-start) ──────────────────────────────
