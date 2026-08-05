@@ -2965,7 +2965,7 @@ def api_semantycs_interpret(session_id):
     add_semantycs_message(session_id, "user", prompt)
     update_semantycs_session(session_id, prompt=prompt, state="video")
 
-    system_prompt = _LVIS_SYSTEM_PROMPT.format(vocab="\n".join(LVIS_NAMES))
+    system_prompt = _LVIS_SYSTEM_PROMPT.replace("{vocab}", "\n".join(LVIS_NAMES))
     reply = _call_gemini(api_key, system_prompt, prompt)
 
     skill = _parse_skill_json(reply)
