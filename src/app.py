@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from flask import Flask, render_template, jsonify, request, Response, stream_with_context, session, g
 from flask_cors import CORS
 from flask_compress import Compress
@@ -35,7 +37,18 @@ from src.database import (
     update_account_password, add_access_log, get_access_logs,
     block_ip, unblock_ip, get_blacklist, is_ip_blocked,
     get_limited_modules, set_limited_modules,
+    create_semantycs_session, get_semantycs_sessions, get_semantycs_session,
+    update_semantycs_session, delete_semantycs_session,
+    add_semantycs_message, get_semantycs_messages,
+    upsert_semantycs_counter, list_semantycs_counters, clear_semantycs_counters,
+    insert_semantycs_log, list_semantycs_logs, clear_semantycs_logs,
 )
+
+from src.modules.smart_semantycs import SmartSemntycsManager
+from src.modules.smart_semantycs_vocab import (
+    LVIS_NAMES, to_lvis, lvis_exists, find_lvis_candidates,
+)
+from src.modules.base import get_device
 
 from src.modules.personas import PersonasManager
 from src.modules.armas import ArmasManager
@@ -2686,3 +2699,482 @@ def api_access_limited_modules():
         set_limited_modules(valid)
         return jsonify({"modules": valid})
     return jsonify({"modules": get_limited_modules()})
+
+
+# ═════════════════════════════════════════════════════════════
+# Smart Semantycs — visión con vocabulario abierto (YOLOE + Gemini)
+# ═════════════════════════════════════════════════════════════
+
+_LVIS_SYSTEM_PROMPT = """Eres el cerebro de interpretación de un módulo de visión con vocabulario abierto.
+Recibes el prompt del usuario y un vocabulario de clases (LVIS). Debes decidir:
+
+1. ¿Es factible detectar lo pedido con el vocabulario disponible?
+   Si pide algo imposible por imágenes de cámara (ej. "moneda triangular con 3
+   agujeros") o requiere entrenamiento especializado -> "feasible": false.
+2. ¿Solo detectar/alerta o también contar? Si pide "cuenta/cuantos",
+   genera contadores (deduplicados por track); si solo pide "detecta/alerta",
+   genera logs. Mantén contadores y logs SIEMPRE alineados con el mismo prompt.
+3. Mapea SIEMPRE a nombres EXACTOS del vocabulario proporcionado (no inventes).
+4. Genera contadores (máx 5) y logs con condiciones válidas.
+
+Reglas de salida:
+- Respuesta SOLO JSON válido, sin markdown ni texto extra.
+- En "reason" (solo si feasible=false) usa lenguaje general, SIN nombres de
+  tecnologías: di que no es posible detectarlo por el momento y que se requeriría
+  un entrenamiento especializado.
+- "classes": lista de nombres LVIS exactos (máx 15).
+- Condiciones admitidas:
+    {"detect": ["cls", ...]}  -> el objeto es de alguna de esas clases.
+    {"detect": [...], "overlap": [...], "min_overlap": 0.30} -> el detectado se
+       solapa >= 30% con un objeto de las clases "overlap" (ej. persona sobre
+       bicicleta).
+
+VOCABULARIO LVIS DEL PROMPT:
+{vocab}"""
+
+
+@app.route("/smart-semantycs")
+def smart_semantycs_view():
+    return render_template("smart_semantycs.html")
+
+
+@app.route("/api/semantycs/sessions", methods=["POST"])
+def api_semantycs_create_session():
+    sid = create_semantycs_session()["id"]
+    return jsonify({"session_id": sid}), 201
+
+
+@app.route("/api/semantycs/sessions", methods=["GET"])
+def api_semantycs_sessions():
+    return jsonify({"sessions": get_semantycs_sessions()})
+
+
+@app.route("/api/semantycs/sessions/<session_id>", methods=["GET", "DELETE"])
+def api_semantycs_session(session_id):
+    s = get_semantycs_session(session_id)
+    if not s:
+        return jsonify({"error": "Session not found"}), 404
+    if request.method == "DELETE":
+        SmartSemntycsManager.get().stop(session_id)
+        delete_semantycs_session(session_id)
+        return jsonify({"deleted": True})
+    s["messages"] = get_semantycs_messages(session_id)
+    try:
+        s["skill"] = json.loads(s["skill"] or "{}")
+    except Exception:
+        s["skill"] = {}
+    return jsonify({"session": s})
+
+
+def _semantycs_source_path(s: dict) -> str | None:
+    vpath = s.get("video_path") or ""
+    vtype = s.get("video_type")
+    if not vpath:
+        return None
+    if vtype == "stream" or vpath.startswith(("rtsp://", "rtmp://", "http://", "https://")):
+        return vpath
+    if vpath.startswith("static/"):
+        return os.path.join(BASE_DIR, vpath.replace("/", os.sep))
+    abspath = os.path.abspath(vpath)
+    if os.path.exists(abspath):
+        return abspath
+    return os.path.join(BASE_DIR, vpath)
+
+
+@app.route("/api/semantycs/sessions/<session_id>/video", methods=["POST"])
+def api_semantycs_video(session_id):
+    s = get_semantycs_session(session_id)
+    if not s:
+        return jsonify({"error": "Session not found"}), 404
+    data = request.get_json(silent=True) or {}
+    vtype = data.get("type") or s.get("video_type")
+    if vtype not in ("video", "stream"):
+        return jsonify({"error": "Invalid video type"}), 400
+    path = (data.get("path") or "").strip()
+    if not path:
+        return jsonify({"error": "path required"}), 400
+    state = "video" if s["state"] == "no_video" else s["state"]
+    update_semantycs_session(session_id, video_path=path, video_type=vtype, state=state)
+    return jsonify({"saved": True, "path": path, "type": vtype})
+
+
+def _canonical_lvis(name: str) -> str | None:
+    c = to_lvis(name)
+    if c:
+        return c
+    cands = find_lvis_candidates(name, 1)
+    return cands[0] if cands else None
+
+
+def _normalize_skill(skill: dict) -> dict | None:
+    """Valida y normaliza una skill de Gemini.
+
+    Convierte clases/condiciones a nombres LVIS canónicos para que el pipeline
+    haga comparación exacta. Devuelve None si la skill es inválida.
+    """
+    try:
+        if skill.get("feasible") is not True:
+            return skill
+
+        classes_raw = skill.get("classes") or []
+        if not isinstance(classes_raw, list) or not classes_raw or len(classes_raw) > 15:
+            return None
+        classes = []
+        for c in classes_raw:
+            if not isinstance(c, str):
+                continue
+            canon = _canonical_lvis(c)
+            if not canon:
+                return None
+            if canon not in classes:
+                classes.append(canon)
+        if not classes:
+            return None
+        skill["classes"] = classes
+        class_set = set(classes)
+
+        def norm_cond(cond):
+            if not isinstance(cond, dict):
+                return None
+            detect = cond.get("detect")
+            if not isinstance(detect, list) or not detect:
+                return None
+            new_detect = []
+            for d in detect:
+                if not isinstance(d, str):
+                    return None
+                canon = _canonical_lvis(d)
+                if not canon or canon not in class_set:
+                    return None
+                if canon not in new_detect:
+                    new_detect.append(canon)
+            new_cond = {"detect": new_detect}
+            overlap = cond.get("overlap")
+            if overlap:
+                if not isinstance(overlap, list) or not overlap:
+                    return None
+                new_overlap = []
+                for o in overlap:
+                    if not isinstance(o, str):
+                        return None
+                    canon = _canonical_lvis(o)
+                    if not canon or canon not in class_set:
+                        return None
+                    if canon not in new_overlap:
+                        new_overlap.append(canon)
+                new_cond["overlap"] = new_overlap
+                try:
+                    new_cond["min_overlap"] = float(cond.get("min_overlap", 0.3))
+                except Exception:
+                    new_cond["min_overlap"] = 0.3
+            return new_cond
+
+        counters = []
+        seen = set()
+        for c in (skill.get("counters") or [])[:5]:
+            if not isinstance(c, dict) or not c.get("id"):
+                return None
+            cid = str(c["id"])
+            if cid in seen:
+                return None
+            seen.add(cid)
+            cond = norm_cond(c.get("condition"))
+            if cond is None:
+                return None
+            counters.append({
+                "id": cid,
+                "label": c.get("label") or cid,
+                "color": c.get("color") or "#22C55E",
+                "condition": cond,
+            })
+        skill["counters"] = counters
+
+        logs = []
+        seen = set()
+        for l in skill.get("logs") or []:
+            if not isinstance(l, dict) or not l.get("id"):
+                return None
+            lid = str(l["id"])
+            if lid in seen:
+                return None
+            seen.add(lid)
+            cond = norm_cond(l.get("condition"))
+            if cond is None:
+                return None
+            priority = l.get("priority", "info")
+            if priority not in ("info", "warning", "critical"):
+                priority = "info"
+            logs.append({
+                "id": lid,
+                "label": l.get("label") or lid,
+                "event": l.get("event") or "",
+                "priority": priority,
+                "condition": cond,
+            })
+        skill["logs"] = logs
+        return skill
+    except Exception:
+        return None
+
+
+def _parse_skill_json(reply: str) -> dict | None:
+    if not reply:
+        return None
+    raw = reply.strip()
+    raw = re.sub(r"```(?:json)?", "", raw).strip()
+    start = raw.find("{")
+    end = raw.rfind("}")
+    if start != -1 and end > start:
+        chunk = raw[start:end + 1]
+    else:
+        chunk = raw
+    try:
+        d = json.loads(chunk)
+        return d if isinstance(d, dict) else None
+    except Exception:
+        return None
+
+
+@app.route("/api/semantycs/sessions/<session_id>/interpret", methods=["POST"])
+def api_semantycs_interpret(session_id):
+    s = get_semantycs_session(session_id)
+    if not s:
+        return jsonify({"error": "Session not found"}), 404
+    if not (s.get("video_path") or ""):
+        return jsonify({"error": "Primero vincula un video o stream."}), 400
+
+    data = request.get_json(silent=True) or {}
+    prompt = (data.get("prompt") or "").strip()
+    if not prompt:
+        return jsonify({"error": "Prompt cannot be empty"}), 400
+
+    client_ip = request.remote_addr or "unknown"
+    now = time.time()
+    last = _chat_rate_limit.get(client_ip, 0)
+    elapsed = now - last
+    if elapsed < 2 and last > 0:
+        wait_for = int(2 - elapsed) + 1
+        return jsonify({"error": f"Wait {wait_for}s before sending.", "retry_after": wait_for}), 429
+    _chat_rate_limit[client_ip] = now
+
+    settings = get_settings()
+    api_key = settings.get("gemini_api_key", "").strip()
+    if not api_key:
+        return jsonify({"error": "No Gemini API Key configured. Go to Settings > General."}), 400
+
+    add_semantycs_message(session_id, "user", prompt)
+    update_semantycs_session(session_id, prompt=prompt, state="video")
+
+    system_prompt = _LVIS_SYSTEM_PROMPT.format(vocab="\n".join(LVIS_NAMES))
+    reply = _call_gemini(api_key, system_prompt, prompt)
+
+    skill = _parse_skill_json(reply)
+    normalized = _normalize_skill(skill) if skill is not None else None
+    if normalized is None:
+        add_semantycs_message(
+            session_id, "model",
+            "No se pudo interpretar tu solicitud. Intenta reformularla, por "
+            "ejemplo: 'detecta y cuenta personas en bicicleta'.",
+            kind="error",
+        )
+        return jsonify({"parsed": False})
+
+    update_semantycs_session(session_id, skill=json.dumps(normalized))
+
+    if normalized.get("feasible"):
+        summary = normalized.get("summary") or "Detector configurado."
+        add_semantycs_message(session_id, "model", f"Listo. {summary}", kind="skill")
+        update_semantycs_session(session_id, state="prompted")
+    else:
+        reason = normalized.get("reason") or (
+            "No es posible detectar eso por el momento; requeriría un "
+            "entrenamiento especializado."
+        )
+        add_semantycs_message(session_id, "model", reason, kind="error")
+        update_semantycs_session(session_id, state="video")
+    return jsonify({"parsed": True})
+
+
+@app.route("/api/semantycs/sessions/<session_id>/start", methods=["POST"])
+def api_semantycs_start(session_id):
+    s = get_semantycs_session(session_id)
+    if not s:
+        return jsonify({"error": "Session not found"}), 404
+    if s["state"] != "prompted":
+        return jsonify({"error": "La sesión no está lista para iniciar."}), 400
+    if not (s.get("video_path") or ""):
+        return jsonify({"error": "No hay video vinculado."}), 400
+    try:
+        skill = json.loads(s["skill"] or "{}")
+    except Exception:
+        skill = {}
+    if not skill or skill.get("feasible") is not True:
+        return jsonify({"error": "La skill no es válida."}), 400
+    classes = skill.get("classes") or []
+    if not classes:
+        return jsonify({"error": "La skill no tiene clases."}), 400
+
+    src_path = _semantycs_source_path(s)
+    if not src_path:
+        return jsonify({"error": "No se pudo resolver la fuente."}), 400
+
+    settings = get_settings()
+    try:
+        conf = float(settings.get("smart_semantycs_conf", "0.25"))
+    except (TypeError, ValueError):
+        conf = 0.25
+    fps = _get_fps_limit({"fps_limit": "", "type": s["video_type"]}, s["video_type"])
+
+    SmartSemntycsManager.get().start(
+        session_id, src_path, s["video_type"], classes, skill, conf, fps,
+    )
+    update_semantycs_session(session_id, state="running")
+    return jsonify({"started": session_id})
+
+
+@app.route("/api/semantycs/sessions/<session_id>/pause", methods=["POST"])
+def api_semantycs_pause(session_id):
+    SmartSemntycsManager.get().pause(session_id)
+    return jsonify({"paused": session_id})
+
+
+@app.route("/api/semantycs/sessions/<session_id>/resume", methods=["POST"])
+def api_semantycs_resume(session_id):
+    SmartSemntycsManager.get().resume(session_id)
+    return jsonify({"resumed": session_id})
+
+
+@app.route("/api/semantycs/sessions/<session_id>/reset", methods=["POST"])
+def api_semantycs_reset(session_id):
+    s = get_semantycs_session(session_id)
+    if not s:
+        return jsonify({"error": "Session not found"}), 404
+    SmartSemntycsManager.get().reset(session_id)
+    return jsonify({"reset": session_id})
+
+
+@app.route("/api/semantycs/sessions/<session_id>/stop", methods=["POST"])
+def api_semantycs_stop(session_id):
+    s = get_semantycs_session(session_id)
+    if not s:
+        return jsonify({"error": "Session not found"}), 404
+    SmartSemntycsManager.get().stop(session_id)
+    update_semantycs_session(session_id, state="stopped")
+    return jsonify({"stopped": session_id})
+
+
+@app.route("/api/semantycs/sessions/<session_id>/stream")
+def api_semantycs_stream(session_id):
+    mgr = SmartSemntycsManager.get()
+
+    def generate():
+        while mgr.is_running(session_id):
+            jpeg = mgr.get_frame_jpeg(session_id)
+            if jpeg is None:
+                time.sleep(0.033)
+                continue
+            yield (
+                b"--frame\r\n"
+                b"Content-Type: image/jpeg\r\n\r\n" + jpeg + b"\r\n"
+            )
+            time.sleep(1 / 30)
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="multipart/x-mixed-replace; boundary=frame",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.route("/api/semantycs/sessions/<session_id>/state")
+def api_semantycs_state(session_id):
+    s = get_semantycs_session(session_id)
+    if not s:
+        return jsonify({"error": "Session not found"}), 404
+    mgr = SmartSemntycsManager.get()
+    running = mgr.is_running(session_id)
+    stats = mgr.get_stats(session_id)
+    if stats:
+        counters = stats["counters"]
+    else:
+        counters = list_semantycs_counters(session_id)
+    try:
+        skill = json.loads(s["skill"] or "{}")
+    except Exception:
+        skill = {}
+    return jsonify({
+        "state": "running" if running else s["state"],
+        "running": running,
+        "paused": bool(stats and stats["paused"]),
+        "video_path": s["video_path"],
+        "video_type": s["video_type"],
+        "prompt": s["prompt"],
+        "skill": skill,
+        "counters": counters,
+        "logs": list_semantycs_logs(session_id, 200),
+    })
+
+
+@app.route("/api/semantycs/sessions/<session_id>/logs/<int:log_row_id>")
+def api_semantycs_log_evidence(session_id, log_row_id):
+    logs = list_semantycs_logs(session_id, 1000)
+    log = next((l for l in logs if l["id"] == log_row_id), None)
+    if not log:
+        return jsonify({"error": "Log not found"}), 404
+    return jsonify({"log": log})
+
+
+@app.route("/api/semantycs/model/status")
+def api_semantycs_model_status():
+    settings = get_settings()
+    device = get_device()
+    use_gpu = device != "cpu"
+    auto = settings.get("smart_semantycs_model_auto", "1") == "1"
+
+    nano_file = os.path.join(MODELS_FOLDER, "yoloe-26n-seg.pt")
+    xl_file = os.path.join(MODELS_FOLDER, "yoloe-26x-seg.pt")
+    nano_on_disk = os.path.exists(nano_file)
+    xl_on_disk = os.path.exists(xl_file)
+
+    def _ready(key, flag, label):
+        path = settings.get(key, "")
+        if not path and flag:
+            path = f"static/uploads/models/{'yoloe-26n-seg.pt' if label == 'nano' else 'yoloe-26x-seg.pt'}"
+        return label, bool(path), path
+
+    if auto:
+        model_path = settings.get("smart_semantycs_model_xl" if use_gpu else "smart_semantycs_model_nano", "")
+        want = "xl" if use_gpu else "nano"
+        on_disk = xl_on_disk if use_gpu else nano_on_disk
+        if not model_path and on_disk:
+            model_path = f"static/uploads/models/{'yoloe-26x-seg.pt' if use_gpu else 'yoloe-26n-seg.pt'}"
+        active = "XL (yoloe-26x-seg.pt)" if (use_gpu and (settings.get('smart_semantycs_model_xl') or xl_on_disk)) else ("Nano (yoloe-26n-seg.pt)" if (not use_gpu and (settings.get('smart_semantycs_model_nano') or nano_on_disk)) else None)
+    else:
+        fixed = settings.get("smart_semantycs_model_fixed", "")
+        if fixed == "nano":
+            model_path = settings.get("smart_semantycs_model_nano", "")
+            if not model_path and nano_on_disk:
+                model_path = "static/uploads/models/yoloe-26n-seg.pt"
+            active = "Nano (yoloe-26n-seg.pt)" if model_path else None
+        elif fixed == "xl":
+            model_path = settings.get("smart_semantycs_model_xl", "")
+            if not model_path and xl_on_disk:
+                model_path = "static/uploads/models/yoloe-26x-seg.pt"
+            active = "XL (yoloe-26x-seg.pt)" if model_path else None
+        else:
+            model_path = ""
+            active = None
+
+    return jsonify({
+        "device": device,
+        "use_gpu": use_gpu,
+        "auto": auto,
+        "active": active,
+        "model_path": model_path,
+        "nano_path": settings.get("smart_semantycs_model_nano", "") or ("static/uploads/models/yoloe-26n-seg.pt" if nano_on_disk else ""),
+        "xl_path": settings.get("smart_semantycs_model_xl", "") or ("static/uploads/models/yoloe-26x-seg.pt" if xl_on_disk else ""),
+    })

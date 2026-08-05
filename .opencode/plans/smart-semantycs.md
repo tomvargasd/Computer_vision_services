@@ -19,6 +19,17 @@ más **Gemini** para interpretación de prompts. El sistema se identifica global
 
 Verificado: `ultralytics 8.4.41` instalado y `from ultralytics import YOLOE` funciona.
 
+### 0.1 Resultado Fase 0 (verificado el 2026-08-05)
+
+- `model.track(frame, persist=True, tracker="bytetrack.yaml")` **asigna IDs estables** con YOLOE nano en CPU (60 frames de `way-2.mp4`, clase `car`): 11 track IDs únicos, ~67 ms/frame.
+- Deduplicación por `track_id` para contadores/logs: **viable**.
+- **Hallazgo 1 — text-encoder**: la primera carga descarga `mobileclip2_b.ts` (242 MB, text-encoder MobileCLIP2) **al CWD** de la app (vía `attempt_download_asset`). Implicación:
+  - La app debe lanzarse con CWD = raíz del proyecto (como ya se hace con `python app.py`).
+  - No commitear ese archivo; añadir `mobileclip2_b.ts` a `.gitignore`.
+  - Al iniciar un pipeline en servidor: verificar precache (si el CWD del proceso no tiene el archivo y existe en `static/uploads/models/mobileclip2_b.ts`, copiarlo al CWD antes de cargar el modelo) para evitar re-descarga de 242 MB por sesión.
+- **Hallazgo 2 — dependencia auto-instalada**: ultralytics instala `clip==1.0` desde `git+https://github.com/ultralytics/CLIP.git` si falta. Añadir esa dependencia a `requirements.txt` (comentada como requerida por YOLOE) para que `pip install -r requirements.txt` la deje lista.
+- Hallazgo 3: auto-instaló también `ftfy`, `regex`, `wcwidth`, `tqdm` como deps de `clip`.
+
 ---
 
 ## 1. Modelo YOLOE (backend)
@@ -339,3 +350,20 @@ Funciones nuevas (estilo de las existentes): CRUD de sesiones/mensajes, `upsert_
 - **No se nombran tecnologías** en mensajes de chat al usuario (solo lenguaje general + sugerencia de entrenamiento especializado).
 - **Stream**: pause→resume salta a lo actual sin buffer; **video**: reanuda donde se quedó.
 - **Evidencia**: cada log genera captura; clic abre popup.
+
+## Fase 8 · Verificación E2E — COMPLETADA (2026-08-05)
+- **deploy.sh** revisado y correcto (CUDA_TAG + descarga yoloe-26n/26x-seg.pt a static/uploads/models/).
+- **`.gitignore`**: añadida `mobileclip2_b.ts` (text-encoder YOLOE que ultralytics descarga al CWD).
+- **Fix bug**: el classmethod singleton `SmartSemntycsManager.get()` y el acceso por `get(session_id)` colisionaban → instancia renombrada a `get_pipeline()`. `src/app.py` usa `SmartSemntycsManager.get().<método>`.
+- **`/api/semantycs/model/status`** ahora detecta el `.pt` ya descargado en `static/uploads/models/` (no solo settings) → `active: Nano (yoloe-26n-seg.pt)` en CPU.
+- **Prueba CRUD API** (test_client autenticado): crear sesión, vincular video, estado `video`, modelo status, página renderiza (`200`, title+css), delete OK.
+- **Prueba pipeline real** (YOLOE nano, CPU, `way-2.mp4`): descarga 1ª vez `mobileclip2_b.ts` (242MB→CWD, ~10s), detecta **10 autos únicos** en ~30s, contador `c_car=10` persistido en BD, **10 logs con captures JPG en disco**, MJPEG `get_frame_jpeg()` OK, stop/cleanup OK.
+
+## Herramienta E2E reutilizable
+`/var/folders/.../T/opencode/e2e_pipeline.py` (armado condición `{detect:[car]}`).
+
+## Docker/deploy: precache MobileCLIP2 text-encoder — COMPLETADA (2026-08-05)
+- **`deploy.sh`**: ahora descarga `mobileclip2_b.ts` (242MB) a `static/uploads/models/` junto al YOLOE .pt (solo si falta).
+- **`src/modules/smart_semantycs.py` `_run()`**: redirige `ultralytics.SETTINGS["weights_dir"] = MODELS_FOLDER` antes de cargar YOLOE. Así `attempt_download_asset` encuentra el text-encoder en la carpeta montada y **no lo re-descarga** (funciona offline y no se repite por cada `up --build`).
+- Verificado: `attempt_download_asset('mobileclip2_b.ts')` resuelve a `static/uploads/models/mobileclip2_b.ts` sin red. `deploy.sh` pasa `bash -n`. `import src.app` OK.
+- `.gitignore` ya cubre `mobileclip2_b.ts` (no entra al repo). El archivo se movió del root a `static/uploads/models/`.

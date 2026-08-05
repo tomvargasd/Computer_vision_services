@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Smart Semantycs · Smart-AI{% endblock %}
+{% block page_title %}Smart Semantycs{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/smart-semantycs.css') }}"/>
+
+<div class="ss-layout" id="ss-layout">
+  <!-- ░░ Columna principal: contadores / video / logs ░░ -->
+  <div class="ss-main">
+    <div class="ss-toolbar">
+
+      <div class="ss-session">
+        <button class="ss-new-session" id="btn-new-session" title="Nueva sesión semántica">+ Nueva</button>
+        <div class="ss-session-chip">
+          <span class="ss-dot"></span>
+          <span id="session-label">Sesión</span>
+        </div>
+      </div>
+
+      <div class="ss-source">
+        <button class="ss-btn ss-btn-primary" id="btn-load-video">📁 Cargar video</button>
+        <input type="file" id="file-video" accept="video/*" hidden>
+        <span id="source-chip" hidden></span>
+      </div>
+
+      <div class="ss-status">
+        <span class="ss-state-badge" id="state-badge">No video</span>
+      </div>
+    </div>
+
+    <!-- Contadores -->
+    <div class="ss-counters" id="ss-counters">
+      <div class="ss-counters-empty">Sin contadores</div>
+    </div>
+
+    <!-- Video -->
+    <div class="ss-video" id="ss-video">
+      <div class="ss-video-empty" id="video-empty">
+        <p id="video-empty-text">Sube o vincula un video o stream para comenzar.</p>
+      </div>
+      <img id="video-frame" alt="semantycs stream" hidden>
+
+      <div class="ss-video-overlay" id="video-overlay" hidden>
+        <button class="ss-btn ss-btn-ghost" id="btn-pause" title="Pausar">⏸</button>
+        <button class="ss-btn ss-btn-ghost" id="btn-resume" title="Reanudar" hidden>▶</button>
+        <button class="ss-btn ss-btn-ghost" id="btn-reset" title="Reset (confirmación)">⟲ Reset</button>
+        <button class="ss-btn ss-btn-stop" id="btn-stop" title="Detener">■ Stop</button>
+      </div>
+
+      <div class="ss-video-prompt" id="video-prompt" hidden></div>
+    </div>
+
+    <!-- Logs -->
+    <div class="ss-logs" id="ss-logs">
+      <div class="ss-logs-header">Logs</div>
+      <div class="ss-logs-body" id="ss-logs-body">
+        <div class="ss-logs-empty">Sin eventos</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ░░ Columna derecha: chat / interpretación ░░ -->
+  <div class="ss-chat">
+    <div class="ss-chat-head">
+      <span>Asistente de detección</span>
+    </div>
+    <div class="chat-messages ss-chat-messages" id="chat-messages">
+      <div class="chat-welcome" id="chat-welcome">
+        <div class="welcome-icon">◈</div>
+        <h2>Describe qué detectar</h2>
+        <p>Escribe un prompt, por ejemplo «detecta y cuenta personas en bicicleta». Se interpretará y configurará la detección.</p>
+      </div>
+    </div>
+    <div class="ss-chat-input">
+      <textarea id="chat-input" rows="1" placeholder="Describe qué detectar y/o contar..."></textarea>
+      <div class="ss-chat-actions">
+        <button class="ss-btn ss-btn-primary" id="chat-send-btn" disabled>Interpretar</button>
+        <button class="ss-btn ss-btn-start" id="btn-start" disabled hidden>▶ Iniciar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% include "components/evidence_modal.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/smart-semantycs.js') }}"></script>
+{% endblock %}

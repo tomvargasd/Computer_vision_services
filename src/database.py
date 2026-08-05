@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sqlite3
 import os
 import json
@@ -102,7 +104,7 @@ MODULES_META = {
 
 
 DEFAULT_SETTINGS = [
-    ("system_name", "Computer Vision"), ("version", APP_VERSION), ("logo", ""),
+    ("system_name", "Smart-AI"), ("version", APP_VERSION), ("logo", ""),
     ("multi_detection", "0"),
     ("armas_model", ""), ("personas_model", ""), ("acciones_model", ""),
     ("troncos_model", ""), ("pallets_model", ""), ("cajas_model", ""),
@@ -153,6 +155,11 @@ DEFAULT_SETTINGS = [
     ("tanques_gas_line_pos", "50"),
     ("gemini_api_key", ""),
     ("modules_order", ""),
+    ("smart_semantycs_model_nano", ""),
+    ("smart_semantycs_model_xl", ""),
+    ("smart_semantycs_model_auto", "1"),
+    ("smart_semantycs_model_fixed", ""),
+    ("smart_semantycs_conf", "0.25"),
 ]
 
 
@@ -259,6 +266,53 @@ def init_db():
                 created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
                 FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
             );
+
+            -- Smart Semantycs: sesiones de visión con vocabulario abierto
+            CREATE TABLE IF NOT EXISTS semantycs_sessions (
+                id          TEXT PRIMARY KEY,
+                title       TEXT NOT NULL DEFAULT 'Nueva sesión',
+                video_path  TEXT,
+                video_type  TEXT CHECK(video_type IN ('video','stream')),
+                prompt      TEXT DEFAULT '',
+                skill       TEXT DEFAULT '{}',
+                state       TEXT NOT NULL DEFAULT 'no_video',
+                created_at  TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                updated_at  TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+            );
+
+            CREATE TABLE IF NOT EXISTS semantycs_messages (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id  TEXT NOT NULL,
+                role        TEXT NOT NULL CHECK(role IN ('user','model','system')),
+                content     TEXT NOT NULL,
+                kind        TEXT NOT NULL DEFAULT 'text',
+                created_at  TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                FOREIGN KEY (session_id) REFERENCES semantycs_sessions(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS semantycs_counters (
+                session_id  TEXT NOT NULL,
+                counter_id  TEXT NOT NULL,
+                label       TEXT NOT NULL,
+                color       TEXT NOT NULL DEFAULT '#22C55E',
+                value       INTEGER NOT NULL DEFAULT 0,
+                updated_at  TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                PRIMARY KEY (session_id, counter_id),
+                FOREIGN KEY (session_id) REFERENCES semantycs_sessions(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS semantycs_logs (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id  TEXT NOT NULL,
+                log_id      TEXT NOT NULL,
+                label       TEXT NOT NULL,
+                event       TEXT DEFAULT '',
+                priority    TEXT NOT NULL DEFAULT 'info',
+                capture_path TEXT,
+                created_at  TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                FOREIGN KEY (session_id) REFERENCES semantycs_sessions(id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_semantycs_logs_session ON semantycs_logs(session_id, created_at DESC);
 
             -- Acceso: cuentas de usuario
             CREATE TABLE IF NOT EXISTS access_accounts (
@@ -989,4 +1043,146 @@ def set_limited_modules(module_ids: list) -> None:
         conn.execute("DELETE FROM access_limited_modules")
         for mid in module_ids:
             conn.execute("INSERT INTO access_limited_modules(module_id) VALUES(?)", (mid,))
+        conn.commit()
+
+
+# ── Smart Semantycs ──────────────────────────────────────────────────────────
+
+def create_semantycs_session(title: str = "Nueva sesión") -> dict:
+    session_id = str(uuid.uuid4())
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO semantycs_sessions(id, title) VALUES (?, ?)",
+            (session_id, title),
+        )
+        conn.commit()
+        row = conn.execute(
+            "SELECT * FROM semantycs_sessions WHERE id=?", (session_id,)
+        ).fetchone()
+    return dict(row)
+
+
+def get_semantycs_sessions() -> list:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, title, video_path, video_type, prompt, state, created_at, updated_at "
+            "FROM semantycs_sessions ORDER BY updated_at DESC"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_semantycs_session(session_id: str) -> dict | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM semantycs_sessions WHERE id=?", (session_id,)
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def update_semantycs_session(session_id: str, **fields) -> dict | None:
+    allowed = {"title", "video_path", "video_type", "prompt", "skill", "state"}
+    cols, params = [], []
+    for k, v in fields.items():
+        if k in allowed:
+            cols.append(f"{k}=?")
+            params.append(v)
+    if not cols:
+        return None
+    params.append(session_id)
+    with get_conn() as conn:
+        conn.execute(
+            f"UPDATE semantycs_sessions SET {', '.join(cols)}, "
+            f"updated_at=datetime('now','localtime') WHERE id=?",
+            params,
+        )
+        conn.commit()
+        row = conn.execute(
+            "SELECT * FROM semantycs_sessions WHERE id=?", (session_id,)
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def delete_semantycs_session(session_id: str) -> None:
+    with get_conn() as conn:
+        conn.execute("DELETE FROM semantycs_sessions WHERE id=?", (session_id,))
+        conn.commit()
+
+
+def add_semantycs_message(session_id: str, role: str, content: str, kind: str = "text") -> int:
+    with get_conn() as conn:
+        cur = conn.execute(
+            "INSERT INTO semantycs_messages(session_id, role, content, kind) VALUES (?,?,?,?)",
+            (session_id, role, content, kind),
+        )
+        conn.commit()
+    return cur.lastrowid
+
+
+def get_semantycs_messages(session_id: str) -> list:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, role, content, kind, created_at FROM semantycs_messages "
+            "WHERE session_id=? ORDER BY id ASC",
+            (session_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def upsert_semantycs_counter(session_id: str, counter_id: str, label: str,
+                             color: str = "#22C55E", value: int = 0) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            """INSERT INTO semantycs_counters(session_id, counter_id, label, color, value)
+               VALUES (?,?,?,?,?)
+               ON CONFLICT(session_id, counter_id)
+               DO UPDATE SET value=excluded.value,
+                             updated_at=datetime('now','localtime')""",
+            (session_id, counter_id, label, color, value),
+        )
+        conn.commit()
+
+
+def list_semantycs_counters(session_id: str) -> list:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT counter_id, label, color, value FROM semantycs_counters "
+            "WHERE session_id=? ORDER BY rowid ASC",
+            (session_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def clear_semantycs_counters(session_id: str) -> None:
+    with get_conn() as conn:
+        conn.execute("DELETE FROM semantycs_counters WHERE session_id=?", (session_id,))
+        conn.commit()
+
+
+def insert_semantycs_log(session_id: str, log_id: str, label: str,
+                         event: str = "", priority: str = "info",
+                         capture_path: str = None) -> int:
+    with get_conn() as conn:
+        cur = conn.execute(
+            """INSERT INTO semantycs_logs(session_id, log_id, label, event, priority, capture_path)
+               VALUES (?,?,?,?,?,?)""",
+            (session_id, log_id, label, event, priority, capture_path),
+        )
+        conn.commit()
+    return cur.lastrowid
+
+
+def list_semantycs_logs(session_id: str, limit: int = 200) -> list:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, log_id, label, event, priority, capture_path, created_at "
+            "FROM semantycs_logs WHERE session_id=? "
+            "ORDER BY id DESC LIMIT ?",
+            (session_id, limit),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def clear_semantycs_logs(session_id: str) -> None:
+    with get_conn() as conn:
+        conn.execute("DELETE FROM semantycs_logs WHERE session_id=?", (session_id,))
         conn.commit()

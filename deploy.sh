@@ -103,6 +103,25 @@ else
     echo "YOLOE model downloaded: $YOLOE_MODEL_NAME"
 fi
 
+# ── Text-encoder MobileCLIP2 (Smart Semantycs) ───────────────────────────────
+# Ultralytics busca este archivo en el CWD o en weights_dir ANTES de descargarlo.
+# Precachearlo en static/uploads/models permite al pipeline redirigir weights_dir
+# ahí y evitar re-descargar 242MB (necesario si el contenedor no tiene internet
+# en runtime; y no se repite el download en cada 'up --build').
+MOBILECLIP_NAME="mobileclip2_b.ts"
+MOBILECLIP_URL="https://github.com/ultralytics/assets/releases/download/v8.4.0/$MOBILECLIP_NAME"
+if [ -f "$YOLOE_MODELS_DIR/$MOBILECLIP_NAME" ]; then
+    echo "MobileCLIP2 text-encoder already present: $MOBILECLIP_NAME (skipping download)"
+else
+    echo "Downloading MobileCLIP2 text-encoder ($MOBILECLIP_NAME, ~242MB) ..."
+    if command -v curl &> /dev/null; then
+        curl -L -o "$YOLOE_MODELS_DIR/$MOBILECLIP_NAME" "$MOBILECLIP_URL" --fail --silent --show-error
+    else
+        wget -O "$YOLOE_MODELS_DIR/$MOBILECLIP_NAME" "$MOBILECLIP_URL"
+    fi
+    echo "MobileCLIP2 text-encoder downloaded: $MOBILECLIP_NAME"
+fi
+
 echo "=================================================="
 
 # Run Docker Compose with conditional file application

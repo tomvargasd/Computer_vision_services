@@ -45,3 +45,6 @@ static/uploads/captures/
 
 # Teach data (user-labeled action samples)
 src/modules/_teach_data.json
+
+# Smart Semantycs: text-encoder YOLOE descargado al CWD por ultralytics
+mobileclip2_b.ts
