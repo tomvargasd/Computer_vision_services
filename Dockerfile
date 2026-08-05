@@ -10,6 +10,7 @@ ENV PYTHONUNBUFFERED=1 \
 # Install system dependencies needed for computer vision, PyTorch, and debugging
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    git \
     libgl1 \
     libglib2.0-0 \
     ffmpeg \
