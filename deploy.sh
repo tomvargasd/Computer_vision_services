@@ -73,6 +73,36 @@ fi
 # Export variables for docker-compose interpolation
 export CUDA_TAG=$CUDA_TAG
 echo "Selected PyTorch installation target: $CUDA_TAG"
+
+# ── Descarga de modelos YOLOE (Smart Semantycs) ──────────────────────────────
+# CPU  → modelo nano (ligero, viable en CPU)
+# GPU  → modelo XL  (máxima efectividad)
+YOLOE_NANO_URL="https://github.com/ultralytics/assets/releases/download/v8.4.0/yoloe-26n-seg.pt"
+YOLOE_XL_URL="https://github.com/ultralytics/assets/releases/download/v8.4.0/yoloe-26x-seg.pt"
+YOLOE_MODELS_DIR="static/uploads/models"
+
+if [ "$CUDA_TAG" = "cpu" ]; then
+    YOLOE_MODEL_NAME="yoloe-26n-seg.pt"
+    YOLOE_MODEL_URL=$YOLOE_NANO_URL
+    echo "YOLOE target for CPU: nano ($YOLOE_MODEL_NAME)"
+else
+    YOLOE_MODEL_NAME="yoloe-26x-seg.pt"
+    YOLOE_MODEL_URL=$YOLOE_XL_URL
+    echo "YOLOE target for GPU: XL ($YOLOE_MODEL_NAME)"
+fi
+
+if [ -f "$YOLOE_MODELS_DIR/$YOLOE_MODEL_NAME" ]; then
+    echo "YOLOE model already present: $YOLOE_MODEL_NAME (skipping download)"
+else
+    echo "Downloading YOLOE model ($YOLOE_MODEL_NAME) ..."
+    if command -v curl &> /dev/null; then
+        curl -L -o "$YOLOE_MODELS_DIR/$YOLOE_MODEL_NAME" "$YOLOE_MODEL_URL" --fail --silent --show-error
+    else
+        wget -O "$YOLOE_MODELS_DIR/$YOLOE_MODEL_NAME" "$YOLOE_MODEL_URL"
+    fi
+    echo "YOLOE model downloaded: $YOLOE_MODEL_NAME"
+fi
+
 echo "=================================================="
 
 # Run Docker Compose with conditional file application
