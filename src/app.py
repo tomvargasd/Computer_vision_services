@@ -3049,7 +3049,8 @@ def api_semantycs_start(session_id):
         conf = float(settings.get("smart_semantycs_conf", "0.25"))
     except (TypeError, ValueError):
         conf = 0.25
-    fps = _get_fps_limit({"fps_limit": "", "type": s["video_type"]}, s["video_type"])
+    # Sin throttle artificial: Smart Semantycs no duerme entre frames.
+    fps = 0.0
 
     SmartSemntycsManager.get().start(
         session_id, src_path, s["video_type"], classes, skill, conf, fps,

@@ -2,6 +2,8 @@
   'use strict';
 
   var currentSessionId = null;
+  var stateSnapshot = null;
+  var pendingActive = false;   // muestra la barra "Iniciar detección / Cancelar"
 
   var $ = function (id) { return document.getElementById(id); };
   var chatMessages = $('chat-messages');
@@ -20,21 +22,15 @@
   var videoControls = $('video-controls');
   var videoPrompt = $('video-prompt');
   var btnToggle = $('btn-toggle');
-  var btnReset = $('btn-reset');
   var btnStop = $('btn-stop');
+  var pendingBar = $('ss-pending');
+  var btnConfirmStart = $('btn-confirm-start');
+  var btnCancelStart = $('btn-cancel-start');
   var btnNew = $('btn-new-session');
   var sessionLabel = $('session-label');
   var sessionsList = $('ss-sessions-list');
   var sessionsToggle = $('ss-sessions-toggle');
   var sessionsCaret = $('ss-sessions-caret');
-
-  function toggleSessionsOpen(force) {
-    var open = sessionsList.hidden;
-    if (force === true) open = true;
-    if (force === false) open = false;
-    sessionsList.hidden = !open;
-    sessionsCaret.textContent = open ? '▴' : '▾';
-  }
 
   var typingBubble = null;
 
@@ -46,6 +42,14 @@
     stopped: 'Stopped'
   };
 
+  function toggleSessionsOpen(force) {
+    var open = sessionsList.hidden;
+    if (force === true) open = true;
+    if (force === false) open = false;
+    sessionsList.hidden = !open;
+    sessionsCaret.textContent = open ? '▴' : '▾';
+  }
+
   function autoResize() {
     chatInput.style.height = 'auto';
     chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
@@ -53,7 +57,9 @@
   }
 
   function updateSendBtn() {
-    chatSendBtn.disabled = !chatInput.value.trim() || chatInput.disabled;
+    var hasVideo = !!(stateSnapshot && stateSnapshot.video_path);
+    var ready = currentSessionId && hasVideo && stateSnapshot.state !== 'running';
+    chatSendBtn.disabled = !ready || !chatInput.value.trim() || chatInput.disabled;
   }
 
   function api(path, opts) {
@@ -147,7 +153,7 @@
     });
   }
 
-  // ── Sessions history ─────────────────────────────────────────────
+  // ── Sessions history (collapsible) ───────────────────────────────
   function renderSessions(sessions) {
     if (!sessions || sessions.length === 0) {
       sessionsList.innerHTML = '<div class="ss-sessions-empty">No sessions yet</div>';
@@ -158,7 +164,8 @@
       var title = s.prompt || s.title || ('Session ' + shortId(s.id));
       var time = (s.updated_at || '').split(' ')[1] || '';
       var dot = ((s.id === currentSessionId && s.state === 'running') ? 'running' : 'off');
-      return '<div class="ss-session-item' + active + '" data-sid="' + s.id + '">' +
+      return '<div class="ss-session-item' + active + '" data-sid="' + s.id + '" data-prompt="' +
+        escapeHtml(s.state) + '">' +
         '<span class="ss-session-dot ' + escapeHtml(dot) + '"></span>' +
         '<span class="ss-session-item-title">' + escapeHtml(title) + '</span>' +
         '<span class="ss-session-item-time">' + escapeHtml(time) + '</span>' +
@@ -179,6 +186,7 @@
   function openSession(sessionId) {
     currentSessionId = sessionId;
     sessionLabel.textContent = 'Session ' + shortId(sessionId);
+    pendingActive = false;
     loadMessages(sessionId);
     refreshSessions();
     refreshState();
@@ -186,6 +194,8 @@
   }
 
   function resetView() {
+    stateSnapshot = null;
+    pendingActive = false;
     sessionLabel.textContent = 'Session';
     stateBadge.textContent = '';
     stateBadge.className = 'ss-state-badge';
@@ -200,10 +210,14 @@
     logsBody.innerHTML = '<div class="ss-logs-empty">No events</div>';
     btnToggle.textContent = '▶ Play';
     btnStop.disabled = true;
-    btnReset.disabled = true;
+    pendingBar.hidden = true;
   }
 
   function newSession() {
+    // Congela la sesión activa (si la hay) antes de crear una nueva.
+    if (currentSessionId) {
+      api('/api/semantycs/sessions/' + currentSessionId + '/stop', { method: 'POST' });
+    }
     api('/api/semantycs/sessions', { method: 'POST' }).then(function (res) {
       if (res.status !== 201) return;
       currentSessionId = res.data.session_id;
@@ -219,26 +233,19 @@
     });
   }
 
-  function initialize() {
-    api('/api/semantycs/sessions').then(function (res) {
-      var sessions = (res.status === 200 && res.data.sessions) ? res.data.sessions : [];
-      renderSessions(sessions);
-      if (sessions.length) {
-        openSession(sessions[0].id);
-      } else {
-        newSession();
-      }
-    });
+  function boot() {
+    // No-auto-load: solo muestra el historial y deja todo en blanco.
+    currentSessionId = null;
+    resetView();
+    clearChat();
+    chatInput.disabled = false;
+    chatInput.value = '';
+    refreshSessions();
   }
 
-  // ── New session button ───────────────────────────────────────────
-  btnNew.addEventListener('click', function () {
-    newSession();
-  });
-
-  sessionsToggle.addEventListener('click', function () {
-    toggleSessionsOpen();
-  });
+  // ── New / toggle ─────────────────────────────────────────────────
+  btnNew.addEventListener('click', function () { newSession(); });
+  sessionsToggle.addEventListener('click', function () { toggleSessionsOpen(); });
 
   // ── Video source ────────────────────────────────────────────────
   btnLoadVideo.addEventListener('click', function () { fileVideo.click(); });
@@ -262,16 +269,20 @@
       .catch(function () { alert('Upload failed'); });
   });
 
-  // ── Interpret (with auto-start) ─────────────────────────────────
+  // ── Interpret (without auto-start) ──────────────────────────────
   function interpret() {
     var prompt = chatInput.value.trim();
-    if (!prompt || !currentSessionId || chatInput.disabled) return;
+    if (!currentSessionId || !stateSnapshot || !stateSnapshot.video_path) return;
+    if (stateSnapshot.state === 'running' || chatInput.disabled) return;
+    if (!prompt) return;
 
     chatInput.value = '';
     autoResize();
     addMessage(prompt, 'user');
     showTypingBubble();
     chatInput.disabled = true;
+    pendingActive = false;
+    pendingBar.hidden = true;
     updateSendBtn();
 
     api('/api/semantycs/sessions/' + currentSessionId + '/interpret', {
@@ -289,14 +300,11 @@
       return refreshState();
     }).then(function (st) {
       if (st && st.state === 'prompted') {
-        // Auto-start: begin detection as soon as the skill is ready.
-        api('/api/semantycs/sessions/' + currentSessionId + '/start', { method: 'POST' })
-          .then(function (rs) {
-            if (rs.status !== 200) { alert(rs.data.error || 'Error starting'); return; }
-            refreshState();
-          })
-          .then(refreshSessions);
+        // Mostrar botones Iniciar/Cancelar en el chat (no arrancar automáticamente).
+        pendingActive = true;
+        pendingBar.hidden = false;
       }
+      if (st && st.state === 'prompted') refreshSessions();
     }).catch(function () {
       removeTypingBubble();
       chatInput.disabled = false;
@@ -312,27 +320,39 @@
   });
   chatInput.addEventListener('input', autoResize);
 
+  // ── Start / Cancel (chat) ───────────────────────────────────────
+  function doStart() {
+    if (!currentSessionId) return;
+    api('/api/semantycs/sessions/' + currentSessionId + '/start', { method: 'POST' })
+      .then(function (r) {
+        if (r.status !== 200) { alert(r.data.error || 'Error starting'); return; }
+        pendingActive = false;
+        pendingBar.hidden = true;
+        refreshSessions();
+        refreshState();
+      });
+  }
+
+  btnConfirmStart.addEventListener('click', doStart);
+
+  btnCancelStart.addEventListener('click', function () {
+    pendingActive = false;
+    pendingBar.hidden = true;
+    chatInput.focus();
+  });
+
   // ── Controls ─────────────────────────────────────────────────────
   btnToggle.addEventListener('click', function () {
     if (!currentSessionId) return;
-    api('/api/semantycs/sessions/' + currentSessionId + '/state').then(function (res) {
-      if (res.status !== 200) return;
-      var st = res.data;
-      var op = st.running ? (st.paused ? 'resume' : 'pause') : 'start';
-      api('/api/semantycs/sessions/' + currentSessionId + '/' + op, { method: 'POST' })
-        .then(function (r) {
-          if (r.status !== 200) { alert(r.data.error || 'Error'); return; }
-          if (op === 'start') refreshSessions();
-          refreshState();
-        });
-    });
-  });
-
-  btnReset.addEventListener('click', function () {
-    if (!currentSessionId) return;
-    if (!confirm('Reset detection? Counters, logs and captures of this session will be cleared.')) return;
-    api('/api/semantycs/sessions/' + currentSessionId + '/reset', { method: 'POST' })
-      .then(refreshState);
+    var st = stateSnapshot;
+    if (!st) return;
+    var op = st.running ? (st.paused ? 'resume' : 'pause') : 'start';
+    api('/api/semantycs/sessions/' + currentSessionId + '/' + op, { method: 'POST' })
+      .then(function (r) {
+        if (r.status !== 200) { alert(r.data.error || 'Error'); return; }
+        if (op === 'start') { pendingActive = false; pendingBar.hidden = true; refreshSessions(); }
+        refreshState();
+      });
   });
 
   btnStop.addEventListener('click', function () {
@@ -398,24 +418,13 @@
       });
   }
 
-  function setToggleUI(st) {
-    videoControls.hidden = !hasState(st.state);
-    if (st.running) {
-      btnToggle.textContent = st.paused ? '▶ Play' : '⏸ Pause';
-      btnToggle.title = st.paused ? 'Resume' : 'Pause';
-    } else {
-      btnToggle.textContent = '▶ Play';
-      btnToggle.title = 'Play';
-    }
-    btnStop.disabled = !st.running;
-    btnReset.disabled = !st.running;
-  }
-
   function refreshState() {
     if (!currentSessionId) return Promise.resolve(null);
     return api('/api/semantycs/sessions/' + currentSessionId + '/state').then(function (res) {
       if (res.status !== 200) return null;
       var st = res.data;
+      stateSnapshot = st;
+
       stateBadge.textContent = STATE_UI[st.state] || st.state;
       stateBadge.className = 'ss-state-badge ' + (st.state || '');
       chatInput.disabled = st.state === 'running';
@@ -442,7 +451,7 @@
         } else if (st.state === 'video') {
           videoEmptyText.textContent = 'Video linked. Type a prompt to configure detection.';
         } else if (st.state === 'prompted') {
-          videoEmptyText.textContent = 'Detection ready. Press Play.';
+          videoEmptyText.textContent = 'Detection ready. Press Play or use the buttons to start.';
         } else if (st.state === 'stopped') {
           videoEmptyText.textContent = 'Detection stopped. Press Play to run it again from the start.';
         }
@@ -453,15 +462,31 @@
       videoPrompt.hidden = !st.prompt;
       if (st.prompt) videoPrompt.textContent = st.prompt;
 
+      pendingBar.hidden = !(pendingActive && st.state === 'prompted' && !st.running);
+
       renderCounters(st.counters);
       renderLogs(st.logs);
       return st;
-    });
+    }).catch(function () { return null; });
+  }
+
+  function setToggleUI(st) {
+    videoControls.hidden = !hasState(st.state) && !st.running;
+    if (st.running) {
+      btnToggle.textContent = st.paused ? '▶ Play' : '⏸ Pause';
+      btnToggle.title = st.paused ? 'Resume' : 'Pause';
+    } else {
+      btnToggle.textContent = '▶ Play';
+      btnToggle.title = 'Play';
+    }
+    btnStop.disabled = !st.running;
+    btnLoadVideo.disabled = st.running;
+    btnLoadVideo.hidden = !(st.state === 'no_video' || st.state === 'video');
   }
 
   // ── Polling ──────────────────────────────────────────────────────
   setInterval(function () { refreshState(); }, 1500);
   setInterval(function () { refreshSessions(); }, 5000);
 
-  initialize();
+  boot();
 })();

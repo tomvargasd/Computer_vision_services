@@ -41,7 +41,6 @@
 
       <div class="ss-video-controls" id="video-controls" hidden>
         <button class="ss-btn ss-btn-ctr" id="btn-toggle" title="Play / Pause">▶ Play</button>
-        <button class="ss-btn ss-btn-ctr" id="btn-reset" title="Reset detection">⟲ Reset</button>
         <button class="ss-btn ss-btn-stop" id="btn-stop" title="Stop">■ Stop</button>
       </div>
 
@@ -78,10 +77,19 @@
     <div class="chat-messages ss-chat-messages" id="chat-messages">
       <div class="chat-welcome" id="chat-welcome">
         <div class="welcome-icon">◈</div>
-        <h2>Describe what to detect</h2>
-        <p>Type a prompt, for example <em>detect and count people on bicycles</em>. It will be interpreted and the detection configured.</p>
+        <h2>Smart Semantycs</h2>
+        <p>Start a new session or pick one from the history to load its saved state.</p>
       </div>
     </div>
+
+    <div class="ss-pending" id="ss-pending" hidden>
+      <span class="ss-pending-text">Detection ready. Start now?</span>
+      <div class="ss-pending-actions">
+        <button class="ss-btn ss-btn-start" id="btn-confirm-start">▶ Start detection</button>
+        <button class="ss-btn" id="btn-cancel-start">Cancel</button>
+      </div>
+    </div>
+
     <div class="ss-chat-input">
       <textarea id="chat-input" rows="1" placeholder="Describe what to detect and/or count..."></textarea>
       <div class="ss-chat-actions">

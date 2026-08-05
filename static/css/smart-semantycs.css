@@ -246,8 +246,32 @@
 .ss-btn:disabled { opacity: .4; cursor: not-allowed; }
 
 .ss-btn-primary { background: #182A55; color: #fff; border-color: #182A55; }
+.ss-btn-start { background: #22C55E; color: #fff; border-color: #22C55E; }
 .ss-btn-stop { background: #EF4444; color: #fff; border-color: #EF4444; }
 .ss-btn-ghost { background: rgba(0,0,0,0.45); color: #fff; border-color: rgba(255,255,255,0.35); }
+
+/* Pending start/cancel bar (chat) */
+.ss-pending {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  background: rgba(34,197,94,0.06);
+}
+.ss-pending-text {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.ss-pending-actions {
+  display: flex;
+  gap: 8px;
+}
+.ss-pending-actions .ss-btn {
+  flex: 1;
+  font-size: 0.78rem;
+}
 
 /* Contadores */
 .ss-counters {
