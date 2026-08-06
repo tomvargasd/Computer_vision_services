@@ -46,7 +46,7 @@ from src.database import (
 
 from src.modules.smart_semantycs import SmartSemntycsManager
 from src.modules.smart_semantycs_vocab import (
-    LVIS_NAMES, to_lvis, lvis_exists, find_lvis_candidates,
+    LVIS_NAMES, to_lvis, lvis_exists, find_lvis_candidates, best_lvis_match,
 )
 from src.modules.base import get_device
 
@@ -2715,6 +2715,10 @@ Recibes el prompt del usuario y un vocabulario de clases (LVIS). Debes decidir:
    genera contadores (deduplicados por track); si solo pide "detecta/alerta",
    genera logs. Mantén contadores y logs SIEMPRE alineados con el mismo prompt.
 3. Mapea SIEMPRE a nombres EXACTOS del vocabulario proporcionado (no inventes).
+   El usuario puede escribir en plural, singular o en español ("personas", "gente",
+   "person"). Traduce y normaliza SIEMPRE al nombre LVIS canónico en inglés
+   (ej. "personas" -> "person", "coches" -> "car"). No repitas la palabra del usuario
+   si no es el nombre LVIS exacto.
 4. Genera contadores (máx 5) y logs con condiciones válidas.
 
 Reglas de salida:
@@ -2815,7 +2819,9 @@ def _canonical_lvis(name: str) -> str | None:
     if c:
         return c
     cands = find_lvis_candidates(name, 1)
-    return cands[0] if cands else None
+    if cands:
+        return cands[0]
+    return best_lvis_match(name)
 
 
 def _normalize_skill(skill: dict) -> dict | None:

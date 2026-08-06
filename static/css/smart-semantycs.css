@@ -113,6 +113,21 @@
   white-space: nowrap;
 }
 
+.ss-session-delete {
+  background: transparent;
+  border: none;
+  color: #f87171;
+  font-size: 0.7rem;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.ss-session-delete:hover {
+  background: rgba(248, 113, 113, 0.15);
+  color: #fca5a5;
+}
+
 .ss-sessions-empty {
   padding: 8px;
   text-align: center;

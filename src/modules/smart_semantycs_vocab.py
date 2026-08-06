@@ -274,3 +274,92 @@ def find_lvis_candidates(text: str, limit: int = 15) -> list[str]:
             if len(matches) >= limit:
                 break
     return matches
+
+
+# ── Morfología y sinónimos para robustez de mapeo ────────────────────
+# Plurale/singular irregular ES-EN y sinónimos frecuentes del usuario.
+_IRREGS = {
+    "people": "person", "gente": "person", "gente en bicicleta": "person bicycle",
+    "personas": "person", "hombre": "man", "mujer": "woman", "niño": "child",
+    "camiones": "truck", "camioneta": "truck", "coches": "car", "carros": "car",
+    "automoviles": "car", "sillas": "chair", "mesas": "table", "botellas": "bottle",
+    "cajas": "box", "bolsas": "bag", "perros": "dog", "gatos": "cat",
+    "bicicletas": "bicycle", "motos": "motorcycle", "caballos": "horse",
+    "motocicleta": "motorcycle", "motocicletas": "motorcycle", "moto": "motorcycle",
+    "camion": "truck", "cuadros": "picture", "rosa": "rose",
+}
+
+
+def _stem(token: str) -> str:
+    """Raíz mínima de una palabra en minusculas (sin plurales comunes ES/EN)."""
+    t = token.strip().lower()
+    for suf in ("ies", "aos", "ios", "s", "es", "os", "as", "s"):
+        if t.endswith(suf) and len(t) - len(suf) >= 3:
+            t = t[: -len(suf)]
+            break
+    return t
+
+
+def _singular(text: str) -> str:
+    """Aplica sinónimos (_IRREGS) y singulariza para buscar en LVIS."""
+    lowered = text.strip().lower()
+    if lowered in _IRREGS:
+        return _IRREGS[lowered]
+    if lowered.endswith("s") and len(lowered) > 2:
+        return lowered[:-1]
+    return lowered
+
+
+def _alias_contains(alias: str, q: str) -> bool:
+    """Compara un alias LVIS (con '/' y espacios) contra el token 'q'."""
+    for part in alias.split("/"):
+        part_s = part.strip().lower()
+        if not part_s:
+            continue
+        if part_s == q:
+            return True
+        qs = _stem(q)
+        ws = _stem(part_s)
+        if ws and (qs == ws or qs.startswith(ws) or ws.startswith(qs)):
+            if abs(len(qs) - len(ws)) <= 3:
+                return True
+    return False
+
+
+def best_lvis_match(text):
+    """Encuentra la clase LVIS mas próxima a un fragmento libre del usuario.
+
+    Usa: lookup exacto -> singular/irregular -> coincidencia parcial por tokens.
+    Devuelve el nombre LVIS canónico o None.
+    """
+    direct = to_lvis(text)
+    if direct:
+        return direct
+
+    cands = find_lvis_candidates(text, 1)
+    if cands:
+        return cands[0]
+
+    sing = _singular(text)
+    if sing != text:
+        direct2 = to_lvis(sing)
+        if direct2:
+            return direct2
+
+    # Coincidencia parcial: algún alias de la clase comparte token con la consulta.
+    q_tokens = _stem(text).split()
+    if not q_tokens:
+        return None
+    matched = []
+    for name in LVIS_NAMES:
+        score = 0
+        for tok in q_tokens:
+            if any(_alias_contains(alias, tok) for alias in name.split("/")):
+                score += 1
+        if score == len(q_tokens) and score > 0:
+            matched.append(name)
+        if len(matched) >= 15:
+            break
+    if matched:
+        return matched[0]
+    return None

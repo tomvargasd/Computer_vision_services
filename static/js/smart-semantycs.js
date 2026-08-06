@@ -144,7 +144,7 @@
   }
 
   function loadMessages(sessionId) {
-    api('/api/semantycs/sessions/' + sessionId).then(function (res) {
+    return api('/api/semantycs/sessions/' + sessionId).then(function (res) {
       if (res.status !== 200) return;
       clearChat();
       (res.data.session.messages || []).forEach(function (m) {
@@ -169,10 +169,27 @@
         '<span class="ss-session-dot ' + escapeHtml(dot) + '"></span>' +
         '<span class="ss-session-item-title">' + escapeHtml(title) + '</span>' +
         '<span class="ss-session-item-time">' + escapeHtml(time) + '</span>' +
+        '<button class="ss-session-delete" title="Delete session">Delete</button>' +
         '</div>';
     }).join('');
     sessionsList.querySelectorAll('.ss-session-item').forEach(function (row) {
       row.addEventListener('click', function () { openSession(row.dataset.sid); });
+    });
+    sessionsList.querySelectorAll('.ss-session-delete').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var sid = btn.parentNode.dataset.sid;
+        if (!confirm('Delete this session? This cannot be undone.')) return;
+        api('/api/semantycs/sessions/' + sid, { method: 'DELETE' }).then(function (res) {
+          if (res.status === 200 && sid === currentSessionId) {
+            currentSessionId = null;
+            resetView();
+            clearChat();
+            btnLoadVideo.hidden = true;
+          }
+          refreshSessions();
+        });
+      });
     });
   }
 
@@ -321,9 +338,13 @@
       if (res.status === 429) {
         addMessage('\u23F1\uFE0F ' + (res.data.error || 'Wait a moment.'), 'model');
       } else if (res.status !== 200) {
-        addMessage('\u26A0\uFE0F ' + (res.data.error || 'Error'), 'model');
+        addMessage('\u23A0\uFE0F ' + (res.data.error || 'Error'), 'model');
       }
-      return refreshState();
+      // Recarga los mensajes desde el servidor para mostrar YA la respuesta de Gemini
+      // (GET falla silenciosamente), luego refresca estado/controles.
+      return loadMessages(currentSessionId).then(function () {
+        return refreshState();
+      });
     }).then(function (st) {
       if (st && st.state === 'prompted') {
         // Mostrar botones Iniciar/Cancelar en el chat (no arrancar automáticamente).
@@ -334,7 +355,7 @@
     }).catch(function () {
       removeTypingBubble();
       chatInput.disabled = false;
-      addMessage('\u26A0\uFE0F Connection error.', 'model');
+      addMessage('\u23A0\uFE0F Connection error.', 'model');
     }).finally(function () {
       updateSendBtn();
     });
