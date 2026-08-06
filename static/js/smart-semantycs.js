@@ -23,6 +23,8 @@
   var videoPrompt = $('video-prompt');
   var btnToggle = $('btn-toggle');
   var btnStop = $('btn-stop');
+  var sleepInput = $('sleep-input');
+  var btnSleepSet = $('btn-sleep-set');
   var pendingBar = $('ss-pending');
   var btnConfirmStart = $('btn-confirm-start');
   var btnCancelStart = $('btn-cancel-start');
@@ -409,6 +411,24 @@
       .then(function () { refreshState(); refreshSessions(); });
   });
 
+  // ── Sleep (timesleep por frame) ──────────────────────────────────
+  btnSleepSet.addEventListener('click', function () {
+    if (!currentSessionId) return;
+    var val = sleepInput.value.trim();
+    var secs = parseFloat(val);
+    if (isNaN(secs) || secs < 0) { alert('Enter a valid number (seconds, decimals allowed).'); return; }
+    btnSleepSet.disabled = true;
+    api('/api/semantycs/sessions/' + currentSessionId + '/sleep', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seconds: secs })
+    }).then(function (r) {
+      if (r.status !== 200) { alert(r.data.error || 'Error'); return; }
+      btnSleepSet.textContent = '✓';
+      setTimeout(function () { btnSleepSet.textContent = 'Set'; }, 1200);
+    }).finally(function () { btnSleepSet.disabled = false; });
+  });
+
   // ── Render ───────────────────────────────────────────────────────
   function renderCounters(counters) {
     if (!counters || counters.length === 0) {
@@ -513,6 +533,9 @@
 
       renderCounters(st.counters);
       renderLogs(st.logs);
+      if (typeof st.sleep_seconds === 'number' && document.activeElement !== sleepInput) {
+        sleepInput.value = st.sleep_seconds;
+      }
       return st;
     }).catch(function () { return null; });
   }

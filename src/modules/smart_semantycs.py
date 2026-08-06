@@ -39,14 +39,15 @@ TRACKER     = "bytetrack.yaml"
 DEFAULT_COLOR = (255, 255, 255)   # blanco
 
 
-def _iou(ax, ay, axx, ayy, bx, byy, bxx, byyy):
+def _iou(box_a, box_b):
     """IoU de dos cajas xyxy."""
-    ix1 = max(ax, bx)
-    iy1 = max(ay, byy)
-    ix2 = min(axx, bxx)
-    iy2 = min(ayy, byyy)
-    iw = max(0.0, ix2 - ix1)
-    ih = max(0.0, iy2 - iy1)
+    ax, ay = box_a[0], box_a[1]
+    axx, ayy = box_a[2], box_a[3]
+    bx, byy = box_b[0], box_b[1]
+    bxx, byyy = box_b[2], box_b[3]
+    ix1 = max(ax, bx); iy1 = max(ay, byy)
+    ix2 = min(axx, bxx); iy2 = min(ayy, byyy)
+    iw = max(0.0, ix2 - ix1); ih = max(0.0, iy2 - iy1)
     inter = iw * ih
     area_a = max(0.0, (axx - ax) * (ayy - ay))
     area_b = max(0.0, (bxx - bx) * (byyy - byy))
@@ -54,35 +55,173 @@ def _iou(ax, ay, axx, ayy, bx, byy, bxx, byyy):
     return inter / union if union > 0 else 0.0
 
 
-def _matches_condition(cls_name: str, xyxy, boxes, condition: dict) -> bool:
+def _inter_ratio(box_a, box_b):
+    """Interscción normalizada por el área menor. Tolerante a cajas de tamaño dispar
+    (ej. persona grande con teléfono pequeño, persona en bicicleta)."""
+    ax, ay = box_a[0], box_a[1]; aax, aay = box_a[2], box_a[3]
+    bx, byy = box_b[0], box_b[1]; bbx, bbyy = box_b[2], box_b[3]
+    ix1 = max(ax, bx); iy1 = max(ay, byy)
+    ix2 = min(aax, bbx); iy2 = min(aay, bbyy)
+    iw = max(0.0, ix2 - ix1); ih = max(0.0, iy2 - iy1)
+    inter = iw * ih
+    area_a = max(0.0, (aax - ax) * (aay - ay))
+    area_b = max(0.0, (bbx - bx) * (bbyy - byy))
+    denom = max(1.0, min(area_a, area_b))
+    return inter / denom
+
+
+def _center(box):
+    return ((box[0] + box[2]) / 2.0, (box[1] + box[3]) / 2.0)
+
+
+def _dist(a, b):
+    return ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5
+
+
+def _box_contains(box, pt):
+    return box[0] <= pt[0] <= box[2] and box[1] <= pt[1] <= box[3]
+
+
+def _relation_hit(spec, xyxy, box):
+    """¿'box' (objeto asociado) cumple la relación con la caja principal 'xyxy'?"""
+    relation = spec.get("relation", "overlap")
+    min_overlap = float(spec.get("min_overlap", 0.2))
+    distance = float(spec.get("distance", 120))
+    h_prim = max(1.0, xyxy[3] - xyxy[1])
+    w_prim = max(1.0, xyxy[2] - xyxy[0])
+    # Tolerancia proporcional al tamaño: acepta objetos ligeramente fuera de la caja.
+    margin = 0.15 * h_prim
+    grown = (xyxy[0] - margin, xyxy[1] - margin, xyxy[2] + margin, xyxy[3] + margin)
+    if relation == "near":
+        d = _dist(_center(xyxy), _center(box))
+        allowed = max(distance, 0.9 * max(w_prim, box[2] - box[0]))
+        if d <= allowed:
+            return True
+        if _inter_ratio(xyxy, box) >= 0.05:
+            return True
+    elif relation in ("inside", "within", "en"):
+        # El centro del objeto asociado cae dentro (con margen) de la caja principal
+        # o viceversa. También vale si la intersección es amplia.
+        if _box_contains(grown, _center(box)) or _box_contains(grown, _center(xyxy)):
+            return True
+        if _inter_ratio(xyxy, box) >= 0.35:
+            return True
+    else:  # overlap / "with" / "en/sobre"
+        if _inter_ratio(xyxy, box) >= min_overlap:
+            return True
+        # tolerancia: aunque la intersección sea pequeña, centros muy próximos cuenta.
+        d = _dist(_center(xyxy), _center(box))
+        if d <= max(48.0, distance * 0.6) and _inter_ratio(xyxy, box) >= 0.04:
+            return True
+    return False
+
+
+_COLOR_HSV = {
+    "red":       [((0, 50, 40), (10, 255, 255)), ((160, 50, 40), (180, 255, 255))],
+    "orange":    [((10, 100, 40), (25, 255, 255))],
+    "yellow":    [((25, 100, 40), (35, 255, 255))],
+    "green":     [((40, 50, 40), (80, 255, 255))],
+    "cyan":      [((80, 50, 40), (100, 255, 255))],
+    "blue":      [((100, 50, 40), (130, 255, 255))],
+    "purple":    [((130, 50, 40), (160, 255, 255))],
+    "pink":      [((145, 40, 60), (175, 255, 255))],
+    "white":     [((0, 0, 180), (180, 90, 255))],
+    "black":     [((0, 0, 0), (180, 255, 40))],
+    "gray":      [((0, 0, 40), (180, 40, 180))],
+    "brown":     [((10, 50, 40), (25, 160, 160))],
+}
+
+
+def _region_has_color(frame, xyxy, spec):
+    """Comprueba si dentro de la caja principal hay un color (fracción >= min_ratio).
+
+    Útil para casos que el modelo de objetos no puede resolver (ej. "persona con
+    camiseta roja") — aquí el color se mide sobre la región de la persona.
+    """
+    if frame is None:
+        return True
+    x1, y1, x2, y2 = [int(v) for v in xyxy]
+    h, w = frame.shape[:2]
+    x1 = max(0, x1); y1 = max(0, y1); x2 = min(w, x2); y2 = min(h, y2)
+    if x2 <= x1 or y2 <= y1:
+        return False
+    crop = frame[y1:y2, x1:x2]
+    if crop.size == 0:
+        return False
+    names = spec.get("names") or []
+    min_ratio = float(spec.get("min_ratio", 0.06))
+    try:
+        hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+    except cv2.error:
+        return False
+    total = max(1.0, float(crop.shape[0] * crop.shape[1]))
+    matched = 0.0
+    for nm in names:
+        ranges = _COLOR_HSV.get(nm.strip().lower())
+        if not ranges:
+            continue
+        mask = np.zeros(crop.shape[:2], dtype=np.uint8)
+        for lo, hi in ranges:
+            mask = cv2.bitwise_or(mask, cv2.inRange(hsv, np.array(lo), np.array(hi)))
+        matched += float(mask.sum() / 255.0)
+    return matched / total >= min_ratio
+
+
+def _matches_condition(cls_name: str, xyxy, boxes, condition: dict, frame=None) -> bool:
     """Evalúa una condition del contrato de skill sobre una caja dada.
 
-    condition = {"detect": [...], "overlap": [...], "min_overlap": 0.3}
-    condition = {"detect": [Y], "missing": [X]}  → Y presente SIN X en el frame
-                                                 (excepción: solo objeto, sin algo).
+    Esquema general (admite varios objetos y relaciones encadenados):
+      condition = {
+        "detect": ["X"],                      # objeto principal (obligatorio)
+        "attach": [                           # opcional: objeto(s) asociado(s)
+            {"classes": ["Y"], "relation": "overlap|inside|near", "min_overlap": 0.2, "distance": 120}
+        ],
+        "require_all": true,                  # true: necesita TODOS los attach; false: al menos uno
+        "absent": ["Z"],                      # estas clases NO deben estar en el frame
+        "color": {"names": ["red"], "min_ratio": 0.06},   # filtro de color en la caja principal (CV)
+        "confirmed_frames": 3,                # frames consecutivos requeridos (control de parpadeo)
+      }
+    Compatible con el esquema previo: "overlap", "missing" y "min_overlap".
     """
     detect = condition.get("detect") or []
     if cls_name not in detect:
         return False
 
-    missing = condition.get("missing")
-    if missing:
-        # Válida solo si NINGÚN objeto de las clases "missing" está en el frame.
-        if any(other["cls_name"] in missing for other in boxes):
+    absent = condition.get("absent") or condition.get("missing")
+    if absent:
+        if any(other["cls_name"] in absent for other in boxes):
             return False
-        return True
 
-    overlap = condition.get("overlap")
-    if not overlap:
-        return True
+    attach = condition.get("attach")
+    if not attach:
+        overlap = condition.get("overlap")
+        if overlap:
+            attach = [{"classes": overlap,
+                       "relation": condition.get("relation", "overlap"),
+                       "min_overlap": condition.get("min_overlap", 0.2)}]
 
-    min_overlap = float(condition.get("min_overlap", 0.3))
-    x1, y1, x2, y2 = xyxy
-    for other in boxes:
-        if other["cls_name"] in overlap:
-            if _iou(x1, y1, x2, y2, *other["xyxy"]) >= min_overlap:
-                return True
-    return False
+    if attach:
+        require_all = bool(condition.get("require_all", True))
+        hits = []
+        for spec in attach:
+            spec_classes = spec.get("classes") or []
+            spec_hit = False
+            for other in boxes:
+                if other["cls_name"] in spec_classes and _relation_hit(spec, xyxy, other["xyxy"]):
+                    spec_hit = True
+                    break
+            hits.append(spec_hit)
+        if require_all and not all(hits):
+            return False
+        if not require_all and not any(hits):
+            return False
+
+    color = condition.get("color")
+    if color:
+        if not _region_has_color(frame, xyxy, color):
+            return False
+
+    return True
 
 
 class SmartSemntycsPipeline:
@@ -90,7 +229,7 @@ class SmartSemntycsPipeline:
 
     def __init__(self, session_id: str, source_path: str, source_type: str,
                  classes: List[str], skill: dict, conf: float = CONF_THRESH,
-                 fps_limit: float = 0.0):
+                 fps_limit: float = 0.0, sleep_seconds: float = 0.0):
         self.session_id  = session_id
         self.source_path = source_path
         self.source_type = source_type
@@ -98,6 +237,9 @@ class SmartSemntycsPipeline:
         self.skill       = skill or {}
         self.conf_thresh = conf
         self.fps_limit   = fps_limit
+        # Timesleep manual por frame (compatible con decimales). 0 = sin espera.
+        self._sleep_lock = threading.Lock()
+        self._sleep_seconds = max(0.0, float(sleep_seconds))
 
         self._counters_def = {c["id"]: c for c in self.skill.get("counters", [])}
         self._logs_def     = {l["id"]: l for l in self.skill.get("logs", [])}
@@ -112,9 +254,14 @@ class SmartSemntycsPipeline:
 
         # Contadores en memoria (inicializados con lo persistido)
         self._counters: Dict[str, int] = {}
-        self._counted_tracks: Dict[str, set] = {}   # counter_id -> {track_id}
-        self._logged_tracks: Dict[str, set] = {}    # log_id -> {track_id}
+        self._counted_tracks: Dict[str, set] = {}   # counter_id -> {track_id} (settled)
+        self._logged_tracks: Dict[str, set] = {}    # log_id -> {track_id} (settled)
+        self._streak_counters: Dict[str, dict] = {} # counter_id -> {track_id: frames seguidos}
+        self._streak_logs: Dict[str, dict] = {}     # log_id -> {track_id: frames seguidos}
         self._seen_tracks: set = set()
+
+        # Frames consecutivos necesarios para "confirmar" un conteo/log (anti-parpadeo).
+        self.confirm_frames = 3
 
         # Capturas
         self._captures_dir = os.path.join(CAPTURES_FOLDER, "semantycs", session_id)
@@ -159,6 +306,15 @@ class SmartSemntycsPipeline:
 
     def is_paused(self) -> bool:
         return self._paused.is_set()
+
+    def set_sleep_seconds(self, seconds: float) -> None:
+        """Ajusta el timesleep por frame en vivo (hilo seguro)."""
+        with self._sleep_lock:
+            self._sleep_seconds = max(0.0, float(seconds))
+
+    def get_sleep_seconds(self) -> float:
+        with self._sleep_lock:
+            return self._sleep_seconds
 
     def reset(self) -> None:
         """Limpia contadores, logs, dedup y capturas (mantiene video+skill)."""
@@ -245,7 +401,11 @@ class SmartSemntycsPipeline:
                     self._frame = annotated
                 self._persist_counters()
 
-                if self.fps_limit and self.fps_limit > 0:
+                # Timesleep por frame: respeta el valor configurado en vivo (Set).
+                sleep_sec = self.get_sleep_seconds()
+                if sleep_sec and sleep_sec > 0:
+                    time.sleep(sleep_sec)
+                elif self.fps_limit and self.fps_limit > 0:
                     time.sleep(self.fps_limit)
 
             cap.release()
@@ -300,31 +460,43 @@ class SmartSemntycsPipeline:
                 "xyxy": tuple(float(v) for v in box.xyxy[0].tolist()),
             })
 
-        # ── Evaluar contadores y logs (dedup por track_id) ──────────────────
+        # ── Evaluar contadores y logs (confirmar tras N frames seguidos) ────
         fired_tracks = {}   # track_id -> color a dibujar
         for counter_id, cdef in self._counters_def.items():
             cond = cdef.get("condition") or {}
+            k = self._confirmed_frames(cond)
+            streak_map = self._streak_counters.setdefault(counter_id, {})
+            settled = self._counted_tracks.setdefault(counter_id, set())
             for det in parsed:
                 tid = det["track_id"]
-                if tid in self._counted_tracks.get(counter_id, set()):
+                if tid in settled:
                     continue
-                if _matches_condition(det["cls_name"], det["xyxy"], parsed, cond):
-                    self._counted_tracks.setdefault(counter_id, set()).add(tid)
+                ok = _matches_condition(det["cls_name"], det["xyxy"], parsed, cond, frame)
+                streak_map[tid] = (streak_map.get(tid, 0) + 1) if ok else 0
+                if streak_map[tid] >= k:
+                    settled.add(tid)
                     self._counters[counter_id] = self._counters.get(counter_id, 0) + 1
                     fired_tracks[tid] = cdef.get("color", "#22C55E")
 
         needs_capture = False
+        new_log_events = []   # [(log_id, track_id)]
         for log_id, ldef in self._logs_def.items():
             cond = ldef.get("condition") or {}
+            k = self._confirmed_frames(cond)
+            streak_map = self._streak_logs.setdefault(log_id, {})
+            settled = self._logged_tracks.setdefault(log_id, set())
             for det in parsed:
                 tid = det["track_id"]
-                if tid in self._logged_tracks.get(log_id, set()):
+                if tid in settled:
                     continue
-                if _matches_condition(det["cls_name"], det["xyxy"], parsed, cond):
-                    needs_capture = True
-                    break   # ya hay al menos un evento nuevo este frame
-            if needs_capture:
-                break
+                if _matches_condition(det["cls_name"], det["xyxy"], parsed, cond, frame):
+                    streak_map[tid] = streak_map.get(tid, 0) + 1
+                    if streak_map[tid] >= k:
+                        settled.add(tid)
+                        new_log_events.append((log_id, tid))
+                        needs_capture = True
+                else:
+                    streak_map[tid] = 0
 
         # ── Dibujar bounding boxes ──────────────────────────────────────────
         for det in parsed:
@@ -340,9 +512,18 @@ class SmartSemntycsPipeline:
                         cv2.FONT_HERSHEY_SIMPLEX, 0.52, color, 2, cv2.LINE_AA)
             self._seen_tracks.add(tid)
 
-        # ── Persistir logs + captura si hubo eventos nuevos ─────────────────
+        # ── Persistir logs + captura si hubo eventos confirmados ─────────────
         if needs_capture:
-            self._persist_logs(parsed, annotated)
+            capture_path = self._save_capture(annotated)
+            for log_id, tid in new_log_events:
+                ldef = self._logs_def.get(log_id) or {}
+                insert_semantycs_log(
+                    self.session_id, log_id,
+                    ldef.get("label", log_id),
+                    ldef.get("event", ""),
+                    ldef.get("priority", "info"),
+                    capture_path,
+                )
 
         # HUD: título de la skill y estado
         summary = self.skill.get("summary", "")
@@ -351,25 +532,13 @@ class SmartSemntycsPipeline:
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
         return annotated
 
-    def _persist_logs(self, parsed: list, annotated: np.ndarray) -> None:
-        capture_path = None
-        for log_id, ldef in self._logs_def.items():
-            cond = ldef.get("condition") or {}
-            for det in parsed:
-                tid = det["track_id"]
-                if tid in self._logged_tracks.get(log_id, set()):
-                    continue
-                if _matches_condition(det["cls_name"], det["xyxy"], parsed, cond):
-                    if capture_path is None:
-                        capture_path = self._save_capture(annotated)
-                    insert_semantycs_log(
-                        self.session_id, log_id,
-                        ldef.get("label", log_id),
-                        ldef.get("event", ""),
-                        ldef.get("priority", "info"),
-                        capture_path,
-                    )
-                    self._logged_tracks.setdefault(log_id, set()).add(tid)
+    def _confirmed_frames(self, cond: dict) -> int:
+        """Frames consecutivos requeridos para confirmar una condición."""
+        try:
+            k = int(cond.get("confirmed_frames", self.confirm_frames))
+        except (TypeError, ValueError):
+            k = self.confirm_frames
+        return max(1, k)
 
     def _save_capture(self, annotated: np.ndarray) -> str:
         fname = f"{int(time.time() * 1000)}.jpg"
@@ -454,7 +623,7 @@ class SmartSemntycsManager:
 
     def start(self, session_id: str, source_path: str, source_type: str,
               classes: List[str], skill: dict, conf: float = CONF_THRESH,
-              fps_limit: float = 0.0) -> None:
+              fps_limit: float = 0.0, sleep_seconds: float = 0.0) -> None:
         # Regla del módulo: detener cualquier pipeline previo (otra sesión o la misma).
         with self._lock:
             ids = list(self.pipelines.keys())
@@ -465,6 +634,7 @@ class SmartSemntycsManager:
 
         p = SmartSemntycsPipeline(
             session_id, source_path, source_type, classes, skill, conf, fps_limit,
+            sleep_seconds,
         )
         p.start()
         with self._lock:

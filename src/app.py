@@ -2706,44 +2706,65 @@ def api_access_limited_modules():
 # ═════════════════════════════════════════════════════════════
 
 _LVIS_SYSTEM_PROMPT = """Eres el cerebro de interpretación de un módulo de visión con vocabulario abierto.
-Recibes el prompt del usuario y un vocabulario de clases (LVIS). Debes decidir:
+Recibes el prompt del usuario y un vocabulario de clases (LVIS). Debes decidir CÓMO
+lograr lo que pide con los conceptos y objetos que el modelo SÍ puede ver.
 
-1. ¿Es factible detectar lo pedido con el vocabulario disponible?
-   Si pide algo imposible por imágenes de cámara (ej. "moneda triangular con 3
-   agujeros") o requiere entrenamiento especializado -> "feasible": false.
-2. ¿Solo detectar/alerta o también contar? Si pide "cuenta/cuantos",
-   genera contadores (deduplicados por track); si solo pide "detecta/alerta",
-   genera logs. Mantén contadores y logs SIEMPRE alineados con el mismo prompt.
-3. Mapea SIEMPRE a nombres EXACTOS del vocabulario proporcionado (no inventes).
-   El usuario puede escribir en plural, singular o en español ("personas", "gente",
-   "person"). Traduce y normaliza SIEMPRE al nombre LVIS canónico en inglés
-   (ej. "personas" -> "person", "coches" -> "car"). No repitas la palabra del usuario
-   si no es el nombre LVIS exacto.
-4. Genera contadores (máx 5) y logs con condiciones válidas.
+RAZONAMIENTO ROBUSTO Y ABIERTO (MUY IMPORTANTE):
+- El usuario escribe libre ("personas", "gente", "perro paseando", "mascota con su
+  dueño", "persona con camiseta roja", "laptop sin persona cerca"). Interpreta la
+  CONDUCTA: sinónimos, plural/singular, INGLÉS/ESPAÑOL, paráfrasis y combinaciones.
+  Traduce SIEMPRE a nombres LVIS canónicos en inglés EXACTOS del vocabulario.
+- No te rindas (feasible:false) solo porque no exista una clase literal. Busca la
+  forma de mapearlo: propiedades (color) se resuelven con la condición "color";
+  combinaciones de objetos con "attach"; ausencia con "absent"; movimiento/proximidad
+  con "near". Solo devuelve feasible:false cuando NO exista forma razonable de
+  expresarlo o sea un concepto que una cámara no puede inferir de ninguna manera.
+- Expande frases vagas en cada significado concreto posible cuando abraje una
+  enumeración natural. Ejemplo: "mascota con su dueño" -> personas con perros Y
+  personas con gatos (DOS contadores). "perros paseando con personas" -> un contador
+  de persona proxima a perro. Si el prompt admite identificar varios sujetos
+  alternativos, genera un contador (o log) por cada uno claro y evidente.
 
-Reglas de salida:
-- Respuesta SOLO JSON válido, sin markdown ni texto extra.
-- En "reason" (solo si feasible=false) usa lenguaje general, SIN nombres de
-  tecnologías: di que no es posible detectarlo por el momento y que se requeriría
-  un entrenamiento especializado.
-- "classes": lista de nombres LVIS exactos (máx 15).
+DECISIÓN DE CONTAR/DETECTAR (2):
+- "cuenta/cuantos" -> contadores (dedup por objeto confirmado).
+- "detecta/alerta/log" -> logs. Mantén contadores y logs SIEMPRE alineados al prompt.
+- Puedes producir varios contadores y logs; cada uno con su condición y color.
 
-Patrón "algo que tenga objeto" (X que tiene Y), ej. "autos que tengan ruedas":
-- Contador PRECISO de X con Y: condition {"detect": ["X"], "overlap": ["Y"],
-  "min_overlap": 0.30}  -> cuenta solo cuando X se solapa con Y.
-- Si solo se detecta X sin Y: no marcar (ese contador ya no dispara).
-- Log de ALERTA/EXCEPCIÓN cuando se detecta solo el objeto Y sin el X (algo):
-  condition {"detect": ["Y"], "missing": ["X"]}; label tipo "Se detectó el objeto
-  Y pero no el X (algo)", priority "warning". Este es un caso de excepción a usar
-  en escenarios de este tipo, no para todo.
+Mapea SIEMPRE a nombres EXACTOS LVIS (escríbelos en su forma canónica singular
+en inglés de la lista "classes"). Toda clase usada en detect/attach/absent debe ir en "classes".
 
-Condiciones admitidas:
-    {"detect": ["cls", ...]}  -> el objeto es de alguna de esas clases.
-    {"detect": [...], "overlap": [...], "min_overlap": 0.30} -> el detectado se
-       solapa >= 30% con un objeto de las clases "overlap" (ej. persona sobre
-       bicicleta). Usar para contadores precisos de "X que tiene Y".
-    {"detect": ["Y"], "missing": ["X"]} -> Y está presente pero X NO está en el
-       frame. Para log de excepción "solo se detectó el objeto Y, no el X".
+CONDICIONES ADMITIDAS (esquema general, admite varios objetos y relaciones):
+    {"detect":["X"]}                                      el objeto es de clase X.
+    {"detect":["X"],"attach":[{"classes":["Y"],"relation":"overlap","min_overlap":0.2}]}
+        X debe solaparse ("con/sobre/en") con Y. Ej. persona en bicicleta.
+    {"detect":["X"],"attach":[{"classes":["Y"],"relation":"inside"},{"classes":["Z"],"relation":"overlap"}]}
+        Varios asociados: require_all=true exige TODOS; false exige al menos uno.
+        Ej. "persona con chaleco en bicicleta": attach [vest(overlap), bicycle(overlap)].
+    {"detect":["X"],"attach":[{"classes":["Y"],"relation":"near","distance":120}]}
+        X está CERCA de Y (ej. perro paseando con persona).
+    {"detect":["X"],"absent":["Y"]}                        hay X pero NO Y (ej. laptop sin persona).
+    {"detect":["person"],"color":{"names":["red"],"min_ratio":0.06}}
+        Filtro de color sobre la caja principal, usado cuando el modelo no distingue
+        la propiedad (ej. "persona con camiseta roja"). Colores soportados:
+red, orange, yellow, green, cyan, blue, purple, pink, white, black, gray, brown.
+    Relaciones: "overlap" (X en/sobre/con Y), "inside"/"within" (uno dentro del otro),
+    "near" (proximidad). Todas son tolerantes por diseño: funcionan aunque el objeto
+    asociado esté parcialmente fuera o a unos píxeles de distancia.
+    "confirmed_frames": N (valor por defecto 3) -> frames consecutivos que la
+    condición se cumple antes de contar/loggear (corta el parpadeo). No lo pongas
+    salvo que quieras sobreescribir el valor por defecto.
+
+ESCENARIO COMPATIBLE PREVIO (sigue válido):
+    {"detect":["X"],"overlap":["Y"],"min_overlap":0.3}   X se solapa con Y.
+    {"detect":["Y"],"missing":["X"]}                     Y presente SIN X (excepción).
+
+REGLAS DE SALIDA:
+- Responde SOLO JSON válido, sin markdown ni texto extra.
+- "reason" (solo si feasible=false): lenguaje general SIN tecnologías; di que no es
+  posible por el momento y requeriría entrenamiento especializado.
+- "classes": todos los nombres LVIS exactos usados (máx 15).
+- "counters": max 5; cada uno {id,label,color,condition}.
+- "logs": cada uno {id,label,event,priority(info|warning|critical),condition}.
 
 VOCABULARIO LVIS DEL PROMPT:
 {vocab}"""
@@ -2867,38 +2888,91 @@ def _normalize_skill(skill: dict) -> dict | None:
                 if canon not in new_detect:
                     new_detect.append(canon)
             new_cond = {"detect": new_detect}
-            missing = cond.get("missing")
-            if missing:
-                if not isinstance(missing, list) or not missing:
+
+            def norm_cls(items):
+                if items is None or items is False:
+                    return []
+                if not isinstance(items, list) or not items:
                     return None
-                new_missing = []
-                for m in missing:
-                    if not isinstance(m, str):
+                out = []
+                for it in items:
+                    if not isinstance(it, str):
                         return None
-                    canon = _canonical_lvis(m)
+                    canon = _canonical_lvis(it)
                     if not canon or canon not in class_set:
                         return None
-                    if canon not in new_missing:
-                        new_missing.append(canon)
-                new_cond["missing"] = new_missing
-            overlap = cond.get("overlap")
-            if overlap:
-                if not isinstance(overlap, list) or not overlap:
+                    if canon not in out:
+                        out.append(canon)
+                return out
+
+            # "absent": clases NO presentes (compat: "missing")
+            absent = norm_cls(cond.get("absent"))
+            if absent is None:
+                absent = norm_cls(cond.get("missing"))
+            if absent is None:
+                return None
+            if absent:
+                new_cond["absent"] = absent
+
+            # "attach": lista de objetos asociados con relación.
+            attach_raw = cond.get("attach")
+            if not attach_raw:
+                overlap = cond.get("overlap")
+                if overlap:
+                    ov = norm_cls(overlap)
+                    if ov is None:
+                        return None
+                    try:
+                        min_ov = float(cond.get("min_overlap", 0.2))
+                    except Exception:
+                        min_ov = 0.2
+                    attach_raw = [{"classes": ov, "relation": cond.get("relation", "overlap"),
+                                   "min_overlap": min_ov}]
+            if attach_raw:
+                if not isinstance(attach_raw, list) or not attach_raw:
                     return None
-                new_overlap = []
-                for o in overlap:
-                    if not isinstance(o, str):
+                new_attach = []
+                relations = ("overlap", "inside", "within", "en", "near")
+                for spec in attach_raw:
+                    if not isinstance(spec, dict):
                         return None
-                    canon = _canonical_lvis(o)
-                    if not canon or canon not in class_set:
+                    sc = norm_cls(spec.get("classes"))
+                    if not sc:
                         return None
-                    if canon not in new_overlap:
-                        new_overlap.append(canon)
-                new_cond["overlap"] = new_overlap
+                    rel = spec.get("relation", "overlap")
+                    if rel not in relations:
+                        rel = "overlap"
+                    n_spec = {"classes": sc, "relation": rel}
+                    try:
+                        n_spec["min_overlap"] = float(spec.get("min_overlap", 0.2))
+                    except Exception:
+                        n_spec["min_overlap"] = 0.2
+                    try:
+                        n_spec["distance"] = float(spec.get("distance", 120))
+                    except Exception:
+                        n_spec["distance"] = 120.0
+                    new_attach.append(n_spec)
+                new_cond["attach"] = new_attach
+                new_cond["require_all"] = bool(cond.get("require_all", True))
+
+            # "color": filtro por color sobre la caja principal (CV).
+            color = cond.get("color")
+            if color:
+                if not isinstance(color, dict):
+                    return None
+                names = color.get("names")
+                if not isinstance(names, list) or not names or not all(isinstance(n, str) for n in names):
+                    return None
                 try:
-                    new_cond["min_overlap"] = float(cond.get("min_overlap", 0.3))
+                    min_ratio = float(color.get("min_ratio", 0.06))
                 except Exception:
-                    new_cond["min_overlap"] = 0.3
+                    min_ratio = 0.06
+                new_cond["color"] = {"names": names, "min_ratio": min_ratio}
+
+            try:
+                new_cond["confirmed_frames"] = max(1, int(cond.get("confirmed_frames", 3)))
+            except (TypeError, ValueError):
+                new_cond["confirmed_frames"] = 3
             return new_cond
 
         counters = []
@@ -3055,14 +3129,41 @@ def api_semantycs_start(session_id):
         conf = float(settings.get("smart_semantycs_conf", "0.25"))
     except (TypeError, ValueError):
         conf = 0.25
-    # Sin throttle artificial: Smart Semantycs no duerme entre frames.
+    # Sin throttle artificial por defecto: Smart Semantycs no duerme entre frames.
     fps = 0.0
+    # Timesleep manual configurado para esta sesión (el botón "Set" de los controles).
+    try:
+        sleep_sec = float(s.get("sleep_seconds") or 0.0)
+    except (TypeError, ValueError):
+        sleep_sec = 0.0
+    if sleep_sec < 0:
+        sleep_sec = 0.0
 
     SmartSemntycsManager.get().start(
-        session_id, src_path, s["video_type"], classes, skill, conf, fps,
+        session_id, src_path, s["video_type"], classes, skill, conf, fps, sleep_sec,
     )
     update_semantycs_session(session_id, state="running")
     return jsonify({"started": session_id})
+
+
+@app.route("/api/semantycs/sessions/<session_id>/sleep", methods=["POST"])
+def api_semantycs_sleep(session_id):
+    """Ajusta el timesleep (segundos, decimal) por frame de la sesión, en vivo."""
+    s = get_semantycs_session(session_id)
+    if not s:
+        return jsonify({"error": "Session not found"}), 404
+    data = request.get_json(silent=True) or {}
+    try:
+        seconds = float(data.get("seconds", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "seconds must be a number"}), 400
+    if seconds < 0:
+        seconds = 0.0
+    p = SmartSemntycsManager.get().get_pipeline(session_id)
+    if p:
+        p.set_sleep_seconds(seconds)
+    update_semantycs_session(session_id, sleep_seconds=seconds)
+    return jsonify({"saved": True, "seconds": seconds})
 
 
 @app.route("/api/semantycs/sessions/<session_id>/pause", methods=["POST"])
@@ -3149,6 +3250,7 @@ def api_semantycs_state(session_id):
         "skill": skill,
         "counters": counters,
         "logs": list_semantycs_logs(session_id, 200),
+        "sleep_seconds": float(s.get("sleep_seconds") or 0.0),
     })
 
 

@@ -384,6 +384,33 @@
 .ss-btn-ctr { background: rgba(255,255,255,0.14); color: #fff; border-color: rgba(255,255,255,0.4); }
 .ss-btn-ctr:hover { background: rgba(255,255,255,0.24); }
 
+.ss-sleep {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 6px;
+  border-left: 1px solid rgba(255,255,255,0.25);
+}
+.ss-sleep-label {
+  font-size: 0.72rem;
+  color: #e5e7eb;
+  white-space: nowrap;
+}
+.ss-sleep-input {
+  width: 74px;
+  padding: 5px 7px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.35);
+  background: rgba(0,0,0,0.35);
+  color: #fff;
+  font-size: 0.82rem;
+  text-align: center;
+}
+.ss-sleep-btn {
+  min-width: 52px;
+  font-size: 0.82rem;
+}
+
 .ss-video-prompt {
   position: absolute;
   top: 12px;

@@ -277,6 +277,7 @@ def init_db():
                 prompt      TEXT DEFAULT '',
                 skill       TEXT DEFAULT '{}',
                 state       TEXT NOT NULL DEFAULT 'no_video',
+                sleep_seconds REAL NOT NULL DEFAULT 0,
                 created_at  TEXT NOT NULL DEFAULT (datetime('now','localtime')),
                 updated_at  TEXT NOT NULL DEFAULT (datetime('now','localtime'))
             );
@@ -368,6 +369,12 @@ def init_db():
         # Migración: fps_limit por fuente (timesleep individual)
         try:
             conn.execute("ALTER TABLE sources ADD COLUMN fps_limit TEXT NOT NULL DEFAULT ''")
+        except Exception:
+            pass
+
+        # Migración: sleep_seconds por sesión de Smart Semantycs (timesleep de frame)
+        try:
+            conn.execute("ALTER TABLE semantycs_sessions ADD COLUMN sleep_seconds REAL NOT NULL DEFAULT 0")
         except Exception:
             pass
 
@@ -1081,7 +1088,7 @@ def get_semantycs_session(session_id: str) -> dict | None:
 
 
 def update_semantycs_session(session_id: str, **fields) -> dict | None:
-    allowed = {"title", "video_path", "video_type", "prompt", "skill", "state"}
+    allowed = {"title", "video_path", "video_type", "prompt", "skill", "state", "sleep_seconds"}
     cols, params = [], []
     for k, v in fields.items():
         if k in allowed:

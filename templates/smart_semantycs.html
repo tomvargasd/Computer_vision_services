@@ -42,6 +42,11 @@
       <div class="ss-video-controls" id="video-controls" hidden>
         <button class="ss-btn ss-btn-ctr" id="btn-toggle" title="Play / Pause">▶ Play</button>
         <button class="ss-btn ss-btn-stop" id="btn-stop" title="Stop">■ Stop</button>
+        <div class="ss-sleep">
+          <span class="ss-sleep-label" title="Seconds to pause between frames">Sleep (s)</span>
+          <input class="ss-input ss-sleep-input" id="sleep-input" type="number" min="0" step="0.1" value="0" inputmode="decimal"/>
+          <button class="ss-btn ss-btn-ctr ss-sleep-btn" id="btn-sleep-set" title="Apply frame delay">Set</button>
+        </div>
       </div>
 
       <div class="ss-video-prompt" id="video-prompt" hidden></div>
